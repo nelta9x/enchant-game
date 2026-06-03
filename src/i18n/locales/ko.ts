@@ -11,7 +11,7 @@ export const ko = {
   'shop.buy': '구매',
   'shop.close': '닫기',
   'shop.owned': '보유',
-  'shop.notEnoughGold': '골드 부족',
+  'shop.insufficient': '재화 부족',
 
   // 비용 카드
   'cost.enhance': '강화비용',

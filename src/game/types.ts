@@ -66,5 +66,5 @@ export type EnhanceResult =
       fromLevel: number
       toLevel: null // 검 소멸
       consumed: ConsumedMaterials
-      drops: ItemStack[] // dropItemOnFail 있으면 [{ itemId, count: 1 }], 없으면 []
+      drops: ItemStack[] // dropOnFail 있으면 [{ ...dropOnFail }], 없으면 []
     }

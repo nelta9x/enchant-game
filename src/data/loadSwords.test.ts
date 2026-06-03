@@ -112,6 +112,38 @@ describe('parseSwords — 구조 검증', () => {
   })
 })
 
+describe('parseSwords — dropOnFail 구조 검증', () => {
+  it('유효한 dropOnFail(아이템 + 수량)을 파싱한다', () => {
+    const swords = parseSwords([
+      row({ dropOnFail: { itemId: 'unknown_iron_scrap', count: 10 } }),
+    ])
+    expect(swords[0].dropOnFail).toEqual({
+      itemId: 'unknown_iron_scrap',
+      count: 10,
+    })
+  })
+
+  it('dropOnFail 이 없으면 null 이다', () => {
+    expect(parseSwords([row()])[0].dropOnFail).toBeNull()
+  })
+
+  it('dropOnFail 이 객체가 아니면 throw (문자열 등)', () => {
+    expect(() => parseSwords([row({ dropOnFail: 'evil_soul' })])).toThrow()
+  })
+
+  it('dropOnFail itemId가 비었거나 count가 양의 정수가 아니면 throw', () => {
+    expect(() =>
+      parseSwords([row({ dropOnFail: { itemId: '', count: 1 } })]),
+    ).toThrow()
+    expect(() =>
+      parseSwords([row({ dropOnFail: { itemId: 'x', count: 0 } })]),
+    ).toThrow()
+    expect(() =>
+      parseSwords([row({ dropOnFail: { itemId: 'x', count: 1.5 } })]),
+    ).toThrow()
+  })
+})
+
 describe('parseSwords — 재료검 참조 무결성', () => {
   it('존재하는 검 단계를 재료로 참조하면 통과', () => {
     const swords = parseSwords([

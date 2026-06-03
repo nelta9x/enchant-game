@@ -44,10 +44,10 @@ export class DataManager {
     return this.shop
   }
 
-  // 특정 itemId의 상점 항목(없으면 undefined). 구매 검증/가격 조회에 사용.
-  getShopItem(itemId: string): ShopItem | undefined {
+  // 특정 항목 id(SKU)의 상점 항목(없으면 undefined). 구매 검증/가격 조회에 사용.
+  getShopItem(id: string): ShopItem | undefined {
     this.ensureLoaded()
-    return this.shop.find((s) => s.itemId === itemId)
+    return this.shop.find((s) => s.id === id)
   }
 }
 

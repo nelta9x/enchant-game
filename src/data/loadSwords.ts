@@ -1,6 +1,6 @@
 import swordsRaw from './sources/swords.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
-import type { Material, SwordData, SwordNote } from './types'
+import type { Drop, Material, SwordData, SwordNote } from './types'
 
 // 데이터 파일(swords.json)을 검증해 SwordData[]로 만드는 로더.
 //
@@ -25,32 +25,41 @@ function fail(msg: string): never {
   throw new Error(`Sword data validation failed: ${msg}`)
 }
 
+// Material(가격/비용) 검증 전용 실패 — 검 enhanceCost·상점 price 가 공유하므로 중립 접두사를 쓴다.
+function failMaterial(msg: string): never {
+  throw new Error(`Material validation failed: ${msg}`)
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
-function parseMaterial(raw: unknown, ctx: string): Material {
-  if (!isRecord(raw)) fail(`${ctx} enhanceCost is not an object`)
+// 임의 입력을 Material(gold / item / free)로 검증한다. ctx 는 에러 문맥 라벨.
+// 검 enhanceCost 와 상점 price 가 공유하는 언어 중립 가격 모델 파서다.
+export function parseMaterial(raw: unknown, ctx: string): Material {
+  if (!isRecord(raw)) failMaterial(`${ctx} material is not an object`)
   const kind = raw.kind
   if (kind === 'gold') {
     const amount = raw.amount
     if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0)
-      fail(`${ctx} gold amount must be positive (got ${String(amount)})`)
+      failMaterial(
+        `${ctx} gold amount must be positive (got ${String(amount)})`,
+      )
     return { kind: 'gold', amount }
   }
   if (kind === 'item') {
     const itemId = raw.itemId
     const count = raw.count
     if (typeof itemId !== 'string' || itemId.length === 0)
-      fail(`${ctx} item itemId is empty`)
+      failMaterial(`${ctx} item itemId is empty`)
     if (typeof count !== 'number' || !Number.isInteger(count) || count <= 0)
-      fail(
+      failMaterial(
         `${ctx} item count must be a positive integer (got ${String(count)})`,
       )
     return { kind: 'item', itemId, count }
   }
   if (kind === 'free') return { kind: 'free' }
-  fail(`${ctx} unknown enhanceCost kind: ${String(kind)}`)
+  failMaterial(`${ctx} unknown material kind: ${String(kind)}`)
 }
 
 function parseNotes(raw: unknown, ctx: string): SwordNote[] {
@@ -109,12 +118,19 @@ function parseSword(raw: unknown): ParsedSword {
     protectionTickets = p
   }
 
-  let dropItemOnFail: string | null = null
-  if (raw.dropItemOnFail !== null && raw.dropItemOnFail !== undefined) {
-    const d = raw.dropItemOnFail
-    if (typeof d !== 'string' || d.length === 0)
-      fail(`${ctx} dropItemOnFail must be a non-empty string or null`)
-    dropItemOnFail = d
+  let dropOnFail: Drop | null = null
+  if (raw.dropOnFail !== null && raw.dropOnFail !== undefined) {
+    const d = raw.dropOnFail
+    if (!isRecord(d)) fail(`${ctx} dropOnFail must be an object or null`)
+    const itemId = d.itemId
+    if (typeof itemId !== 'string' || itemId.length === 0)
+      fail(`${ctx} dropOnFail itemId must be a non-empty string`)
+    const count = d.count
+    if (typeof count !== 'number' || !Number.isInteger(count) || count <= 0)
+      fail(
+        `${ctx} dropOnFail count must be a positive integer (got ${String(count)})`,
+      )
+    dropOnFail = { itemId, count }
   }
 
   // 전용 스프라이트 파일명(선택). 없으면 null — parseSwords 에서 폴백을 채운다.
@@ -136,7 +152,7 @@ function parseSword(raw: unknown): ParsedSword {
     successRate,
     sellPrice,
     protectionTickets,
-    dropItemOnFail,
+    dropOnFail,
     notes: parseNotes(raw.notes, ctx),
     sprite,
   }

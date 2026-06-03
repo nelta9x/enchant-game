@@ -41,8 +41,8 @@ describe('gameStore — 강화 적용 (seam)', () => {
     expect(countOf(store.getState().items, 'sword_19')).toBe(1)
   })
 
-  it('파괴 후 인벤토리에 검이 없으면 낡은 단검(+0)으로 재시작 + dropItemOnFail 산출', () => {
-    // level 6: 골드 2000, dropItemOnFail = unknown_iron_scrap.
+  it('파괴 후 인벤토리에 검이 없으면 낡은 단검(+0)으로 재시작 + dropOnFail 산출', () => {
+    // level 6: 골드 2000, dropOnFail = unknown_iron_scrap ×1.
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 5000,
@@ -88,7 +88,7 @@ describe('gameStore — 강화 적용 (seam)', () => {
   })
 
   it('방지: 단계 유지 + 방지권 차감 + 드랍 없음', () => {
-    // level 14: 골드 100000, 방지권 소모 3, dropItemOnFail = evil_soul.
+    // level 14: 골드 100000, 방지권 소모 3, dropOnFail = unknown_iron_scrap ×10.
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 200000,
@@ -101,7 +101,7 @@ describe('gameStore — 강화 적용 (seam)', () => {
     expect(store.getState().gold).toBe(100000)
     expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(2)
     // 방지 시 드랍 없음.
-    expect(countOf(store.getState().items, 'evil_soul')).toBe(0)
+    expect(countOf(store.getState().items, 'unknown_iron_scrap')).toBe(0)
   })
 })
 
@@ -194,61 +194,76 @@ describe('gameStore — 판매', () => {
 })
 
 describe('gameStore — 상점 구매', () => {
-  // shop.json: protection_ticket 가격 100만.
-  it('구매: 골드 차감 + 인벤토리 적재', () => {
+  // shop.json: protection_ticket_gold(골드 100만), protection_ticket_scrap(철조각 10개)
+  it('골드 구매: 골드 차감 + 방지권 적재', () => {
     const store = createGameStore({ gold: 2_500_000 })
-    expect(store.getState().canBuy(PROTECTION_TICKET_ID)).toBe(true)
-    const spent = store.getState().buy(PROTECTION_TICKET_ID)
-    expect(spent).toBe(1_000_000)
+    expect(store.getState().canBuy('protection_ticket_gold')).toBe(true)
+    expect(store.getState().buy('protection_ticket_gold')).not.toBeNull()
     expect(store.getState().gold).toBe(1_500_000)
     expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(1)
   })
 
-  it('구매: 기존 스택에 합산된다', () => {
+  it('아이템 구매: 철조각 10개 차감 + 방지권 적재(골드 불변)', () => {
     const store = createGameStore({
-      gold: 2_000_000,
-      items: [{ itemId: PROTECTION_TICKET_ID, count: 2 }],
+      gold: 0,
+      items: [{ itemId: 'unknown_iron_scrap', count: 25 }],
     })
-    store.getState().buy(PROTECTION_TICKET_ID)
-    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(3)
-  })
-
-  it('수량 구매: 총액 = 가격 × qty', () => {
-    const store = createGameStore({ gold: 3_000_000 })
-    const spent = store.getState().buy(PROTECTION_TICKET_ID, 3)
-    expect(spent).toBe(3_000_000)
-    expect(store.getState().gold).toBe(0)
-    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(3)
-  })
-
-  it('골드가 가격과 정확히 같으면 구매 가능(경계) → 구매 후 0', () => {
-    const store = createGameStore({ gold: 1_000_000 })
-    expect(store.getState().canBuy(PROTECTION_TICKET_ID)).toBe(true)
-    expect(store.getState().buy(PROTECTION_TICKET_ID)).toBe(1_000_000)
+    expect(store.getState().canBuy('protection_ticket_scrap')).toBe(true)
+    expect(store.getState().buy('protection_ticket_scrap')).not.toBeNull()
+    expect(countOf(store.getState().items, 'unknown_iron_scrap')).toBe(15)
+    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(1)
     expect(store.getState().gold).toBe(0)
   })
 
-  it('골드가 부족하면 구매 불가 + buy는 null(상태 불변)', () => {
-    const store = createGameStore({ gold: 999_999, items: [] })
-    expect(store.getState().canBuy(PROTECTION_TICKET_ID)).toBe(false)
-    expect(store.getState().buy(PROTECTION_TICKET_ID)).toBeNull()
-    expect(store.getState().gold).toBe(999_999)
+  it('아이템 구매: 철조각이 정확히 가격과 같으면 구매 가능(경계) → 0', () => {
+    const store = createGameStore({
+      gold: 0,
+      items: [{ itemId: 'unknown_iron_scrap', count: 10 }],
+    })
+    expect(store.getState().canBuy('protection_ticket_scrap')).toBe(true)
+    store.getState().buy('protection_ticket_scrap')
+    expect(countOf(store.getState().items, 'unknown_iron_scrap')).toBe(0)
+    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(1)
+  })
+
+  it('아이템 부족이면 구매 불가 + buy는 null(상태 불변)', () => {
+    const store = createGameStore({
+      gold: 0,
+      items: [{ itemId: 'unknown_iron_scrap', count: 9 }],
+    })
+    expect(store.getState().canBuy('protection_ticket_scrap')).toBe(false)
+    expect(store.getState().buy('protection_ticket_scrap')).toBeNull()
+    expect(countOf(store.getState().items, 'unknown_iron_scrap')).toBe(9)
     expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(0)
   })
 
-  it('카탈로그에 없는 아이템은 구매 불가', () => {
+  it('수량 구매: 골드 가격 × qty 차감 + qty개 지급', () => {
+    const store = createGameStore({ gold: 3_000_000 })
+    expect(store.getState().buy('protection_ticket_gold', 3)).not.toBeNull()
+    expect(store.getState().gold).toBe(0)
+    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(3)
+  })
+
+  it('골드가 부족하면 구매 불가 + buy는 null(상태 불변)', () => {
+    const store = createGameStore({ gold: 999_999 })
+    expect(store.getState().canBuy('protection_ticket_gold')).toBe(false)
+    expect(store.getState().buy('protection_ticket_gold')).toBeNull()
+    expect(store.getState().gold).toBe(999_999)
+  })
+
+  it('존재하지 않는 상점 항목 id는 구매 불가', () => {
     const store = createGameStore({ gold: 10_000_000 })
-    expect(store.getState().canBuy('nonexistent_item')).toBe(false)
-    expect(store.getState().buy('nonexistent_item')).toBeNull()
+    expect(store.getState().canBuy('nonexistent')).toBe(false)
+    expect(store.getState().buy('nonexistent')).toBeNull()
     expect(store.getState().gold).toBe(10_000_000)
   })
 
   it('비정상 수량(0 · 음수 · 소수)은 구매 불가', () => {
     const store = createGameStore({ gold: 10_000_000 })
-    expect(store.getState().canBuy(PROTECTION_TICKET_ID, 0)).toBe(false)
-    expect(store.getState().canBuy(PROTECTION_TICKET_ID, -1)).toBe(false)
-    expect(store.getState().canBuy(PROTECTION_TICKET_ID, 1.5)).toBe(false)
-    expect(store.getState().buy(PROTECTION_TICKET_ID, 0)).toBeNull()
+    expect(store.getState().canBuy('protection_ticket_gold', 0)).toBe(false)
+    expect(store.getState().canBuy('protection_ticket_gold', -1)).toBe(false)
+    expect(store.getState().canBuy('protection_ticket_gold', 1.5)).toBe(false)
+    expect(store.getState().buy('protection_ticket_gold', 0)).toBeNull()
     expect(store.getState().gold).toBe(10_000_000)
   })
 })

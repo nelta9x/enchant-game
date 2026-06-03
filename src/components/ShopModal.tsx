@@ -1,7 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { dataManager } from '../data/DataManager'
-import type { ShopItem } from '../data/types'
+import type { Material, ShopItem } from '../data/types'
 import { useI18nStore, useT, type Lang, type TranslationKey } from '../i18n'
 import { formatGold } from '../lib/format'
 import { countOf, itemDisplayName, swordItemLevel } from '../lib/items'
@@ -118,11 +118,11 @@ export function ShopModal({ open, onClose }: ShopModalProps) {
             <ul className="max-h-[60vh] space-y-2 overflow-y-auto p-3">
               {shopItems.map((shopItem) => (
                 <ShopRow
-                  key={shopItem.itemId}
+                  key={shopItem.id}
                   shopItem={shopItem}
                   owned={countOf(items, shopItem.itemId)}
-                  affordable={canBuyFn(shopItem.itemId)}
-                  onBuy={() => buy(shopItem.itemId)}
+                  affordable={canBuyFn(shopItem.id)}
+                  onBuy={() => buy(shopItem.id)}
                   t={t}
                   lang={lang}
                 />
@@ -157,8 +157,7 @@ function ShopRow({
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-on-dark">{name}</div>
         <div className="mt-0.5 flex items-center gap-1 text-xs font-medium text-on-dark-soft">
-          <Coin variant="gold" className="h-3.5 w-3.5 shrink-0" />
-          <span className="tabular-nums">{formatGold(shopItem.price, lang)}</span>
+          <PriceTag price={shopItem.price} t={t} lang={lang} />
           <span className="mx-1 text-panel-edge">·</span>
           <span className="tabular-nums">
             {t('shop.owned')} {owned}
@@ -181,12 +180,40 @@ function ShopRow({
         {/* 비활성 사유를 가시 텍스트로 — hover 툴팁은 키보드/비활성 버튼에 닿지 않는다. */}
         {!affordable && (
           <span className="text-[10px] font-semibold text-danger">
-            {t('shop.notEnoughGold')}
+            {t('shop.insufficient')}
           </span>
         )}
       </div>
     </li>
   )
+}
+
+// 가격 표시 — 골드는 코인+금액, 아이템은 이름 ×수량, 무료는 '무료'.
+function PriceTag({
+  price,
+  t,
+  lang,
+}: {
+  price: Material
+  t: (key: TranslationKey) => string
+  lang: Lang
+}) {
+  if (price.kind === 'gold') {
+    return (
+      <>
+        <Coin variant="gold" className="h-3.5 w-3.5 shrink-0" />
+        <span className="tabular-nums">{formatGold(price.amount, lang)}</span>
+      </>
+    )
+  }
+  if (price.kind === 'item') {
+    return (
+      <span className="tabular-nums">
+        {itemDisplayName(price.itemId, t)} ×{price.count}
+      </span>
+    )
+  }
+  return <span>{t('cost.free')}</span>
 }
 
 // 상점 아이템 썸네일(자체 포함). 검 재료는 스프라이트, 방지권은 방패, 그 외(잡템 등)는

@@ -53,7 +53,7 @@
     "successRate": 0.9,
     "sellPrice": 3500,
     "protectionTickets": 1,
-    "dropItemOnFail": "unknown_iron_scrap",
+    "dropOnFail": { "itemId": "unknown_iron_scrap", "count": 1 },
     "sprite": "double_edged_sword.png"
   },
   {
@@ -62,7 +62,7 @@
     "successRate": 0.9,
     "sellPrice": 6100,
     "protectionTickets": 1,
-    "dropItemOnFail": "unknown_iron_scrap",
+    "dropOnFail": { "itemId": "unknown_iron_scrap", "count": 1 },
     "sprite": "judicators_greatsword.png"
   },
   {
@@ -71,7 +71,7 @@
     "successRate": 0.85,
     "sellPrice": 10000,
     "protectionTickets": 1,
-    "dropItemOnFail": "unknown_iron_scrap",
+    "dropOnFail": { "itemId": "unknown_iron_scrap", "count": 1 },
     "sprite": "arcane_sword.png"
   },
   {
@@ -80,7 +80,7 @@
     "successRate": 0.8,
     "sellPrice": 20000,
     "protectionTickets": 1,
-    "dropItemOnFail": "tau_bone_fragment",
+    "dropOnFail": { "itemId": "unknown_iron_scrap", "count": 2 },
     "sprite": "tau_sword.png"
   },
   {
@@ -89,7 +89,7 @@
     "successRate": 0.8,
     "sellPrice": 35100,
     "protectionTickets": 1,
-    "dropItemOnFail": "faded_fluorescent",
+    "dropOnFail": { "itemId": "faded_fluorescent", "count": 1 },
     "sprite": "fluorescent_sword.png"
   },
   {
@@ -98,7 +98,7 @@
     "successRate": 0.75,
     "sellPrice": 160000,
     "protectionTickets": 1,
-    "dropItemOnFail": "swiss_iron_scrap",
+    "dropOnFail": { "itemId": "unknown_iron_scrap", "count": 5 },
     "sprite": "bloodstained_sword.png"
   },
   {
@@ -107,7 +107,7 @@
     "successRate": 0.7,
     "sellPrice": 350000,
     "protectionTickets": 1,
-    "dropItemOnFail": "swiss_iron_scrap",
+    "dropOnFail": { "itemId": "unknown_iron_scrap", "count": 5 },
     "sprite": "flame_twin_swords.png"
   },
   {
@@ -116,7 +116,7 @@
     "successRate": 0.7,
     "sellPrice": 1000000,
     "protectionTickets": 2,
-    "dropItemOnFail": "flame_sword_handle",
+    "dropOnFail": { "itemId": "flame_sword_handle", "count": 1 },
     "sprite": "blazing_demon_blade.png"
   },
   {
@@ -125,7 +125,7 @@
     "successRate": 0.65,
     "sellPrice": 3000000,
     "protectionTickets": 3,
-    "dropItemOnFail": "evil_soul",
+    "dropOnFail": { "itemId": "unknown_iron_scrap", "count": 10 },
     "sprite": "apophis_the_demon_sword.png"
   },
   {
@@ -134,7 +134,7 @@
     "successRate": 0.6,
     "sellPrice": 7500000,
     "protectionTickets": 4,
-    "dropItemOnFail": "axe_dust",
+    "dropOnFail": { "itemId": "unknown_iron_scrap", "count": 15 },
     "sprite": "demon_battle_axe.png"
   },
   {
@@ -143,7 +143,7 @@
     "successRate": 0.6,
     "sellPrice": 14200000,
     "protectionTickets": 7,
-    "dropItemOnFail": "invisible_matter",
+    "dropOnFail": { "itemId": "unknown_iron_scrap", "count": 20 },
     "sprite": "invisible_sword.png"
   },
   {
@@ -207,7 +207,7 @@
   },
   {
     "level": 23,
-    "enhanceCost": { "kind": "item", "itemId": "evil_soul", "count": 8 },
+    "enhanceCost": { "kind": "item", "itemId": "unknown_iron_scrap", "count": 80 },
     "successRate": 0.4,
     "sellPrice": 230000000,
     "protectionTickets": 22,
@@ -227,7 +227,7 @@
   },
   {
     "level": 25,
-    "enhanceCost": { "kind": "item", "itemId": "axe_dust", "count": 15 },
+    "enhanceCost": { "kind": "item", "itemId": "unknown_iron_scrap", "count": 225 },
     "successRate": 0.35,
     "sellPrice": 400000000,
     "protectionTickets": 23,
@@ -244,7 +244,7 @@
   },
   {
     "level": 27,
-    "enhanceCost": { "kind": "item", "itemId": "invisible_matter", "count": 2 },
+    "enhanceCost": { "kind": "item", "itemId": "unknown_iron_scrap", "count": 40 },
     "successRate": 0.4,
     "sellPrice": 2500000000,
     "protectionTickets": "disabled",

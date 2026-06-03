@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { dataManager } from '../data/DataManager'
+import type { ShopItem } from '../data/types'
 import { Enhancer, type EnhanceInput } from '../game/enhancer'
 import type { EnhanceResult, ItemStack, PlayerState } from '../game/types'
-import { swordItemLevel } from '../lib/items'
+import { countOf, swordItemLevel } from '../lib/items'
 
 // 시작 자금 / 시작 검. 시작 자금은 사용자 지정값(100만). 시작 검 획득 방식 등 나머지
 // '게임 시작 설정'은 디자인 미확정이며, 밸런스 확정 시 이 값은 조정될 수 있다.
@@ -20,11 +21,12 @@ type GameActions = {
   // 현재 검 판매: 판매가만큼 골드를 받고 검을 비운다(currentSwordLevel = null).
   // 판매 불가(검 없음 / sellPrice null)면 null 반환(변화 없음). 반환값 = 받은 골드.
   sell: () => number | null
-  // 상점 구매 가능 여부(카탈로그 존재 + 골드 충분). UI 버튼 게이팅용.
-  canBuy: (itemId: string, qty?: number) => boolean
-  // 상점 구매: 카탈로그 가격 × qty 만큼 골드를 차감하고 itemId를 인벤토리에 적재한다.
-  // 불가(카탈로그 없음 / 골드 부족 / qty 비정상)면 null 반환(변화 없음). 반환값 = 소모한 골드.
-  buy: (itemId: string, qty?: number) => number | null
+  // 상점 구매 가능 여부(항목 존재 + 가격 충족). UI 버튼 게이팅용. shopId = 상점 항목 SKU.
+  canBuy: (shopId: string, qty?: number) => boolean
+  // 상점 구매(shopId = 상점 항목 SKU): 가격(골드/아이템) × qty 만큼 차감하고 지급 아이템을
+  // qty개 인벤토리에 적재한다. 불가(항목 없음 / 가격 부족 / qty 비정상)면 null(변화 없음).
+  // 반환값 = 구매한 상점 항목(ShopItem).
+  buy: (shopId: string, qty?: number) => ShopItem | null
 }
 
 export type GameState = PlayerState & GameActions
@@ -177,28 +179,47 @@ export function createGameStore(opts: CreateOpts = {}) {
         return price
       },
 
-      canBuy: (itemId, qty = 1) => {
+      canBuy: (shopId, qty = 1) => {
         if (!Number.isInteger(qty) || qty <= 0) return false
-        const shopItem = dataManager.getShopItem(itemId)
-        if (!shopItem) return false
-        return get().gold >= shopItem.price * qty
+        const entry = dataManager.getShopItem(shopId)
+        if (!entry) return false
+        const price = entry.price
+        if (price.kind === 'free') return true
+        if (price.kind === 'gold') return get().gold >= price.amount * qty
+        return countOf(get().items, price.itemId) >= price.count * qty
       },
 
-      buy: (itemId, qty = 1) => {
+      buy: (shopId, qty = 1) => {
         if (!Number.isInteger(qty) || qty <= 0) return null
-        const shopItem = dataManager.getShopItem(itemId)
-        if (!shopItem) return null
+        const entry = dataManager.getShopItem(shopId)
+        if (!entry) return null
 
-        const total = shopItem.price * qty
-        if (get().gold < total) return null
+        const price = entry.price
+        // 가격 충족 검사(골드 / 아이템). free 는 항상 통과.
+        if (price.kind === 'gold' && get().gold < price.amount * qty) return null
+        if (
+          price.kind === 'item' &&
+          countOf(get().items, price.itemId) < price.count * qty
+        )
+          return null
 
-        // 구매한 아이템은 itemId 그대로 인벤토리에 적재한다(스택 합산).
-        // (검 itemId를 파는 경우의 '장착' 처리는 검 상점 도입 시 별도로 다룬다.)
-        set((state) => ({
-          gold: state.gold - total,
-          items: addItems(state.items, [{ itemId, count: qty }]),
-        }))
-        return total
+        set((state) => {
+          const gold =
+            price.kind === 'gold' ? state.gold - price.amount * qty : state.gold
+          const paidItems =
+            price.kind === 'item'
+              ? subtractItems(state.items, [
+                  { itemId: price.itemId, count: price.count * qty },
+                ])
+              : state.items
+          // 구매한 아이템(지급 itemId)을 qty개 인벤토리에 적재(스택 합산).
+          // (검 itemId를 파는 경우의 '장착' 처리는 검 상점 도입 시 별도로 다룬다.)
+          return {
+            gold,
+            items: addItems(paidItems, [{ itemId: entry.itemId, count: qty }]),
+          }
+        })
+        return entry
       },
     }
   })

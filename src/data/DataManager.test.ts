@@ -31,11 +31,15 @@ describe('DataManager', () => {
     expect(() => dm.getShopItem('protection_ticket')).toThrow()
   })
 
-  it('load() 후 상점 항목을 조회할 수 있다', () => {
+  it('load() 후 상점 항목을 항목 id(SKU)로 조회할 수 있다', () => {
     const dm = new DataManager()
     dm.load()
     expect(dm.getShopItems().length).toBeGreaterThan(0)
-    expect(dm.getShopItem('protection_ticket')?.price).toBe(1_000_000)
+    expect(dm.getShopItem('protection_ticket_gold')?.itemId).toBe(
+      'protection_ticket',
+    )
+    // itemId는 항목 id가 아니므로 조회되지 않는다.
+    expect(dm.getShopItem('protection_ticket')).toBeUndefined()
     expect(dm.getShopItem('nonexistent')).toBeUndefined()
   })
 })
@@ -58,11 +62,13 @@ describe('검 데이터 ↔ i18n 무결성', () => {
 // loadShop 은 구조 검증만 하므로(데이터→뷰 결합 회피), 표시명 무결성은 이 시드 테스트가
 // 강제한다 — 미해석 itemId 는 런타임에 원문이 노출되어 원칙1(다국어)을 위반한다.
 describe('상점 데이터 ↔ i18n 무결성', () => {
-  it('모든 상점 itemId가 표시명으로 해석 가능하다', () => {
+  it('모든 상점 itemId(지급 + 아이템 가격)가 표시명으로 해석 가능하다', () => {
     // isDisplayableItemId 의 검 경로는 공유 DataManager 인스턴스를 참조하므로 적재한다.
     dataManager.load()
     for (const item of dataManager.getShopItems()) {
       expect(isDisplayableItemId(item.itemId)).toBe(true)
+      if (item.price.kind === 'item')
+        expect(isDisplayableItemId(item.price.itemId)).toBe(true)
     }
   })
 })

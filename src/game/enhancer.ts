@@ -104,9 +104,7 @@ export class Enhancer {
       }
     }
 
-    const drops: ItemStack[] = sword.dropItemOnFail
-      ? [{ itemId: sword.dropItemOnFail, count: 1 }]
-      : []
+    const drops: ItemStack[] = sword.dropOnFail ? [{ ...sword.dropOnFail }] : []
     return {
       outcome: 'destroyed',
       fromLevel,

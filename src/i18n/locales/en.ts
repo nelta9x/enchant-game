@@ -12,7 +12,7 @@ export const en: Record<TranslationKey, string> = {
   'shop.buy': 'Buy',
   'shop.close': 'Close',
   'shop.owned': 'Owned',
-  'shop.notEnoughGold': 'Not enough gold',
+  'shop.insufficient': 'Not enough',
 
   // 비용 카드
   'cost.enhance': 'Enhance Cost',

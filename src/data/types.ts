@@ -9,15 +9,21 @@ export type Material =
   | { kind: 'item'; itemId: string; count: number }
   | { kind: 'free' }
 
-// 상점 판매 항목(언어 중립). 표시명은 데이터에 박지 않고 itemId로 두어,
-// 표시 시점에 lib/items의 itemDisplayName(검 이름 키 / item.<id> 키)으로 해석한다.
-// 구매하면 itemId가 그대로 인벤토리(items)에 적재된다. 새 아이템은 이 카탈로그 항목과
-// (검이 아니면) lib/items의 표시명 매핑·번역을 함께 갖춰야 한다(무결성은 시드 테스트가 강제).
-//  - itemId: 판매 아이템 식별자(인벤토리 itemId 규약과 동일)
-//  - price: 1개 구매 가격(골드)
+// 강화 실패(파괴) 시 드랍되는 아이템 + 수량(언어 중립). null = 드랍 없음.
+// 구조는 인벤토리 한 칸(ItemStack)과 같지만 데이터 레이어 독립을 위해 별도로 둔다.
+export type Drop = { itemId: string; count: number }
+
+// 상점 판매 항목(언어 중립). 항목 식별자(id)는 지급 itemId와 분리한다 —
+// 같은 itemId를 서로 다른 가격(골드 / 아이템)으로 여러 항목에서 팔 수 있기 때문이다.
+// 표시명은 데이터에 박지 않고 itemId → lib/items의 itemDisplayName으로 해석한다.
+// 새 항목은 이 카탈로그 + (검이 아니면) lib/items 표시명 매핑·번역을 갖춰야 한다(무결성은 시드 테스트가 강제).
+//  - id: 상점 항목 식별자(SKU, 구매 대상 — dedup/조회 키)
+//  - itemId: 구매 시 인벤토리(items)에 지급되는 아이템 id
+//  - price: 1개당 가격 — Material(gold / item / free) 재사용
 export type ShopItem = {
+  id: string
   itemId: string
-  price: number
+  price: Material
 }
 
 // 검의 특수 플래그(언어 중립 태그). 표시가 필요하면 i18n에서 해석한다.
@@ -35,7 +41,7 @@ export type SwordData = {
   successRate: number | null // 0~1, null = 최종 단계
   sellPrice: number | null // null = 판매 불가
   protectionTickets: number | 'disabled' // 'disabled' = 방지권 사용 불가
-  dropItemOnFail: string | null // 실패 시 드랍되는 잡템 itemId, null = 없음
+  dropOnFail: Drop | null // 파괴 시 드랍되는 아이템 + 수량, null = 없음
   notes: SwordNote[]
   // 스프라이트 파일명(예: 'rusty_dagger.png'). 전용 스프라이트가 없는 단계는
   // 로더가 마지막(최고 단계) 보유 스프라이트로 채운다(임시). 디렉토리/URL은 뷰에서 해석.

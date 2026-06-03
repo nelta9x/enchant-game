@@ -22,7 +22,7 @@ function sword(over: Partial<SwordData> = {}): SwordData {
     successRate: 0.5,
     sellPrice: 1000,
     protectionTickets: 0,
-    dropItemOnFail: null,
+    dropOnFail: null,
     notes: [],
     sprite: 'placeholder.png',
     ...over,
@@ -109,10 +109,10 @@ describe('Enhancer — 재료 부족 (req 2)', () => {
 })
 
 describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
-  it('방지권 없이 실패하면 파괴되고 dropItemOnFail 이 drops 로 산출된다', () => {
+  it('방지권 없이 실패하면 파괴되고 dropOnFail 이 drops 로 산출된다', () => {
     const s = sword({
       successRate: 0.5,
-      dropItemOnFail: 'evil_soul',
+      dropOnFail: { itemId: 'evil_soul', count: 1 },
       protectionTickets: 3,
     })
     const r = new Enhancer(() => 0.9999).enhance({ sword: s, supply: RICH })
@@ -121,8 +121,18 @@ describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
     expect(r.drops).toEqual([{ itemId: 'evil_soul', count: 1 }])
   })
 
-  it('dropItemOnFail 이 없으면 파괴돼도 drops 가 비어 있다', () => {
-    const s = sword({ successRate: 0.5, dropItemOnFail: null })
+  it('dropOnFail 수량이 1보다 크면 그 수량만큼 drops 로 산출된다', () => {
+    const s = sword({
+      successRate: 0.5,
+      dropOnFail: { itemId: 'unknown_iron_scrap', count: 10 },
+    })
+    const r = new Enhancer(() => 0.9999).enhance({ sword: s, supply: RICH })
+    expect(r.outcome).toBe('destroyed')
+    expect(r.drops).toEqual([{ itemId: 'unknown_iron_scrap', count: 10 }])
+  })
+
+  it('dropOnFail 이 없으면 파괴돼도 drops 가 비어 있다', () => {
+    const s = sword({ successRate: 0.5, dropOnFail: null })
     const r = new Enhancer(() => 0.9999).enhance({ sword: s, supply: RICH })
     expect(r.outcome).toBe('destroyed')
     expect(r.drops).toEqual([])
@@ -133,7 +143,7 @@ describe('Enhancer — 파괴 방지권 (req 4)', () => {
   const protectable = sword({
     level: 14,
     successRate: 0.5,
-    dropItemOnFail: 'evil_soul',
+    dropOnFail: { itemId: 'evil_soul', count: 1 },
     protectionTickets: 3,
   })
   const withTickets: EnhanceInput['supply'] = {
