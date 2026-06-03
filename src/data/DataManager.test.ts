@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { DataManager } from './DataManager'
-import { SWORDS } from './sources/swords'
+import { loadSwords } from './loadSwords'
 import { ko } from '../i18n/locales/ko'
 
 describe('DataManager', () => {
@@ -10,11 +10,12 @@ describe('DataManager', () => {
     expect(() => dm.getSwordByLevel(0)).toThrow()
   })
 
-  it('load() 후 검 데이터를 조회할 수 있다', () => {
+  it('load() 후 전체 검 데이터를 조회할 수 있다', () => {
     const dm = new DataManager()
     dm.load()
-    expect(dm.getSwords()).toHaveLength(SWORDS.length)
+    expect(dm.getSwords()).toHaveLength(loadSwords().length)
     expect(dm.getSwordByLevel(0)?.level).toBe(0)
+    expect(dm.getSwordByLevel(29)?.level).toBe(29)
   })
 
   it('존재하지 않는 단계 조회 시 undefined를 반환한다', () => {

@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 import { dataManager } from '../data/DataManager'
+import { swordSpriteUrl } from '../lib/sprites'
 import { useT } from '../i18n'
 
 export function EnhanceStage() {
@@ -15,9 +16,18 @@ export function EnhanceStage() {
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className="flex aspect-square w-full max-w-[18rem] flex-col items-center justify-center gap-2 rounded-2xl border border-edge bg-surface"
       >
-        <span className="text-7xl" aria-hidden>
-          🗡️
-        </span>
+        {sword?.sprite ? (
+          <img
+            src={swordSpriteUrl(sword.sprite)}
+            alt={t(sword.nameKey)}
+            className="h-40 w-40 object-contain"
+            draggable={false}
+          />
+        ) : (
+          <span className="text-7xl" aria-hidden>
+            🗡️
+          </span>
+        )}
         <span className="text-sm text-muted">+{sword?.level ?? 0}</span>
         <span className="text-lg font-semibold text-fg">
           {sword ? t(sword.nameKey) : ''}

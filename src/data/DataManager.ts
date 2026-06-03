@@ -1,5 +1,5 @@
 import type { SwordData } from './types'
-import { SWORDS } from './sources/swords'
+import { loadSwords } from './loadSwords'
 
 // 중앙 데이터 관리자.
 // 게임이 켜질 때 load()로 데이터를 적재하고, 모든 게임 데이터는
@@ -8,10 +8,12 @@ export class DataManager {
   private swords: readonly SwordData[] = []
   private loaded = false
 
-  // 번들된 데이터 소스를 적재한다(동기).
-  // 외부 JSON/원격 로드가 필요해지면 이 메서드만 async로 전환하면 된다.
+  // 데이터 파일(sources/swords.json)을 검증·적재한다(동기).
+  // 데이터 소스는 코드 상수가 아니라 별도 데이터 파일이며, loadSwords()가
+  // 파일을 읽어 런타임 검증을 거친 SwordData[]로 만든다.
+  // 원격/비동기 로드가 필요해지면 이 메서드만 async로 전환하면 된다.
   load(): void {
-    this.swords = SWORDS
+    this.swords = loadSwords()
     this.loaded = true
   }
 

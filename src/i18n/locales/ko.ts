@@ -31,8 +31,37 @@ export const ko = {
   'panel.comingSoon': '🚧 준비 중 — 해당 스프린트에서 구현됩니다.',
 
   // 검 이름 (게임 데이터의 표시명 — DataManager의 nameKey가 이 키를 가리킨다)
+  // 보관필요/이지버그 등 특수 플래그는 이름이 아니라 SwordData.notes로 둔다.
   'sword.0.name': '낡은 단검',
   'sword.1.name': '쓸만한 단검',
+  'sword.2.name': '견고한 단검',
+  'sword.3.name': '바이킹 소드',
+  'sword.4.name': '불타는 검',
+  'sword.5.name': '냉기의 소드',
+  'sword.6.name': '양날 검',
+  'sword.7.name': '심판자의 대검',
+  'sword.8.name': '마력의 검',
+  'sword.9.name': '타우 스워드',
+  'sword.10.name': '형광검',
+  'sword.11.name': '피묻은 검',
+  'sword.12.name': '화염의 쌍검',
+  'sword.13.name': '불꽃 마검',
+  'sword.14.name': '마검 아포피스',
+  'sword.15.name': '데몬 배틀 엑스',
+  'sword.16.name': '투명 검',
+  'sword.17.name': '날렵한 용검',
+  'sword.18.name': '샤이니 소드',
+  'sword.19.name': '왕푸야샤',
+  'sword.20.name': '다색검',
+  'sword.21.name': '템페스트 골드',
+  'sword.22.name': '샤프 워커',
+  'sword.23.name': '피에로의 쌍검',
+  'sword.24.name': '도룡도',
+  'sword.25.name': '안 강해보이는 검',
+  'sword.26.name': '메두사',
+  'sword.27.name': '오딧세이 소드',
+  'sword.28.name': '모자이칼',
+  'sword.29.name': '화염에 달군 검',
 } as const
 
 // 모든 번역 키의 합집합 타입. 데이터·UI 양쪽에서 이 타입을 키로 사용한다.

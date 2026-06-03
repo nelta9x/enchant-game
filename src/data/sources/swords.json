@@ -1,0 +1,271 @@
+[
+  {
+    "level": 0,
+    "enhanceCost": { "kind": "gold", "amount": 300 },
+    "successRate": 1.0,
+    "sellPrice": null,
+    "protectionTickets": 0,
+    "sprite": "rusty_dagger.png"
+  },
+  {
+    "level": 1,
+    "enhanceCost": { "kind": "gold", "amount": 300 },
+    "successRate": 1.0,
+    "sellPrice": 150,
+    "protectionTickets": 0,
+    "sprite": "decent_dagger.png"
+  },
+  {
+    "level": 2,
+    "enhanceCost": { "kind": "gold", "amount": 500 },
+    "successRate": 1.0,
+    "sellPrice": 400,
+    "protectionTickets": 0,
+    "sprite": "sturdy_dagger.png"
+  },
+  {
+    "level": 3,
+    "enhanceCost": { "kind": "gold", "amount": 500 },
+    "successRate": 0.95,
+    "sellPrice": 600,
+    "protectionTickets": 0,
+    "sprite": "viking_sword.png"
+  },
+  {
+    "level": 4,
+    "enhanceCost": { "kind": "gold", "amount": 1000 },
+    "successRate": 0.95,
+    "sellPrice": 800,
+    "protectionTickets": 0,
+    "sprite": "burning_sword.png"
+  },
+  {
+    "level": 5,
+    "enhanceCost": { "kind": "gold", "amount": 1500 },
+    "successRate": 0.9,
+    "sellPrice": 1600,
+    "protectionTickets": 0,
+    "sprite": "frost_sword.png"
+  },
+  {
+    "level": 6,
+    "enhanceCost": { "kind": "gold", "amount": 2000 },
+    "successRate": 0.9,
+    "sellPrice": 3500,
+    "protectionTickets": 1,
+    "dropItemOnFail": "unknown_iron_scrap",
+    "sprite": "double_edged_sword.png"
+  },
+  {
+    "level": 7,
+    "enhanceCost": { "kind": "gold", "amount": 2000 },
+    "successRate": 0.9,
+    "sellPrice": 6100,
+    "protectionTickets": 1,
+    "dropItemOnFail": "unknown_iron_scrap",
+    "sprite": "judicators_greatsword.png"
+  },
+  {
+    "level": 8,
+    "enhanceCost": { "kind": "gold", "amount": 3000 },
+    "successRate": 0.85,
+    "sellPrice": 10000,
+    "protectionTickets": 1,
+    "dropItemOnFail": "unknown_iron_scrap",
+    "sprite": "arcane_sword.png"
+  },
+  {
+    "level": 9,
+    "enhanceCost": { "kind": "gold", "amount": 5000 },
+    "successRate": 0.8,
+    "sellPrice": 20000,
+    "protectionTickets": 1,
+    "dropItemOnFail": "tau_bone_fragment",
+    "sprite": "tau_sword.png"
+  },
+  {
+    "level": 10,
+    "enhanceCost": { "kind": "gold", "amount": 10900 },
+    "successRate": 0.8,
+    "sellPrice": 35100,
+    "protectionTickets": 1,
+    "dropItemOnFail": "faded_fluorescent",
+    "sprite": "fluorescent_sword.png"
+  },
+  {
+    "level": 11,
+    "enhanceCost": { "kind": "gold", "amount": 20000 },
+    "successRate": 0.75,
+    "sellPrice": 160000,
+    "protectionTickets": 1,
+    "dropItemOnFail": "swiss_iron_scrap",
+    "sprite": "bloodstained_sword.png"
+  },
+  {
+    "level": 12,
+    "enhanceCost": { "kind": "gold", "amount": 35000 },
+    "successRate": 0.7,
+    "sellPrice": 350000,
+    "protectionTickets": 1,
+    "dropItemOnFail": "swiss_iron_scrap",
+    "sprite": "flame_twin_swords.png"
+  },
+  {
+    "level": 13,
+    "enhanceCost": { "kind": "gold", "amount": 55000 },
+    "successRate": 0.7,
+    "sellPrice": 1000000,
+    "protectionTickets": 2,
+    "dropItemOnFail": "flame_sword_handle",
+    "sprite": "blazing_demon_blade.png"
+  },
+  {
+    "level": 14,
+    "enhanceCost": { "kind": "gold", "amount": 100000 },
+    "successRate": 0.65,
+    "sellPrice": 3000000,
+    "protectionTickets": 3,
+    "dropItemOnFail": "evil_soul",
+    "sprite": "apophis_the_demon_sword.png"
+  },
+  {
+    "level": 15,
+    "enhanceCost": { "kind": "gold", "amount": 180000 },
+    "successRate": 0.6,
+    "sellPrice": 7500000,
+    "protectionTickets": 4,
+    "dropItemOnFail": "axe_dust",
+    "sprite": "demon_battle_axe.png"
+  },
+  {
+    "level": 16,
+    "enhanceCost": { "kind": "gold", "amount": 300000 },
+    "successRate": 0.6,
+    "sellPrice": 14200000,
+    "protectionTickets": 7,
+    "dropItemOnFail": "invisible_matter",
+    "sprite": "invisible_sword.png"
+  },
+  {
+    "level": 17,
+    "enhanceCost": { "kind": "gold", "amount": 300000 },
+    "successRate": 0.55,
+    "sellPrice": 20000000,
+    "protectionTickets": 9,
+    "sprite": "swift_dragon_sword.png"
+  },
+  {
+    "level": 18,
+    "enhanceCost": { "kind": "gold", "amount": 500000 },
+    "successRate": 0.5,
+    "sellPrice": 30000000,
+    "protectionTickets": 10,
+    "sprite": "shiny_sword.png"
+  },
+  {
+    "level": 19,
+    "enhanceCost": { "kind": "gold", "amount": 800000 },
+    "successRate": 0.5,
+    "sellPrice": 47500000,
+    "protectionTickets": 12,
+    "notes": ["storable"],
+    "sprite": "wangpuyasha.png"
+  },
+  {
+    "level": 20,
+    "enhanceCost": { "kind": "gold", "amount": 1500000 },
+    "successRate": 0.45,
+    "sellPrice": 68300000,
+    "protectionTickets": 15,
+    "sprite": "prismatic_sword.png"
+  },
+  {
+    "level": 21,
+    "enhanceCost": {
+      "kind": "item",
+      "itemId": "sword_19_wangpuyasha",
+      "count": 1
+    },
+    "successRate": 0.4,
+    "sellPrice": 101000000,
+    "protectionTickets": 17,
+    "notes": ["storable"],
+    "sprite": "tempest_gold.png"
+  },
+  {
+    "level": 22,
+    "enhanceCost": {
+      "kind": "item",
+      "itemId": "sword_21_tempest_gold",
+      "count": 2
+    },
+    "successRate": 0.4,
+    "sellPrice": 160000000,
+    "protectionTickets": 20,
+    "notes": ["storable"],
+    "sprite": "sharp_walker.png"
+  },
+  {
+    "level": 23,
+    "enhanceCost": { "kind": "item", "itemId": "evil_soul", "count": 8 },
+    "successRate": 0.4,
+    "sellPrice": 230000000,
+    "protectionTickets": 22,
+    "sprite": "pierrots_twin_swords.png"
+  },
+  {
+    "level": 24,
+    "enhanceCost": {
+      "kind": "item",
+      "itemId": "sword_22_sharp_walker",
+      "count": 1
+    },
+    "successRate": 0.4,
+    "sellPrice": 300000000,
+    "protectionTickets": 23,
+    "sprite": "dragonslaying_saber.png"
+  },
+  {
+    "level": 25,
+    "enhanceCost": { "kind": "item", "itemId": "axe_dust", "count": 15 },
+    "successRate": 0.35,
+    "sellPrice": 400000000,
+    "protectionTickets": 23,
+    "sprite": "unimposing_sword.png"
+  },
+  {
+    "level": 26,
+    "enhanceCost": { "kind": "gold", "amount": 5000000 },
+    "successRate": 0.5,
+    "sellPrice": 1800000000,
+    "protectionTickets": "disabled",
+    "notes": ["easyBug"],
+    "sprite": "medusa.png"
+  },
+  {
+    "level": 27,
+    "enhanceCost": { "kind": "item", "itemId": "invisible_matter", "count": 2 },
+    "successRate": 0.4,
+    "sellPrice": 2500000000,
+    "protectionTickets": "disabled",
+    "notes": ["easyBug"],
+    "sprite": "odyssey_sword.png"
+  },
+  {
+    "level": 28,
+    "enhanceCost": { "kind": "free" },
+    "successRate": 0.15,
+    "sellPrice": null,
+    "protectionTickets": "disabled",
+    "notes": ["easyBug"],
+    "sprite": "mosaikal.png"
+  },
+  {
+    "level": 29,
+    "enhanceCost": null,
+    "successRate": null,
+    "sellPrice": null,
+    "protectionTickets": 0,
+    "sprite": "flame_tempered_sword.png"
+  }
+]
