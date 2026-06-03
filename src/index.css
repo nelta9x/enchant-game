@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+
+/* 게임 디자인 토큰 — Tailwind v4 CSS-first 테마.
+   여기 정의한 --color-* 는 bg-surface / text-gold 같은 유틸리티로 자동 생성된다. */
+@theme {
+  --color-bg: #0b0d12;
+  --color-surface: #151823;
+  --color-edge: #262b3a;
+  --color-muted: #8b90a3;
+  --color-fg: #e7e3ef;
+  --color-gold: #f5c451;
+  --color-accent: #a855f7;
+  --color-accent-soft: #c084fc;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100svh;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
