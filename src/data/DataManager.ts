@@ -20,7 +20,7 @@ export class DataManager {
   private ensureLoaded(): void {
     if (!this.loaded) {
       throw new Error(
-        'DataManager가 로드되지 않았습니다. 게임 시작 시 load()를 먼저 호출하세요.',
+        'DataManager is not loaded. Call load() at game startup first.',
       )
     }
   }

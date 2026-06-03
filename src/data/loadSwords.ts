@@ -22,7 +22,7 @@ const SWORD_MATERIAL_RE = /^sword_(\d+)$/
 type ParsedSword = Omit<SwordData, 'sprite'> & { sprite: string | null }
 
 function fail(msg: string): never {
-  throw new Error(`검 데이터 검증 실패: ${msg}`)
+  throw new Error(`Sword data validation failed: ${msg}`)
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -30,42 +30,44 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 function parseMaterial(raw: unknown, ctx: string): Material {
-  if (!isRecord(raw)) fail(`${ctx} enhanceCost가 객체가 아닙니다`)
+  if (!isRecord(raw)) fail(`${ctx} enhanceCost is not an object`)
   const kind = raw.kind
   if (kind === 'gold') {
     const amount = raw.amount
     if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0)
-      fail(`${ctx} gold amount는 양수여야 합니다 (got ${String(amount)})`)
+      fail(`${ctx} gold amount must be positive (got ${String(amount)})`)
     return { kind: 'gold', amount }
   }
   if (kind === 'item') {
     const itemId = raw.itemId
     const count = raw.count
     if (typeof itemId !== 'string' || itemId.length === 0)
-      fail(`${ctx} item itemId가 비어 있습니다`)
+      fail(`${ctx} item itemId is empty`)
     if (typeof count !== 'number' || !Number.isInteger(count) || count <= 0)
-      fail(`${ctx} item count는 양의 정수여야 합니다 (got ${String(count)})`)
+      fail(
+        `${ctx} item count must be a positive integer (got ${String(count)})`,
+      )
     return { kind: 'item', itemId, count }
   }
   if (kind === 'free') return { kind: 'free' }
-  fail(`${ctx} 알 수 없는 enhanceCost kind: ${String(kind)}`)
+  fail(`${ctx} unknown enhanceCost kind: ${String(kind)}`)
 }
 
 function parseNotes(raw: unknown, ctx: string): SwordNote[] {
   if (raw === undefined) return []
-  if (!Array.isArray(raw)) fail(`${ctx} notes는 배열이어야 합니다`)
+  if (!Array.isArray(raw)) fail(`${ctx} notes must be an array`)
   return raw.map((n) => {
     if (typeof n !== 'string' || !SWORD_NOTES.includes(n as SwordNote))
-      fail(`${ctx} 알 수 없는 note: ${String(n)}`)
+      fail(`${ctx} unknown note: ${String(n)}`)
     return n as SwordNote
   })
 }
 
 function parseSword(raw: unknown): ParsedSword {
-  if (!isRecord(raw)) fail('검 항목이 객체가 아닙니다')
+  if (!isRecord(raw)) fail('sword entry is not an object')
   const level = raw.level
   if (typeof level !== 'number' || !Number.isInteger(level) || level < 0)
-    fail(`level은 0 이상 정수여야 합니다 (got ${String(level)})`)
+    fail(`level must be a non-negative integer (got ${String(level)})`)
   const ctx = `[+${level}]`
 
   // enhanceCost / successRate 는 둘 다 null 이면 최종 단계(terminal)다.
@@ -74,7 +76,7 @@ function parseSword(raw: unknown): ParsedSword {
   const rateNull = raw.successRate === null
   if (costNull !== rateNull)
     fail(
-      `${ctx} enhanceCost와 successRate는 함께 null(최종 단계)이거나 함께 값이어야 합니다`,
+      `${ctx} enhanceCost and successRate must both be null (terminal) or both be set`,
     )
 
   const enhanceCost = costNull ? null : parseMaterial(raw.enhanceCost, ctx)
@@ -83,7 +85,7 @@ function parseSword(raw: unknown): ParsedSword {
   if (!rateNull) {
     const r = raw.successRate
     if (typeof r !== 'number' || !Number.isFinite(r) || r < 0 || r > 1)
-      fail(`${ctx} successRate는 0~1 범위여야 합니다 (got ${String(r)})`)
+      fail(`${ctx} successRate must be within 0~1 (got ${String(r)})`)
     successRate = r
   }
 
@@ -91,9 +93,7 @@ function parseSword(raw: unknown): ParsedSword {
   if (raw.sellPrice !== null && raw.sellPrice !== undefined) {
     const s = raw.sellPrice
     if (typeof s !== 'number' || !Number.isFinite(s) || s < 0)
-      fail(
-        `${ctx} sellPrice는 0 이상이거나 null이어야 합니다 (got ${String(s)})`,
-      )
+      fail(`${ctx} sellPrice must be >= 0 or null (got ${String(s)})`)
     sellPrice = s
   }
 
@@ -104,7 +104,7 @@ function parseSword(raw: unknown): ParsedSword {
     const p = raw.protectionTickets
     if (typeof p !== 'number' || !Number.isInteger(p) || p < 0)
       fail(
-        `${ctx} protectionTickets는 0 이상 정수 또는 'disabled'여야 합니다 (got ${String(p)})`,
+        `${ctx} protectionTickets must be a non-negative integer or 'disabled' (got ${String(p)})`,
       )
     protectionTickets = p
   }
@@ -113,9 +113,7 @@ function parseSword(raw: unknown): ParsedSword {
   if (raw.dropItemOnFail !== null && raw.dropItemOnFail !== undefined) {
     const d = raw.dropItemOnFail
     if (typeof d !== 'string' || d.length === 0)
-      fail(
-        `${ctx} dropItemOnFail는 비어 있지 않은 문자열 또는 null이어야 합니다`,
-      )
+      fail(`${ctx} dropItemOnFail must be a non-empty string or null`)
     dropItemOnFail = d
   }
 
@@ -123,7 +121,7 @@ function parseSword(raw: unknown): ParsedSword {
   let sprite: string | null = null
   if (raw.sprite !== null && raw.sprite !== undefined) {
     if (typeof raw.sprite !== 'string' || raw.sprite.length === 0)
-      fail(`${ctx} sprite는 비어 있지 않은 문자열이어야 합니다`)
+      fail(`${ctx} sprite must be a non-empty string`)
     sprite = raw.sprite
   }
 
@@ -156,12 +154,12 @@ function lastSprite(sorted: readonly ParsedSword[]): string {
 // 순수 검증기: 임의 입력(unknown)을 검증된 SwordData[]로 변환한다.
 // 단계 중복 검사 + 재료검 참조 무결성까지 확인하고, 단계 오름차순으로 정렬해 반환한다.
 export function parseSwords(raw: unknown): SwordData[] {
-  if (!Array.isArray(raw)) fail('검 데이터 루트는 배열이어야 합니다')
+  if (!Array.isArray(raw)) fail('sword data root must be an array')
   const parsed = raw.map(parseSword)
 
   const levels = new Set<number>()
   for (const s of parsed) {
-    if (levels.has(s.level)) fail(`중복된 단계: +${s.level}`)
+    if (levels.has(s.level)) fail(`duplicate stage: +${s.level}`)
     levels.add(s.level)
   }
 
@@ -172,7 +170,7 @@ export function parseSwords(raw: unknown): SwordData[] {
       const m = SWORD_MATERIAL_RE.exec(s.enhanceCost.itemId)
       if (m && !levels.has(Number(m[1])))
         fail(
-          `+${s.level} 강화 재료가 존재하지 않는 검 단계를 참조합니다: ${s.enhanceCost.itemId}`,
+          `+${s.level} enhance material references a non-existent sword stage: ${s.enhanceCost.itemId}`,
         )
     }
   }
@@ -191,7 +189,9 @@ export function assertNameKeysResolve(
 ): void {
   for (const s of swords) {
     if (!localeKeys.has(s.nameKey))
-      fail(`검 nameKey가 번역 리소스에 없습니다: ${s.nameKey} (+${s.level})`)
+      fail(
+        `sword nameKey is missing from translation resources: ${s.nameKey} (+${s.level})`,
+      )
   }
 }
 
