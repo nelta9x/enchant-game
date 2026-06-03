@@ -1,17 +1,27 @@
 import { AnimatePresence, motion } from 'motion/react'
 import type { PanelTab } from '../store/uiStore'
 import { useUiStore } from '../store/uiStore'
+import { useT, type TranslationKey } from '../i18n'
 
-const TABS: { id: PanelTab; label: string; hint: string }[] = [
-  { id: 'shop', label: '상점', hint: '검 · 워프권 · 방지권 구매' },
-  { id: 'forge', label: '조합소', hint: '잡템 → 방지권 / 검 교환' },
-  { id: 'inventory', label: '인벤토리', hint: '보유 검 · 잡템 · 방지권' },
+const TABS: {
+  id: PanelTab
+  labelKey: TranslationKey
+  hintKey: TranslationKey
+}[] = [
+  { id: 'shop', labelKey: 'panel.shop', hintKey: 'panel.shop.hint' },
+  { id: 'forge', labelKey: 'panel.forge', hintKey: 'panel.forge.hint' },
+  {
+    id: 'inventory',
+    labelKey: 'panel.inventory',
+    hintKey: 'panel.inventory.hint',
+  },
 ]
 
 export function PanelTabs() {
+  const t = useT()
   const activeTab = useUiStore((s) => s.activeTab)
   const setActiveTab = useUiStore((s) => s.setActiveTab)
-  const active = TABS.find((t) => t.id === activeTab) ?? TABS[0]
+  const active = TABS.find((tab) => tab.id === activeTab) ?? TABS[0]
 
   return (
     <section className="overflow-hidden rounded-xl border border-edge bg-surface">
@@ -27,7 +37,7 @@ export function PanelTabs() {
                 : 'text-muted hover:text-fg'
             }`}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -41,11 +51,9 @@ export function PanelTabs() {
           transition={{ duration: 0.15 }}
           className="px-5 py-6 text-center"
         >
-          <p className="text-sm font-semibold text-fg">{active.label}</p>
-          <p className="mt-1 text-xs text-muted">{active.hint}</p>
-          <p className="mt-4 text-xs text-muted">
-            🚧 준비 중 — 해당 스프린트에서 구현됩니다.
-          </p>
+          <p className="text-sm font-semibold text-fg">{t(active.labelKey)}</p>
+          <p className="mt-1 text-xs text-muted">{t(active.hintKey)}</p>
+          <p className="mt-4 text-xs text-muted">{t('panel.comingSoon')}</p>
         </motion.div>
       </AnimatePresence>
     </section>

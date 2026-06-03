@@ -9,6 +9,8 @@ NBS 〈검 강화하기〉를 웹으로 클론한 확률 강화 게임.
 - **Tailwind CSS v4** (`@tailwindcss/vite`, CSS-first 테마)
 - **Zustand** — 상태 관리
 - **Motion** — 애니메이션 (`motion/react`)
+- **경량 i18n** — 타입드 리소스 + `useT` 훅 (ko / en)
+- **Vitest** — 로직 테스트
 - **LocalStorage** — 로컬 세이브 (서버 없음, 로컬 전용)
 
 ## 개발
@@ -20,17 +22,31 @@ npm run build      # 프로덕션 빌드 (tsc + vite)
 npm run preview    # 빌드 결과 미리보기
 npm run lint       # ESLint
 npm run format     # Prettier 포맷 적용
+npm test           # vitest 테스트
 ```
+
+## 아키텍처 원칙
+
+- **상수 하드코딩 금지 + 다국어** — UI 문자열·게임 텍스트는 i18n 키로 관리 (`src/i18n`)
+- **중앙 데이터 관리** — 게임 시작 시 `DataManager`에 데이터 적재, 게임 데이터는 전부 매니저 경유 (`src/data`)
+- **뷰/로직 분리** — 로직은 테스트 가능하게 분리, 유의미한 로직만 테스트
 
 ## 디렉토리
 
 ```
 src/
   App.tsx              # 레이아웃 조립 (HUD · 강화 무대 · 패널)
-  components/
-    TopBar.tsx         # HUD — 골드 / 단계 / 방지권 / 난이도
-    EnhanceStage.tsx   # 검 표시 + 강화 / 판매 버튼
-    PanelTabs.tsx      # 상점 / 조합소 / 인벤토리 탭
+  components/          # 뷰
+    TopBar.tsx         #   HUD — 골드 / 단계 / 방지권 / 난이도 / 언어
+    EnhanceStage.tsx   #   검 표시 + 강화 / 판매 버튼
+    PanelTabs.tsx      #   상점 / 조합소 / 인벤토리 탭
+  data/                # 데이터 레이어 (단일 출처)
+    DataManager.ts     #   중앙 데이터 관리자 (시작 시 load)
+    types.ts           #   언어 중립 데이터 타입 (SwordData 등)
+    sources/swords.ts  #   검 데이터 소스 (골격 placeholder)
+  i18n/                # 다국어
+    index.ts           #   언어 store + useT 훅
+    locales/{ko,en}.ts #   번역 리소스 (ko = 키의 단일 출처)
   store/
     uiStore.ts         # Zustand UI 상태 (난이도 · 활성 탭)
 ```
@@ -41,6 +57,7 @@ src/
 
 - [x] 프로젝트 셋업 (Vite · React · TS · Tailwind v4 · Zustand · Motion · ESLint · Prettier)
 - [x] 베이스 레이아웃 골격
+- [x] 아키텍처 토대 (i18n · DataManager · 뷰/로직 분리 · vitest)
 - [ ] 데이터 시트 → 코드 상수화
 - [ ] 밸런스 미확정 항목 확정 / 경제 시뮬레이션
 

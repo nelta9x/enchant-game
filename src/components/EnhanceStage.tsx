@@ -1,9 +1,12 @@
 import { motion } from 'motion/react'
-
-// 스프린트 1 표시용 placeholder 검. 스프린트 2에서 데이터 시트 기반 실제 검으로 대체.
-const PLACEHOLDER_SWORD = { level: 0, name: '낡은 단검' }
+import { dataManager } from '../data/DataManager'
+import { useT } from '../i18n'
 
 export function EnhanceStage() {
+  const t = useT()
+  // 골격: 시작 검 = +0. 스프린트 2에서 게임 진행 상태의 현재 검으로 대체.
+  const sword = dataManager.getSwordByLevel(0)
+
   return (
     <section className="flex w-full max-w-sm flex-col items-center gap-6">
       <motion.div
@@ -15,9 +18,9 @@ export function EnhanceStage() {
         <span className="text-7xl" aria-hidden>
           🗡️
         </span>
-        <span className="text-sm text-muted">+{PLACEHOLDER_SWORD.level}</span>
+        <span className="text-sm text-muted">+{sword?.level ?? 0}</span>
         <span className="text-lg font-semibold text-fg">
-          {PLACEHOLDER_SWORD.name}
+          {sword ? t(sword.nameKey) : ''}
         </span>
       </motion.div>
 
@@ -27,20 +30,18 @@ export function EnhanceStage() {
           disabled
           className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white opacity-50"
         >
-          강화
+          {t('enhance.enhance')}
         </button>
         <button
           type="button"
           disabled
           className="flex-1 rounded-xl border border-edge px-4 py-3 text-sm font-semibold text-fg opacity-50"
         >
-          판매
+          {t('enhance.sell')}
         </button>
       </div>
 
-      <p className="text-xs text-muted">
-        ⚙️ 강화·판매 로직은 스프린트 2에서 구현됩니다.
-      </p>
+      <p className="text-xs text-muted">{t('enhance.notice')}</p>
     </section>
   )
 }
