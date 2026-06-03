@@ -45,6 +45,8 @@ src/
     loadSwords.ts      #   검 데이터 검증 로더 (JSON 파싱·검증, 스프라이트 폴백)
     types.ts           #   언어 중립 데이터 타입 (SwordData · Material 등)
     sources/swords.json#   검 데이터 파일 (+0~+29, 코드가 아닌 데이터로 분리)
+  game/                # 도메인 모델 / 로직 (뷰·상태와 분리, 테스트 대상)
+    types.ts           #   Sword · PlayerState · EnhanceResult (강화 루프 모델)
   i18n/                # 다국어
     index.ts           #   언어 store + useT 훅
     locales/{ko,en}.ts #   번역 리소스 (ko = 키의 단일 출처)

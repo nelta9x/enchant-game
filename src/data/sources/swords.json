@@ -183,7 +183,7 @@
     "level": 21,
     "enhanceCost": {
       "kind": "item",
-      "itemId": "sword_19_wangpuyasha",
+      "itemId": "sword_19",
       "count": 1
     },
     "successRate": 0.4,
@@ -196,7 +196,7 @@
     "level": 22,
     "enhanceCost": {
       "kind": "item",
-      "itemId": "sword_21_tempest_gold",
+      "itemId": "sword_21",
       "count": 2
     },
     "successRate": 0.4,
@@ -217,7 +217,7 @@
     "level": 24,
     "enhanceCost": {
       "kind": "item",
-      "itemId": "sword_22_sharp_walker",
+      "itemId": "sword_22",
       "count": 1
     },
     "successRate": 0.4,

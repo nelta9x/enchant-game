@@ -14,8 +14,9 @@ import type { Material, SwordData, SwordNote } from './types'
 
 const SWORD_NOTES: readonly SwordNote[] = ['storable', 'easyBug']
 
-// itemId 가 재료로 쓰이는 '검'을 가리키는 경우의 패턴: sword_<level>_<slug>
-const SWORD_MATERIAL_RE = /^sword_(\d+)_/
+// itemId 가 재료로 쓰이는 '검'을 가리키는 경우의 패턴: sword_<level>
+// (검 itemId 규약은 단계만으로 식별 — 게임 도메인의 items 인벤토리와 동일한 itemId)
+const SWORD_MATERIAL_RE = /^sword_(\d+)$/
 
 // 스프라이트 폴백 적용 전의 중간 표현(sprite 가 아직 null 일 수 있음).
 type ParsedSword = Omit<SwordData, 'sprite'> & { sprite: string | null }
@@ -164,7 +165,7 @@ export function parseSwords(raw: unknown): SwordData[] {
     levels.add(s.level)
   }
 
-  // 재료검 참조 무결성: itemId 가 sword_<level>_* 형태면 그 단계 검이 존재해야 한다.
+  // 재료검 참조 무결성: itemId 가 sword_<level> 형태면 그 단계 검이 존재해야 한다.
   // (잡템 itemId 는 아이템 카탈로그가 생기는 스프린트에서 검증한다.)
   for (const s of parsed) {
     if (s.enhanceCost?.kind === 'item') {

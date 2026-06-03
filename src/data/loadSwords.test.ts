@@ -118,7 +118,7 @@ describe('parseSwords — 재료검 참조 무결성', () => {
       row({ level: 19 }),
       row({
         level: 21,
-        enhanceCost: { kind: 'item', itemId: 'sword_19_wangpuyasha', count: 1 },
+        enhanceCost: { kind: 'item', itemId: 'sword_19', count: 1 },
         successRate: 0.4,
         sellPrice: 1,
       }),
@@ -132,7 +132,7 @@ describe('parseSwords — 재료검 참조 무결성', () => {
         row({ level: 0 }),
         row({
           level: 21,
-          enhanceCost: { kind: 'item', itemId: 'sword_99_ghost', count: 1 },
+          enhanceCost: { kind: 'item', itemId: 'sword_99', count: 1 },
           successRate: 0.4,
           sellPrice: 1,
         }),
