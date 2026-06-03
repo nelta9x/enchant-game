@@ -192,3 +192,63 @@ describe('gameStore — 판매', () => {
     expect(store.getState().sell()).toBeNull()
   })
 })
+
+describe('gameStore — 상점 구매', () => {
+  // shop.json: protection_ticket 가격 100만.
+  it('구매: 골드 차감 + 인벤토리 적재', () => {
+    const store = createGameStore({ gold: 2_500_000 })
+    expect(store.getState().canBuy(PROTECTION_TICKET_ID)).toBe(true)
+    const spent = store.getState().buy(PROTECTION_TICKET_ID)
+    expect(spent).toBe(1_000_000)
+    expect(store.getState().gold).toBe(1_500_000)
+    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(1)
+  })
+
+  it('구매: 기존 스택에 합산된다', () => {
+    const store = createGameStore({
+      gold: 2_000_000,
+      items: [{ itemId: PROTECTION_TICKET_ID, count: 2 }],
+    })
+    store.getState().buy(PROTECTION_TICKET_ID)
+    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(3)
+  })
+
+  it('수량 구매: 총액 = 가격 × qty', () => {
+    const store = createGameStore({ gold: 3_000_000 })
+    const spent = store.getState().buy(PROTECTION_TICKET_ID, 3)
+    expect(spent).toBe(3_000_000)
+    expect(store.getState().gold).toBe(0)
+    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(3)
+  })
+
+  it('골드가 가격과 정확히 같으면 구매 가능(경계) → 구매 후 0', () => {
+    const store = createGameStore({ gold: 1_000_000 })
+    expect(store.getState().canBuy(PROTECTION_TICKET_ID)).toBe(true)
+    expect(store.getState().buy(PROTECTION_TICKET_ID)).toBe(1_000_000)
+    expect(store.getState().gold).toBe(0)
+  })
+
+  it('골드가 부족하면 구매 불가 + buy는 null(상태 불변)', () => {
+    const store = createGameStore({ gold: 999_999, items: [] })
+    expect(store.getState().canBuy(PROTECTION_TICKET_ID)).toBe(false)
+    expect(store.getState().buy(PROTECTION_TICKET_ID)).toBeNull()
+    expect(store.getState().gold).toBe(999_999)
+    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(0)
+  })
+
+  it('카탈로그에 없는 아이템은 구매 불가', () => {
+    const store = createGameStore({ gold: 10_000_000 })
+    expect(store.getState().canBuy('nonexistent_item')).toBe(false)
+    expect(store.getState().buy('nonexistent_item')).toBeNull()
+    expect(store.getState().gold).toBe(10_000_000)
+  })
+
+  it('비정상 수량(0 · 음수 · 소수)은 구매 불가', () => {
+    const store = createGameStore({ gold: 10_000_000 })
+    expect(store.getState().canBuy(PROTECTION_TICKET_ID, 0)).toBe(false)
+    expect(store.getState().canBuy(PROTECTION_TICKET_ID, -1)).toBe(false)
+    expect(store.getState().canBuy(PROTECTION_TICKET_ID, 1.5)).toBe(false)
+    expect(store.getState().buy(PROTECTION_TICKET_ID, 0)).toBeNull()
+    expect(store.getState().gold).toBe(10_000_000)
+  })
+})

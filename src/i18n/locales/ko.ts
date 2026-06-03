@@ -5,9 +5,13 @@ export const ko = {
   // 앱 공통
   'app.title': '검 강화하기',
 
-  // 상점(다음 스프린트에서 구현 — 현재는 버튼만)
+  // 상점
   'shop.open': '상점',
-  'shop.todo': '상점은 다음 업데이트에 추가됩니다',
+  'shop.title': '상점',
+  'shop.buy': '구매',
+  'shop.close': '닫기',
+  'shop.owned': '보유',
+  'shop.notEnoughGold': '골드 부족',
 
   // 비용 카드
   'cost.enhance': '강화비용',

@@ -9,6 +9,17 @@ export type Material =
   | { kind: 'item'; itemId: string; count: number }
   | { kind: 'free' }
 
+// 상점 판매 항목(언어 중립). 표시명은 데이터에 박지 않고 itemId로 두어,
+// 표시 시점에 lib/items의 itemDisplayName(검 이름 키 / item.<id> 키)으로 해석한다.
+// 구매하면 itemId가 그대로 인벤토리(items)에 적재된다. 새 아이템은 이 카탈로그 항목과
+// (검이 아니면) lib/items의 표시명 매핑·번역을 함께 갖춰야 한다(무결성은 시드 테스트가 강제).
+//  - itemId: 판매 아이템 식별자(인벤토리 itemId 규약과 동일)
+//  - price: 1개 구매 가격(골드)
+export type ShopItem = {
+  itemId: string
+  price: number
+}
+
 // 검의 특수 플래그(언어 중립 태그). 표시가 필요하면 i18n에서 해석한다.
 //  - storable(보관필요): 고단계 강화 재료로도 쓰일 수 있는 검
 //  - easyBug(이지버그): Easy 모드 버그성 특수 단계

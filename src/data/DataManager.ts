@@ -1,19 +1,22 @@
-import type { SwordData } from './types'
+import type { ShopItem, SwordData } from './types'
 import { loadSwords } from './loadSwords'
+import { loadShop } from './loadShop'
 
 // 중앙 데이터 관리자.
 // 게임이 켜질 때 load()로 데이터를 적재하고, 모든 게임 데이터는
 // 이 매니저를 통해서만 접근한다(데이터의 단일 출처).
 export class DataManager {
   private swords: readonly SwordData[] = []
+  private shop: readonly ShopItem[] = []
   private loaded = false
 
-  // 데이터 파일(sources/swords.json)을 검증·적재한다(동기).
-  // 데이터 소스는 코드 상수가 아니라 별도 데이터 파일이며, loadSwords()가
-  // 파일을 읽어 런타임 검증을 거친 SwordData[]로 만든다.
+  // 데이터 파일(sources/*.json)을 검증·적재한다(동기).
+  // 데이터 소스는 코드 상수가 아니라 별도 데이터 파일이며, loadSwords()/loadShop()이
+  // 파일을 읽어 런타임 검증을 거친 도메인 타입으로 만든다.
   // 원격/비동기 로드가 필요해지면 이 메서드만 async로 전환하면 된다.
   load(): void {
     this.swords = loadSwords()
+    this.shop = loadShop()
     this.loaded = true
   }
 
@@ -33,6 +36,18 @@ export class DataManager {
   getSwordByLevel(level: number): SwordData | undefined {
     this.ensureLoaded()
     return this.swords.find((s) => s.level === level)
+  }
+
+  // 상점 판매 목록(데이터 순서 유지). 상점 UI가 그대로 순회해 렌더한다.
+  getShopItems(): readonly ShopItem[] {
+    this.ensureLoaded()
+    return this.shop
+  }
+
+  // 특정 itemId의 상점 항목(없으면 undefined). 구매 검증/가격 조회에 사용.
+  getShopItem(itemId: string): ShopItem | undefined {
+    this.ensureLoaded()
+    return this.shop.find((s) => s.itemId === itemId)
   }
 }
 

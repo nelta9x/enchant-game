@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { dataManager } from '../data/DataManager'
 import { PROTECTION_TICKET_ID } from '../game/enhancer'
 import { countOf } from '../lib/items'
@@ -10,6 +10,7 @@ import { GoldDisplay } from './GoldDisplay'
 import { InventoryPanel } from './InventoryPanel'
 import { ResultToast, type EnhanceFeedback } from './ResultToast'
 import { SellButton } from './SellButton'
+import { ShopModal } from './ShopModal'
 import { SwordStage } from './SwordStage'
 import { TopControls } from './TopControls'
 
@@ -44,6 +45,11 @@ export function GameScreen() {
   const canEnhance = canEnhanceFn(effectiveProtection)
   const canSell = canSellFn()
 
+  // 상점 팝업 열림 상태.
+  const [shopOpen, setShopOpen] = useState(false)
+  const openShop = useCallback(() => setShopOpen(true), [])
+  const closeShop = useCallback(() => setShopOpen(false), [])
+
   // 강화 결과 피드백(자동 소멸).
   const [feedback, setFeedback] = useState<EnhanceFeedback | null>(null)
   const nextId = useRef(0)
@@ -64,7 +70,7 @@ export function GameScreen() {
   return (
     <div className="flex min-h-svh items-center justify-center overflow-auto bg-bezel p-3 sm:p-6">
       <div className="relative w-full max-w-5xl rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5">
-        <TopControls />
+        <TopControls onOpenShop={openShop} />
 
         {/* 모바일(<sm)은 단일 컬럼으로 스택 — 좁은 화면에서 고정폭 검 스테이지가
             좁은 트랙에 눌려 좌우 패널과 겹치는 것을 방지(반응형 폴리시는 스프린트 6). */}
@@ -121,6 +127,9 @@ export function GameScreen() {
           </div>
         </div>
       </div>
+
+      {/* 상점 팝업 (전체 화면 오버레이 — 열렸을 때만 렌더) */}
+      <ShopModal open={shopOpen} onClose={closeShop} />
     </div>
   )
 }

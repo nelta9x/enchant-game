@@ -8,7 +8,11 @@ export const en: Record<TranslationKey, string> = {
 
   // 상점
   'shop.open': 'Shop',
-  'shop.todo': 'The shop arrives in a future update',
+  'shop.title': 'Shop',
+  'shop.buy': 'Buy',
+  'shop.close': 'Close',
+  'shop.owned': 'Owned',
+  'shop.notEnoughGold': 'Not enough gold',
 
   // 비용 카드
   'cost.enhance': 'Enhance Cost',

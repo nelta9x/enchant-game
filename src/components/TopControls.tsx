@@ -1,7 +1,9 @@
 import { LANGS, useI18nStore, useT } from '../i18n'
 
-// 상단 컨트롤. 좌: 언어 토글, 우: 상점(다음 스프린트 — 비활성 스텁).
-export function TopControls() {
+// 상단 컨트롤. 좌: 언어 토글, 우: 상점(클릭 시 상점 팝업 열기).
+type TopControlsProps = { onOpenShop: () => void }
+
+export function TopControls({ onOpenShop }: TopControlsProps) {
   const t = useT()
   return (
     <div className="flex items-center justify-between gap-2">
@@ -9,9 +11,9 @@ export function TopControls() {
 
       <button
         type="button"
-        disabled
-        title={t('shop.todo')}
-        className="flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-panel-edge bg-panel px-3 py-1.5 text-sm font-semibold text-on-dark opacity-60"
+        onClick={onOpenShop}
+        aria-haspopup="dialog"
+        className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-frame/50 bg-panel px-3 py-1.5 text-sm font-semibold text-on-dark transition-opacity hover:opacity-90"
       >
         <ShopIcon />
         {t('shop.open')}

@@ -45,3 +45,13 @@ export function swordItemLevel(itemId: string): number | null {
   const m = SWORD_ITEM_RE.exec(itemId)
   return m ? Number(m[1]) : null
 }
+
+// itemId가 표시명으로 해석 가능한지 — 존재하는 검 단계(sword_<level>)이거나
+// 알려진 아이템 키(ITEM_NAME_KEYS)면 true. false면 itemDisplayName이 원문 itemId를
+// 그대로 반환(미번역)한다. itemDisplayName과 동일한 해석 경로를 따르며,
+// 상점 등 카탈로그 itemId의 데이터↔i18n 무결성 검증(시드 테스트)에 사용한다.
+export function isDisplayableItemId(itemId: string): boolean {
+  const lvl = swordItemLevel(itemId)
+  if (lvl !== null) return dataManager.getSwordByLevel(lvl) !== undefined
+  return itemId in ITEM_NAME_KEYS
+}

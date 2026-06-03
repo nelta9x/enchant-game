@@ -20,6 +20,11 @@ type GameActions = {
   // 현재 검 판매: 판매가만큼 골드를 받고 검을 비운다(currentSwordLevel = null).
   // 판매 불가(검 없음 / sellPrice null)면 null 반환(변화 없음). 반환값 = 받은 골드.
   sell: () => number | null
+  // 상점 구매 가능 여부(카탈로그 존재 + 골드 충분). UI 버튼 게이팅용.
+  canBuy: (itemId: string, qty?: number) => boolean
+  // 상점 구매: 카탈로그 가격 × qty 만큼 골드를 차감하고 itemId를 인벤토리에 적재한다.
+  // 불가(카탈로그 없음 / 골드 부족 / qty 비정상)면 null 반환(변화 없음). 반환값 = 소모한 골드.
+  buy: (itemId: string, qty?: number) => number | null
 }
 
 export type GameState = PlayerState & GameActions
@@ -170,6 +175,30 @@ export function createGameStore(opts: CreateOpts = {}) {
           }
         })
         return price
+      },
+
+      canBuy: (itemId, qty = 1) => {
+        if (!Number.isInteger(qty) || qty <= 0) return false
+        const shopItem = dataManager.getShopItem(itemId)
+        if (!shopItem) return false
+        return get().gold >= shopItem.price * qty
+      },
+
+      buy: (itemId, qty = 1) => {
+        if (!Number.isInteger(qty) || qty <= 0) return null
+        const shopItem = dataManager.getShopItem(itemId)
+        if (!shopItem) return null
+
+        const total = shopItem.price * qty
+        if (get().gold < total) return null
+
+        // 구매한 아이템은 itemId 그대로 인벤토리에 적재한다(스택 합산).
+        // (검 itemId를 파는 경우의 '장착' 처리는 검 상점 도입 시 별도로 다룬다.)
+        set((state) => ({
+          gold: state.gold - total,
+          items: addItems(state.items, [{ itemId, count: qty }]),
+        }))
+        return total
       },
     }
   })
