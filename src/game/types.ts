@@ -1,4 +1,4 @@
-import type { Material, SwordData } from '../data/types'
+import type { SwordData } from '../data/types'
 
 // 도메인 어휘에서 '검(Sword)'은 단계 정의 그 자체다 — 단계가 곧 검 종류이고,
 // 검에는 인스턴스별 상태가 없다(원작과 동일). 정식 데이터 타입은 데이터 레이어의
@@ -32,9 +32,14 @@ export type PlayerState = {
   items: ItemStack[]
 }
 
+// 강화 1회 시도에 소모되는 재료(호출자가 인벤토리에서 차감하는 데 사용).
+// 골드 + 아이템(강화비용 아이템 · 소모된 방지권 등).
+export type ConsumedMaterials = { gold: number; items: ItemStack[] }
+
 // 강화 1회 시도의 결과 — '새 상태'가 아니라 '무슨 일이 일어났는가'를 서술하는 이벤트.
 // outcome 으로 구별되는 판별 유니온이라 불가능한 상태가 타입상 표현되지 않는다
-// (예: 파괴인데 toLevel 존재, 성공인데 드랍 존재 등은 만들 수 없음).
+// (예: 파괴인데 toLevel 존재, 성공인데 drops 존재 등은 만들 수 없음).
+//  - consumed: 차감할 재료   - drops: 산출된 아이템(파괴 조각 등)   - toLevel: 결과 검 단계
 export type EnhanceOutcome = 'success' | 'protected' | 'destroyed'
 
 export type EnhanceResult =
@@ -42,22 +47,24 @@ export type EnhanceResult =
       // 성공: 단계 +1.
       outcome: 'success'
       fromLevel: number
-      toLevel: number // = fromLevel + 1
-      costPaid: Material
+      toLevel: number // = fromLevel + 1 (강화된 검)
+      consumed: ConsumedMaterials
+      drops: ItemStack[] // 항상 [] — 성공 시 드랍 없음
     }
   | {
       // 실패했으나 방지권으로 검 보존(단계 유지).
       outcome: 'protected'
       fromLevel: number
-      toLevel: number // = fromLevel (유지)
-      costPaid: Material
-      protectionUsed: number // 소모된 방지권 수
-      droppedItem: string | null // 드랍된 잡템 itemId(없으면 null)
+      toLevel: number // = fromLevel (보존)
+      consumed: ConsumedMaterials // 강화비용 + 소모된 방지권
+      protectionUsed: number
+      drops: ItemStack[] // 항상 [] — 방지 시 드랍 없음
     }
   | {
       // 실패 + 검 파괴.
       outcome: 'destroyed'
       fromLevel: number
-      costPaid: Material
-      droppedItem: string | null // 드랍된 잡템 itemId(없으면 null)
+      toLevel: null // 검 소멸
+      consumed: ConsumedMaterials
+      drops: ItemStack[] // dropItemOnFail 있으면 [{ itemId, count: 1 }], 없으면 []
     }

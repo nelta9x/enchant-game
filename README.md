@@ -47,6 +47,7 @@ src/
     sources/swords.json#   검 데이터 파일 (+0~+29, 코드가 아닌 데이터로 분리)
   game/                # 도메인 모델 / 로직 (뷰·상태와 분리, 테스트 대상)
     types.ts           #   Sword · PlayerState · EnhanceResult (강화 루프 모델)
+    enhancer.ts        #   강화 확률 엔진 (Enhancer 클래스 — 순수, rng 주입)
   i18n/                # 다국어
     index.ts           #   언어 store + useT 훅
     locales/{ko,en}.ts #   번역 리소스 (ko = 키의 단일 출처)
