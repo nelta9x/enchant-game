@@ -60,6 +60,28 @@ function addItems(
   return next
 }
 
+// 빈 강화 슬롯을 채울 다음 검을 정한다(파괴·판매 공통 규칙).
+//  - 인벤토리에 검(sword_<n>)이 있으면 최고 레벨을 장착하고 그 스택 1개를 차감,
+//  - 없으면 낡은 단검(+0 = INITIAL_SWORD_LEVEL)을 생성해 장착(items 변화 없음).
+function equipNextFromBag(items: readonly ItemStack[]): {
+  level: number
+  items: ItemStack[]
+} {
+  const bagSwords: { itemId: string; lvl: number }[] = []
+  for (const it of items) {
+    const lvl = swordItemLevel(it.itemId)
+    if (lvl !== null) bagSwords.push({ itemId: it.itemId, lvl })
+  }
+  if (bagSwords.length === 0) {
+    return { level: INITIAL_SWORD_LEVEL, items: items.map((i) => ({ ...i })) }
+  }
+  const best = bagSwords.reduce((a, b) => (b.lvl > a.lvl ? b : a))
+  return {
+    level: best.lvl,
+    items: subtractItems(items, [{ itemId: best.itemId, count: 1 }]),
+  }
+}
+
 // 게임 진행 상태 store 팩토리. 기본 인스턴스(useGameStore)는 Math.random 엔진을 쓰고,
 // 테스트는 결정적 enhancer와 초기 상태를 주입해 독립 store를 만든다.
 export function createGameStore(opts: CreateOpts = {}) {
@@ -98,23 +120,27 @@ export function createGameStore(opts: CreateOpts = {}) {
         if (input === null || !enhancer.canEnhance(input)) return null
 
         const result = enhancer.enhance(input)
-        // 파괴 시 검을 잃지 않고 항상 낡은 단검(+0 = INITIAL_SWORD_LEVEL)으로 재시작한다
-        // (막다른 상태 방지). 성공(+1)·방지(유지)는 엔진 결과의 toLevel을 그대로 따른다.
-        // 반환하는 result는 엔진 이벤트 그대로(outcome 'destroyed', toLevel null) — 토스트·드랍 표시용.
-        const nextLevel =
-          result.outcome === 'destroyed'
-            ? INITIAL_SWORD_LEVEL
-            : result.toLevel
+        // 반환하는 result는 엔진 이벤트 그대로(파괴는 outcome 'destroyed', toLevel null) — 토스트·드랍 표시용.
         set((state) => {
           // 1) 소모 적용(골드 + consumed.items) → 2) 드랍 병합.
-          const items = addItems(
+          const baseItems = addItems(
             subtractItems(state.items, result.consumed.items),
             result.drops,
           )
+          // 파괴 시 검을 잃지 않고 인벤토리 검(없으면 낡은 단검)으로 재시작(판매와 동일 규칙).
+          // 성공(+1)·방지(유지)는 엔진 결과의 toLevel을 그대로 따른다.
+          if (result.outcome === 'destroyed') {
+            const next = equipNextFromBag(baseItems)
+            return {
+              gold: state.gold - result.consumed.gold,
+              currentSwordLevel: next.level,
+              items: next.items,
+            }
+          }
           return {
             gold: state.gold - result.consumed.gold,
-            currentSwordLevel: nextLevel,
-            items,
+            currentSwordLevel: result.toLevel,
+            items: baseItems,
           }
         })
         return result
@@ -135,24 +161,13 @@ export function createGameStore(opts: CreateOpts = {}) {
 
         const price = sword.sellPrice
         set((state) => {
-          // 판매 후 빈 슬롯을 채운다: 인벤토리에 검(sword_<n>)이 있으면 최고 레벨을
-          // 장착하고 그 스택 1개를 차감, 없으면 낡은 단검(+0)을 배치한다.
-          const bagSwords: { itemId: string; lvl: number }[] = []
-          for (const it of state.items) {
-            const lvl = swordItemLevel(it.itemId)
-            if (lvl !== null) bagSwords.push({ itemId: it.itemId, lvl })
+          // 판매 후 빈 슬롯을 인벤토리 검(없으면 낡은 단검)으로 채운다(파괴와 동일 규칙).
+          const next = equipNextFromBag(state.items)
+          return {
+            gold: state.gold + price,
+            currentSwordLevel: next.level,
+            items: next.items,
           }
-
-          let nextLevel = INITIAL_SWORD_LEVEL
-          let items = state.items
-          if (bagSwords.length > 0) {
-            const best = bagSwords.reduce((a, b) => (b.lvl > a.lvl ? b : a))
-            nextLevel = best.lvl
-            items = subtractItems(state.items, [
-              { itemId: best.itemId, count: 1 },
-            ])
-          }
-          return { gold: state.gold + price, currentSwordLevel: nextLevel, items }
         })
         return price
       },

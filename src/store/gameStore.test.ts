@@ -41,7 +41,7 @@ describe('gameStore — 강화 적용 (seam)', () => {
     expect(countOf(store.getState().items, 'sword_19')).toBe(1)
   })
 
-  it('파괴: 낡은 단검(+0)으로 재시작 + dropItemOnFail이 items로 산출', () => {
+  it('파괴 후 인벤토리에 검이 없으면 낡은 단검(+0)으로 재시작 + dropItemOnFail 산출', () => {
     // level 6: 골드 2000, dropItemOnFail = unknown_iron_scrap.
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
@@ -59,6 +59,21 @@ describe('gameStore — 강화 적용 (seam)', () => {
       itemId: 'unknown_iron_scrap',
       count: 1,
     })
+  })
+
+  it('파괴 후 인벤토리에 검이 있으면 그 검(최고 레벨)을 장착한다(판매와 동일 규칙)', () => {
+    const store = createGameStore({
+      enhancer: ALWAYS_FAIL(),
+      gold: 5000,
+      currentSwordLevel: 6,
+      items: [{ itemId: 'sword_19', count: 1 }],
+    })
+    const r = store.getState().enhance(false)
+    expect(r?.outcome).toBe('destroyed')
+    expect(store.getState().currentSwordLevel).toBe(19)
+    expect(countOf(store.getState().items, 'sword_19')).toBe(0)
+    // 드랍은 그대로 들어온다.
+    expect(countOf(store.getState().items, 'unknown_iron_scrap')).toBe(1)
   })
 
   it('파괴: 드랍이 기존 스택에 병합된다', () => {
