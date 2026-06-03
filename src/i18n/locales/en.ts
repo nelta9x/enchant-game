@@ -5,31 +5,49 @@ import type { TranslationKey } from './ko'
 export const en: Record<TranslationKey, string> = {
   // 앱 공통
   'app.title': 'Sword Enchant',
-  'app.footer':
-    'Sprint 1 · base layout skeleton — game logic begins in Sprint 2.',
 
-  // HUD
-  'hud.gold': 'Gold',
-  'hud.level': 'Level',
-  'hud.tickets': 'Tickets',
+  // 상점
+  'shop.open': 'Shop',
+  'shop.todo': 'The shop arrives in a future update',
 
-  // 난이도
-  'difficulty.easy': 'Easy',
-  'difficulty.hard': 'Hard',
+  // 비용 카드
+  'cost.enhance': 'Enhance Cost',
+  'cost.sell': 'Sell Price',
+  'cost.free': 'Free',
 
-  // 강화 무대
-  'enhance.enhance': 'Enhance',
-  'enhance.sell': 'Sell',
-  'enhance.notice': '⚙️ Enhance / sell logic arrives in Sprint 2.',
+  // 강화 / 판매 동작
+  'action.enhance': 'Enhance',
+  'action.sell': 'Sell',
 
-  // 하단 패널
-  'panel.shop': 'Shop',
-  'panel.forge': 'Forge',
-  'panel.inventory': 'Inventory',
-  'panel.shop.hint': 'Buy swords · warp tickets · protection tickets',
-  'panel.forge.hint': 'Trade junk items → protection tickets / swords',
-  'panel.inventory.hint': 'Owned swords · junk items · tickets',
-  'panel.comingSoon': '🚧 Coming soon — built in its sprint.',
+  // 방지권 사용(armed) 토글
+  'protection.toggle': 'Toggle protection',
+  'protection.on': 'Armed',
+
+  // 검 스테이지 스탯
+  'stat.protection': 'Protection',
+  'stat.successRate': 'Success Rate',
+  'sword.none': 'No Sword',
+  'sword.maxLevel': 'Max Level',
+
+  // 인벤토리
+  'inventory.title': 'Inventory',
+  'inventory.equipped': 'Equipped',
+
+  // 강화 결과 토스트
+  'toast.success': 'Enhanced',
+  'toast.protected': 'Protected',
+  'toast.destroyed': 'Destroyed',
+
+  // 아이템 표시명
+  'item.protection_ticket': 'Protection Ticket',
+  'item.unknown_iron_scrap': 'Unknown Iron Scrap',
+  'item.tau_bone_fragment': 'Tau Bone Fragment',
+  'item.faded_fluorescent': 'Faded Fluorescent',
+  'item.swiss_iron_scrap': 'Swiss Iron Scrap',
+  'item.flame_sword_handle': 'Flame Sword Handle',
+  'item.evil_soul': 'Evil Soul',
+  'item.axe_dust': 'Axe Dust',
+  'item.invisible_matter': 'Invisible Matter',
 
   // 검 이름
   'sword.0.name': 'Rusty Dagger',

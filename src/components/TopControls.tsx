@@ -1,0 +1,72 @@
+import { LANGS, useI18nStore, useT } from '../i18n'
+
+// 상단 컨트롤. 좌: 언어 토글, 우: 상점(다음 스프린트 — 비활성 스텁).
+export function TopControls() {
+  const t = useT()
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <LangToggle />
+
+      <button
+        type="button"
+        disabled
+        title={t('shop.todo')}
+        className="flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-panel-edge bg-panel px-3 py-1.5 text-sm font-semibold text-on-dark opacity-60"
+      >
+        <ShopIcon />
+        {t('shop.open')}
+      </button>
+    </div>
+  )
+}
+
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { id: T; label: string }[]
+  value: T
+  onChange: (v: T) => void
+}) {
+  return (
+    <div className="flex rounded-lg border border-panel-edge bg-panel p-0.5">
+      {options.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          onClick={() => onChange(opt.id)}
+          aria-pressed={value === opt.id}
+          className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+            value === opt.id
+              ? 'bg-enhance text-on-dark'
+              : 'text-on-dark-soft hover:text-on-dark'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function LangToggle() {
+  const lang = useI18nStore((s) => s.lang)
+  const setLang = useI18nStore((s) => s.setLang)
+  return (
+    <Segmented
+      options={LANGS.map((l) => ({ id: l, label: l.toUpperCase() }))}
+      value={lang}
+      onChange={setLang}
+    />
+  )
+}
+
+function ShopIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+      <path d="M4 4h16l-1 4.5a3 3 0 0 1-3 2.5 3 3 0 0 1-3-2.5A3 3 0 0 1 10 11a3 3 0 0 1-3-2.5L4 4Z" />
+      <path d="M5 11v9h14v-9a4.2 4.2 0 0 1-3 .9 4 4 0 0 1-2-1 4 4 0 0 1-2 1 4 4 0 0 1-2-1 4.2 4.2 0 0 1-3 .1Z" />
+    </svg>
+  )
+}

@@ -4,31 +4,50 @@
 export const ko = {
   // 앱 공통
   'app.title': '검 강화하기',
-  'app.footer':
-    '스프린트 1 · 베이스 레이아웃 골격 — 게임 로직은 스프린트 2부터 구현됩니다.',
 
-  // HUD
-  'hud.gold': '골드',
-  'hud.level': '단계',
-  'hud.tickets': '방지권',
+  // 상점(다음 스프린트에서 구현 — 현재는 버튼만)
+  'shop.open': '상점',
+  'shop.todo': '상점은 다음 업데이트에 추가됩니다',
 
-  // 난이도
-  'difficulty.easy': '쉬움',
-  'difficulty.hard': '어려움',
+  // 비용 카드
+  'cost.enhance': '강화비용',
+  'cost.sell': '판매가격',
+  'cost.free': '무료',
 
-  // 강화 무대
-  'enhance.enhance': '강화',
-  'enhance.sell': '판매',
-  'enhance.notice': '⚙️ 강화·판매 로직은 스프린트 2에서 구현됩니다.',
+  // 강화 / 판매 동작
+  'action.enhance': '강화',
+  'action.sell': '판매',
 
-  // 하단 패널
-  'panel.shop': '상점',
-  'panel.forge': '조합소',
-  'panel.inventory': '인벤토리',
-  'panel.shop.hint': '검 · 워프권 · 방지권 구매',
-  'panel.forge.hint': '잡템 → 방지권 / 검 교환',
-  'panel.inventory.hint': '보유 검 · 잡템 · 방지권',
-  'panel.comingSoon': '🚧 준비 중 — 해당 스프린트에서 구현됩니다.',
+  // 방지권 사용(armed) 토글
+  'protection.toggle': '방지권 사용 전환',
+  'protection.on': '사용 중',
+
+  // 검 스테이지 스탯
+  'stat.protection': '방지권',
+  'stat.successRate': '성공률',
+  'sword.none': '검 없음',
+  'sword.maxLevel': '최종 단계',
+
+  // 인벤토리
+  'inventory.title': '인벤토리',
+  'inventory.equipped': '장착 중',
+
+  // 강화 결과 토스트
+  'toast.success': '강화 성공',
+  'toast.protected': '방지권으로 보호',
+  'toast.destroyed': '검 파괴',
+
+  // 아이템 표시명 (방지권 · 잡템 — 인벤토리/드랍 표시에 사용)
+  // 재료로 쓰이는 검(sword_<level>)은 검 이름 키(sword.N.name)로 해석한다.
+  'item.protection_ticket': '방지권',
+  'item.unknown_iron_scrap': '국적불분명 철조각',
+  'item.tau_bone_fragment': '타우의 뼈 부스러기',
+  'item.faded_fluorescent': '빛 바랜 형광물질',
+  'item.swiss_iron_scrap': '스위스산 철조각',
+  'item.flame_sword_handle': '불꽃마검 손잡이',
+  'item.evil_soul': '사악한 영혼',
+  'item.axe_dust': '도끼 가루',
+  'item.invisible_matter': '투명 물질',
 
   // 검 이름 (게임 데이터의 표시명 — DataManager의 nameKey가 이 키를 가리킨다)
   // 보관필요/이지버그 등 특수 플래그는 이름이 아니라 SwordData.notes로 둔다.
