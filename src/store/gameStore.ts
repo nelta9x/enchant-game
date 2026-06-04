@@ -38,6 +38,13 @@ type GameActions = {
   // 하는 실제 검이라 장착이 늘 유효하다(게이팅할 무효 상태가 없음). 판매·강화처럼 무효 상태가
   // 발생할 수 있는 동작만 canX 게이트를 둔다.
   equip: (itemId: string) => void
+  // 파괴 드랍 "수집": pendingDrops 에서 itemId 를 count 만큼(보유 대기분 한도 내에서) items 로 옮긴다.
+  // 흩뿌림 연출에서 토큰이 인벤토리에 도착할 때마다 호출된다. 대기분을 초과해 추가하지 않으므로
+  // flushDrops 와 겹쳐도 중복 합산되지 않는다(연출 완료 콜백이 flush 뒤 늦게 와도 안전).
+  collectDrop: (itemId: string, count: number) => void
+  // 남은 pendingDrops 전체를 items 로 합산하고 비운다(연출 종료 시 미수집분 유실 방지). 멱등 —
+  // 대기분이 없으면 무변화라 종료 트리거가 여러 번 와도 안전하다.
+  flushDrops: () => void
 }
 
 export type GameState = PlayerState & GameActions
@@ -170,6 +177,7 @@ export function createGameStore(opts: CreateOpts = {}) {
           ? opts.currentSwordId
           : INITIAL_SWORD_ID,
       items: opts.items ?? [],
+      pendingDrops: [],
 
       canEnhance: (useProtection) => {
         const input = buildInput(useProtection)
@@ -183,11 +191,9 @@ export function createGameStore(opts: CreateOpts = {}) {
         const result = enhancer.enhance(input)
         // 반환하는 result는 엔진 이벤트 그대로(파괴는 outcome 'destroyed', toId null) — 연출·드랍 표시용.
         set((state) => {
-          // 1) 소모 적용(골드 + consumed.items) → 2) 드랍 병합.
-          const baseItems = addItems(
-            subtractItems(state.items, result.consumed.items),
-            result.drops,
-          )
+          // 소모 적용(골드 + consumed.items). 드랍은 즉시 items 에 넣지 않는다 — "수집 연출"에서
+          // 토큰이 인벤토리에 도착할 때 collectDrop 으로 옮긴다(deferred). 그 전까지 pendingDrops 에 둔다.
+          const baseItems = subtractItems(state.items, result.consumed.items)
           // 파괴 시 검을 잃지 않고 인벤토리 검(없으면 낡은 단검)으로 재시작(판매와 동일 규칙).
           // 성공(다음 검)·방지(유지)는 엔진 결과의 toId를 그대로 따른다.
           if (result.outcome === 'destroyed') {
@@ -196,6 +202,9 @@ export function createGameStore(opts: CreateOpts = {}) {
               gold: state.gold - result.consumed.gold,
               currentSwordId: next.id,
               items: next.items,
+              // 미수집 대기분에 합산(replace 가 아닌 merge) — 연속 파괴(파괴 후 가방 검 자동 장착 →
+              // 같은 연출 창 안에서 재실패) 시에도 이전 잔여분이 유실되지 않는다. flush 가 한도 내에서 정리.
+              pendingDrops: addItems(state.pendingDrops, result.drops),
             }
           }
           return {
@@ -287,6 +296,31 @@ export function createGameStore(opts: CreateOpts = {}) {
             [{ itemId, count: 1 }],
           ),
         }))
+      },
+
+      collectDrop: (itemId, count) => {
+        set((state) => {
+          // 대기분(pendingDrops)을 한도로만 옮긴다 — 음수·과다 추가, flush 와의 중복 합산을 막는다.
+          const take = Math.min(count, countOf(state.pendingDrops, itemId))
+          if (take <= 0) return state
+          return {
+            items: addItems(state.items, [{ itemId, count: take }]),
+            pendingDrops: subtractItems(state.pendingDrops, [
+              { itemId, count: take },
+            ]),
+          }
+        })
+      },
+
+      flushDrops: () => {
+        set((state) =>
+          state.pendingDrops.length === 0
+            ? state // 멱등 — 대기분이 없으면 무변화(종료 트리거 중복 호출 안전)
+            : {
+                items: addItems(state.items, state.pendingDrops),
+                pendingDrops: [],
+              },
+        )
       },
     }
   })

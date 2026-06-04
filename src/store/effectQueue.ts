@@ -13,6 +13,7 @@ export type EffectPayload = {
   spriteUrl?: string // 떨림 잔상 스프라이트(파괴·성공 공용)
   particleCount?: number // 분출할 파티클 수(파괴·성공 — 단계에 비례)
   coinCount?: number // 분출할 코인 수(판매 — 판매가에 비례)
+  drops?: { itemId: string; count: number }[] // 파괴 드롭 스택(검 아래 흩뿌림 연출)
 }
 
 // 효과 명세(호출 측이 enqueue 에 넘기는 것 — id 는 시스템이 부여).

@@ -30,6 +30,10 @@ export type PlayerState = {
   currentSwordId: string | null
   // 모든 보유 아이템(재료 검 · 잡템 · 파괴보호장치 · 워프권 등) — itemId로 식별.
   items: ItemStack[]
+  // 파괴로 떨어졌지만 아직 "수집되지 않은" 드랍(검 아래 흩뿌림 연출 대기분). items 와 분리해,
+  // 마우스로 스치거나(개별) 일정 시간 후(자동) 수집될 때 collectDrop 으로 items 로 옮긴다.
+  // 연출이 끝날 때 미수집분은 flushDrops 로 일괄 items 에 합산해 유실을 막는다(손실 0 보장).
+  pendingDrops: ItemStack[]
 }
 
 // 강화 1회 시도에 소모되는 재료(호출자가 인벤토리에서 차감하는 데 사용).

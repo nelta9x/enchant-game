@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { dataManager } from '../data/DataManager'
 import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useT, type TranslationKey } from '../i18n'
@@ -16,6 +16,7 @@ import {
 import { destructionTargetOf } from './destruction'
 import { coinCount } from './coins'
 import { CoinFlight, COIN_FLIGHT_MS, type CoinFlightEvent } from './CoinFlight'
+import { DropScatter, DROP_LIFETIME_MS, type DropEvent } from './DropScatter'
 import { EnhanceButton } from './EnhanceButton'
 import { GoldDisplay } from './GoldDisplay'
 import { InventoryPanel } from './InventoryPanel'
@@ -56,6 +57,8 @@ export function GameScreen() {
   const store = useGameStore((s) => s.store)
   const equip = useGameStore((s) => s.equip)
   const canStoreFn = useGameStore((s) => s.canStore)
+  const collectDrop = useGameStore((s) => s.collectDrop)
+  const flushDrops = useGameStore((s) => s.flushDrops)
 
   const protectionArmed = useUiStore((s) => s.protectionArmed)
   const toggleProtection = useUiStore((s) => s.toggleProtection)
@@ -93,6 +96,8 @@ export function GameScreen() {
   // 판매 코인 연출의 출발점(검 박스)·도착점(골드창) 측정용 ref.
   const swordBoxRef = useRef<HTMLDivElement>(null)
   const goldRef = useRef<HTMLDivElement>(null)
+  // 파괴 드롭 수집 연출의 도착점(인벤토리창) 측정용 ref(출발점은 검 박스 = swordBoxRef).
+  const inventoryRef = useRef<HTMLDivElement>(null)
 
   const handleSell = () => {
     const price = sell()
@@ -171,6 +176,17 @@ export function GameScreen() {
           durationMs: SHAKE_SEC * 1000,
         })
       }
+      // 드롭이 있으면 재료가 검 아래로 흩어져 떨어지는 연출(잠금X·병렬). 폭발이 드러난 뒤
+      // 떨어지도록 등장은 연출 내부에서 지연한다. 실제 인벤토리 수량은 store 에서 이미 반영됨.
+      if (result.drops.length > 0) {
+        enqueueEffect({
+          kind: 'drop',
+          exclusive: false,
+          locksEnhance: false,
+          durationMs: DROP_LIFETIME_MS,
+          payload: { drops: result.drops.map((d) => ({ ...d })) },
+        })
+      }
       lockEnhance()
     } else if (result.outcome === 'protected') {
       // 방지 = 떨림만(잠금·폭발 없음) → 파괴보호장치 덕분에 살아남았음을 인지시킨다.
@@ -216,6 +232,17 @@ export function GameScreen() {
     const fx = latestRunning(running, 'coinFlight')
     return fx ? { id: fx.id, coinCount: fx.payload?.coinCount ?? 0 } : null
   }, [running])
+  const dropEvent = useMemo<DropEvent | null>(() => {
+    const fx = latestRunning(running, 'drop')
+    return fx?.payload?.drops?.length
+      ? { id: fx.id, drops: fx.payload.drops }
+      : null
+  }, [running])
+  // 드롭 연출이 끝나면(running 에서 'drop' 효과가 빠져 dropEvent 가 null 이 됨) 미수집 대기분을
+  // 인벤토리로 회수한다(연출 완료 콜백이 누락돼도 유실 0). flushDrops 는 멱등 — 빈 대기분이면 무변화.
+  useEffect(() => {
+    if (dropEvent === null) flushDrops()
+  }, [dropEvent, flushDrops])
   const shakeKey = latestRunning(running, 'protectedShake')?.id ?? 0
 
   // 결과를 스크린리더에 알린다(시각 연출은 aria-hidden). 가장 최근 알림 대상 효과의 문구.
@@ -235,7 +262,8 @@ export function GameScreen() {
             좁은 트랙에 눌려 좌우 패널과 겹치는 것을 방지(반응형 폴리시는 스프린트 6). */}
         <div className="mt-3 grid grid-cols-1 gap-4 sm:min-h-[34rem] sm:grid-cols-[minmax(9.5rem,13rem)_minmax(0,1fr)_minmax(11rem,13rem)]">
           {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음) */}
-          <div className="flex min-h-0 flex-col">
+          {/* ref: 파괴 드롭이 빨려 들어갈 도착점 측정용. */}
+          <div ref={inventoryRef} className="flex min-h-0 flex-col">
             <div className="min-h-0 flex-1">
               <InventoryPanel
                 sword={sword}
@@ -315,6 +343,15 @@ export function GameScreen() {
           event={coinFlightEvent}
           sourceRef={swordBoxRef}
           targetRef={goldRef}
+        />
+
+        {/* 파괴 드롭 수집 연출 — 카드 전체를 덮는 오버레이(검 아래 → 인벤토리창). 재료가 검 아래로
+            흩어져 떨어진 뒤 마우스로 스칠 때마다(또는 일정 시간 후) 인벤토리로 빨려 든다. */}
+        <DropScatter
+          event={dropEvent}
+          sourceRef={swordBoxRef}
+          targetRef={inventoryRef}
+          onCollect={collectDrop}
         />
       </div>
 
