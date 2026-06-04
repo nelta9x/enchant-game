@@ -1,15 +1,24 @@
 import { dataManager } from '../data/DataManager'
+import { swordItemLevel } from '../data/swordId'
+import { PROTECTION_TICKET_ID } from '../game/enhancer'
 import type { TranslationKey } from '../i18n'
 import type { ItemStack } from '../game/types'
 
-// 검 재료 itemId 규약: `sword_<level>` (레벨이 곧 정체성, 로케일 독립).
-const SWORD_ITEM_RE = /^sword_(\d+)$/
+// 방지권 itemId 의 정식 출처는 엔진(enhancer)이다. 엔진은 DataManager 비의존이라
+// 상수를 거기 두고, 뷰·아이템 어휘 계층은 엔진을 직접 import 하지 않고 이 허브를
+// 통해 같은 상수를 참조한다(재노출).
+export { PROTECTION_TICKET_ID }
+
+// 검 재료 itemId 규약(sword_<level>) 파서는 data/swordId 의 단일 출처를 재노출한다 —
+// 검 데이터 무결성 검증(loadSwords)과 같은 정규식을 공유한다. 인벤토리 행의 '+레벨' 표시 등
+// 뷰에서 lib/items 를 통해 그대로 import 한다.
+export { swordItemLevel }
 
 // 검이 아닌 아이템(방지권 · 잡템) → 표시명 i18n 키 매핑.
 // 동적 문자열로 t()를 호출하면 TranslationKey 타입을 벗어나므로, 알려진 itemId만
 // 리터럴 키로 매핑해 타입 안전하게 해석한다. (검 재료는 SwordData.nameKey로 해석)
 const ITEM_NAME_KEYS: Record<string, TranslationKey> = {
-  protection_ticket: 'item.protection_ticket',
+  [PROTECTION_TICKET_ID]: 'item.protection_ticket',
   iron_scrap: 'item.iron_scrap',
   faded_fluorescent: 'item.faded_fluorescent',
   flame_sword_handle: 'item.flame_sword_handle',
@@ -27,19 +36,13 @@ export function itemDisplayName(
   itemId: string,
   t: (key: TranslationKey) => string,
 ): string {
-  const m = SWORD_ITEM_RE.exec(itemId)
-  if (m) {
-    const sword = dataManager.getSwordByLevel(Number(m[1]))
+  const lvl = swordItemLevel(itemId)
+  if (lvl !== null) {
+    const sword = dataManager.getSwordByLevel(lvl)
     if (sword) return t(sword.nameKey)
   }
   const key = ITEM_NAME_KEYS[itemId]
   return key ? t(key) : itemId
-}
-
-// itemId가 검 재료면 해당 레벨을, 아니면 null. (인벤토리 행에서 '+레벨' 표시용)
-export function swordItemLevel(itemId: string): number | null {
-  const m = SWORD_ITEM_RE.exec(itemId)
-  return m ? Number(m[1]) : null
 }
 
 // itemId가 표시명으로 해석 가능한지 — 존재하는 검 단계(sword_<level>)이거나

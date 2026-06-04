@@ -7,3 +7,10 @@ export function formatGold(amount: number, lang: Lang): string {
   const n = amount.toLocaleString('en-US')
   return lang === 'ko' ? `${n}원` : `${n} G`
 }
+
+// 성공률(0~1) → 정수 백분율 표시 문자열(뷰 경계). 백분율은 로케일 무관이라 formatGold 와
+// 달리 lang 인자가 없다. null/검없음 등 부재 처리는 호출 측 책임이다(뷰마다 의미가 다르다:
+// 최종 단계 vs 검 없음).
+export function formatRate(rate: number): string {
+  return `${Math.round(rate * 100)}%`
+}

@@ -10,8 +10,9 @@ beforeAll(() => {
 })
 
 // 항상 성공 / 항상 실패하는 결정적 엔진.
+// 실패는 rng=1 — 성공 판정이 `rng < rate`라 rate=1 인 검도 확실히 실패한다(0.9999 는 부적합).
 const ALWAYS_SUCCESS = () => new Enhancer(() => 0)
-const ALWAYS_FAIL = () => new Enhancer(() => 0.9999)
+const ALWAYS_FAIL = () => new Enhancer(() => 1)
 
 describe('gameStore — 강화 적용 (seam)', () => {
   it('성공: 골드 차감 + 단계 +1', () => {

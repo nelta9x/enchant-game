@@ -1,10 +1,19 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { dataManager } from '../data/DataManager'
 import type { Material, ShopItem } from '../data/types'
 import { useI18nStore, useT, type Lang, type TranslationKey } from '../i18n'
 import { formatGold } from '../lib/format'
-import { countOf, itemDisplayName, swordItemLevel } from '../lib/items'
+import {
+  countOf,
+  itemDisplayName,
+  PROTECTION_TICKET_ID,
+  swordItemLevel,
+} from '../lib/items'
 import { swordSpriteUrl } from '../lib/sprites'
 import { useGameStore } from '../store/gameStore'
 import { Coin } from './Coin'
@@ -155,7 +164,9 @@ function ShopRow({
     <li className="flex items-center gap-3 rounded-lg border border-panel-edge bg-panel-soft/40 px-3 py-2.5">
       <ShopThumb itemId={shopItem.itemId} alt={name} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-on-dark">{name}</div>
+        <div className="truncate text-sm font-semibold text-on-dark">
+          {name}
+        </div>
         <div className="mt-0.5 flex items-center gap-1 text-xs font-medium text-on-dark-soft">
           <PriceTag price={shopItem.price} t={t} lang={lang} />
           <span className="mx-1 text-panel-edge">·</span>
@@ -233,10 +244,15 @@ function ShopThumb({ itemId, alt }: { itemId: string; alt: string }) {
       />
     )
   }
-  const isTicket = itemId === 'protection_ticket'
+  const isTicket = itemId === PROTECTION_TICKET_ID
   return (
     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-panel text-on-dark-soft">
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
+      <svg
+        viewBox="0 0 24 24"
+        className="h-5 w-5"
+        fill="currentColor"
+        aria-hidden
+      >
         {isTicket ? (
           <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" />
         ) : (

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { dataManager } from '../data/DataManager'
-import type { ShopItem } from '../data/types'
+import type { Material, ShopItem } from '../data/types'
 import { Enhancer, type EnhanceInput } from '../game/enhancer'
 import type { EnhanceResult, ItemStack, PlayerState } from '../game/types'
 import { countOf, swordItemLevel } from '../lib/items'
@@ -65,6 +65,36 @@ function addItems(
     else next.push({ ...a })
   }
   return next
+}
+
+// 가격(골드/아이템/무료) 충족 여부 — canBuy 게이트와 buy 게이트가 공유하는 단일 정의.
+function canAfford(
+  price: Material,
+  qty: number,
+  gold: number,
+  items: readonly ItemStack[],
+): boolean {
+  if (price.kind === 'free') return true
+  if (price.kind === 'gold') return gold >= price.amount * qty
+  return countOf(items, price.itemId) >= price.count * qty
+}
+
+// 가격 차감 후의 골드·인벤토리(구매 아이템 적재 전). buy 의 적용부가 공유한다.
+function chargeFor(
+  price: Material,
+  qty: number,
+  gold: number,
+  items: readonly ItemStack[],
+): { gold: number; items: readonly ItemStack[] } {
+  if (price.kind === 'gold') return { gold: gold - price.amount * qty, items }
+  if (price.kind === 'item')
+    return {
+      gold,
+      items: subtractItems(items, [
+        { itemId: price.itemId, count: price.count * qty },
+      ]),
+    }
+  return { gold, items } // free
 }
 
 // 빈 강화 슬롯을 채울 다음 검을 정한다(파괴·판매 공통 규칙).
@@ -183,40 +213,23 @@ export function createGameStore(opts: CreateOpts = {}) {
         if (!Number.isInteger(qty) || qty <= 0) return false
         const entry = dataManager.getShopItem(shopId)
         if (!entry) return false
-        const price = entry.price
-        if (price.kind === 'free') return true
-        if (price.kind === 'gold') return get().gold >= price.amount * qty
-        return countOf(get().items, price.itemId) >= price.count * qty
+        return canAfford(entry.price, qty, get().gold, get().items)
       },
 
       buy: (shopId, qty = 1) => {
         if (!Number.isInteger(qty) || qty <= 0) return null
         const entry = dataManager.getShopItem(shopId)
         if (!entry) return null
-
-        const price = entry.price
-        // 가격 충족 검사(골드 / 아이템). free 는 항상 통과.
-        if (price.kind === 'gold' && get().gold < price.amount * qty) return null
-        if (
-          price.kind === 'item' &&
-          countOf(get().items, price.itemId) < price.count * qty
-        )
-          return null
+        // 게이트는 canBuy 와 동일한 canAfford 로 단일화한다(이중 작성 → 어긋남 방지).
+        if (!canAfford(entry.price, qty, get().gold, get().items)) return null
 
         set((state) => {
-          const gold =
-            price.kind === 'gold' ? state.gold - price.amount * qty : state.gold
-          const paidItems =
-            price.kind === 'item'
-              ? subtractItems(state.items, [
-                  { itemId: price.itemId, count: price.count * qty },
-                ])
-              : state.items
+          const paid = chargeFor(entry.price, qty, state.gold, state.items)
           // 구매한 아이템(지급 itemId)을 qty개 인벤토리에 적재(스택 합산).
           // (검 itemId를 파는 경우의 '장착' 처리는 검 상점 도입 시 별도로 다룬다.)
           return {
-            gold,
-            items: addItems(paidItems, [{ itemId: entry.itemId, count: qty }]),
+            gold: paid.gold,
+            items: addItems(paid.items, [{ itemId: entry.itemId, count: qty }]),
           }
         })
         return entry

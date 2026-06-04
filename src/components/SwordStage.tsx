@@ -2,6 +2,7 @@ import { useEffect, type ReactNode, type Ref } from 'react'
 import { motion, useAnimationControls } from 'motion/react'
 import { useT } from '../i18n'
 import type { SwordData } from '../data/types'
+import { formatRate } from '../lib/format'
 import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, SHAKE_TRANSITION } from './shake'
 
@@ -57,7 +58,7 @@ export function SwordStage({
 
   const successText =
     sword && sword.successRate !== null
-      ? `${Math.round(sword.successRate * 100)}%`
+      ? formatRate(sword.successRate)
       : t('sword.maxLevel')
 
   return (

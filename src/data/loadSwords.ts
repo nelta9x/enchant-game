@@ -1,5 +1,6 @@
 import swordsRaw from './sources/swords.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
+import { swordItemLevel } from './swordId'
 import type { Drop, Material, SwordData, SwordNote } from './types'
 
 // 데이터 파일(swords.json)을 검증해 SwordData[]로 만드는 로더.
@@ -13,10 +14,6 @@ import type { Drop, Material, SwordData, SwordNote } from './types'
 // loadSwords 가 번들된 데이터와 i18n 소스를 묶는 진입점이다.
 
 const SWORD_NOTES: readonly SwordNote[] = ['storable', 'easyBug']
-
-// itemId 가 재료로 쓰이는 '검'을 가리키는 경우의 패턴: sword_<level>
-// (검 itemId 규약은 단계만으로 식별 — 게임 도메인의 items 인벤토리와 동일한 itemId)
-const SWORD_MATERIAL_RE = /^sword_(\d+)$/
 
 // 스프라이트 폴백 적용 전의 중간 표현(sprite 가 아직 null 일 수 있음).
 type ParsedSword = Omit<SwordData, 'sprite'> & { sprite: string | null }
@@ -183,8 +180,8 @@ export function parseSwords(raw: unknown): SwordData[] {
   // (잡템 itemId 는 아이템 카탈로그가 생기는 스프린트에서 검증한다.)
   for (const s of parsed) {
     if (s.enhanceCost?.kind === 'item') {
-      const m = SWORD_MATERIAL_RE.exec(s.enhanceCost.itemId)
-      if (m && !levels.has(Number(m[1])))
+      const lvl = swordItemLevel(s.enhanceCost.itemId)
+      if (lvl !== null && !levels.has(lvl))
         fail(
           `+${s.level} enhance material references a non-existent sword stage: ${s.enhanceCost.itemId}`,
         )

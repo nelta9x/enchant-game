@@ -2,7 +2,12 @@ import { dataManager } from '../data/DataManager'
 import { useT, type TranslationKey } from '../i18n'
 import type { SwordData } from '../data/types'
 import type { ItemStack } from '../game/types'
-import { itemDisplayName, swordItemLevel } from '../lib/items'
+import {
+  itemDisplayName,
+  PROTECTION_TICKET_ID,
+  swordItemLevel,
+} from '../lib/items'
+import { formatRate } from '../lib/format'
 import { swordSpriteUrl } from '../lib/sprites'
 
 // 보유 인벤토리 패널: 맨 위 장착 중인 검(선택 행) + 그 아래 보유 아이템 행들.
@@ -56,7 +61,7 @@ function EquippedRow({
   equippedLabel: string
 }) {
   const t = useT()
-  const rate = sword.successRate !== null ? `${Math.round(sword.successRate * 100)}%` : '—'
+  const rate = sword.successRate !== null ? formatRate(sword.successRate) : '—'
   return (
     <li className="flex items-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5 py-1.5">
       <SpriteThumb src={swordSpriteUrl(sword.sprite)} alt={t(sword.nameKey)} />
@@ -129,10 +134,15 @@ function SpriteThumb({ src, alt }: { src: string; alt: string }) {
 
 // 스프라이트가 없는 아이템(방지권·잡템)용 대체 아이콘 — 방지권은 방패, 잡템은 보석.
 function TokenThumb({ itemId }: { itemId: string }) {
-  const isTicket = itemId === 'protection_ticket'
+  const isTicket = itemId === PROTECTION_TICKET_ID
   return (
     <span className="grid h-7 w-7 shrink-0 place-items-center rounded bg-panel-soft text-on-dark-soft">
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+      <svg
+        viewBox="0 0 24 24"
+        className="h-4 w-4"
+        fill="currentColor"
+        aria-hidden
+      >
         {isTicket ? (
           <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" />
         ) : (
