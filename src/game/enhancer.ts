@@ -33,6 +33,9 @@ export class Enhancer {
 
     if (sword.enhanceCost === null || sword.successRate === null)
       return `Cannot enhance a terminal sword (level ${sword.level})`
+    // 강화 가능한 검은 성공 시 되는 검(nextId)을 반드시 가진다. 없으면 데이터 오류.
+    if (sword.nextId === null)
+      return `Enhanceable sword is missing nextId (data error): ${sword.id}`
 
     const cost = sword.enhanceCost
     if (cost.kind === 'gold' && supply.gold < cost.amount)
@@ -66,10 +69,10 @@ export class Enhancer {
     if (reason !== null) throw new Error(reason)
 
     const { sword, useProtection } = input
-    // validate 통과 → enhanceCost / successRate 는 non-null 임이 보장된다.
+    // validate 통과 → enhanceCost / successRate / nextId 는 non-null 임이 보장된다.
     const cost = sword.enhanceCost!
     const rate = sword.successRate!
-    const fromLevel = sword.level
+    const fromId = sword.id
 
     const costGold = cost.kind === 'gold' ? cost.amount : 0
     const costItems: ItemStack[] =
@@ -81,8 +84,8 @@ export class Enhancer {
     if (success) {
       return {
         outcome: 'success',
-        fromLevel,
-        toLevel: fromLevel + 1,
+        fromId,
+        toId: sword.nextId!, // validate 통과 → 강화 가능한 검은 다음 검 id 보장
         consumed: baseConsumed,
         drops: [],
       }
@@ -93,8 +96,8 @@ export class Enhancer {
       const used = sword.protectionTickets as number // validate 가 number>0 보장
       return {
         outcome: 'protected',
-        fromLevel,
-        toLevel: fromLevel,
+        fromId,
+        toId: fromId, // 같은 검 유지
         consumed: {
           gold: costGold,
           items: [...costItems, { itemId: PROTECTION_TICKET_ID, count: used }],
@@ -107,8 +110,8 @@ export class Enhancer {
     const drops: ItemStack[] = sword.dropOnFail ? [{ ...sword.dropOnFail }] : []
     return {
       outcome: 'destroyed',
-      fromLevel,
-      toLevel: null,
+      fromId,
+      toId: null,
       consumed: baseConsumed,
       drops,
     }

@@ -2,11 +2,7 @@ import { dataManager } from '../data/DataManager'
 import { useT, type TranslationKey } from '../i18n'
 import type { SwordData } from '../data/types'
 import type { ItemStack } from '../game/types'
-import {
-  itemDisplayName,
-  PROTECTION_TICKET_ID,
-  swordItemLevel,
-} from '../lib/items'
+import { itemDisplayName, PROTECTION_TICKET_ID } from '../lib/items'
 import { formatRate } from '../lib/format'
 import { swordSpriteUrl } from '../lib/sprites'
 
@@ -92,8 +88,8 @@ function ItemRow({
   item: ItemStack
   t: (key: TranslationKey) => string
 }) {
-  const lvl = swordItemLevel(item.itemId)
-  const sword = lvl !== null ? dataManager.getSwordByLevel(lvl) : undefined
+  const sword = dataManager.getSwordById(item.itemId)
+  const lvl = sword?.level ?? null
   const name = itemDisplayName(item.itemId, t)
 
   return (

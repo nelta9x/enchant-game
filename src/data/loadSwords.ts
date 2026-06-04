@@ -1,6 +1,5 @@
 import swordsRaw from './sources/swords.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
-import { swordItemLevel } from './swordId'
 import type { Drop, Material, SwordData, SwordNote } from './types'
 
 // 데이터 파일(swords.json)을 검증해 SwordData[]로 만드는 로더.
@@ -76,6 +75,19 @@ function parseSword(raw: unknown): ParsedSword {
     fail(`level must be a non-negative integer (got ${String(level)})`)
   const ctx = `[+${level}]`
 
+  // 검 식별자(= 인벤토리 itemId). 검은 이 id로 조회한다(레벨 파싱 없음).
+  const id = raw.id
+  if (typeof id !== 'string' || id.length === 0)
+    fail(`${ctx} id must be a non-empty string`)
+
+  // 강화 성공 시 되는 검 id. null = 최종 단계(다음 없음). 체인 무결성은 parseSwords에서 검증.
+  let nextId: string | null = null
+  if (raw.nextId !== null && raw.nextId !== undefined) {
+    if (typeof raw.nextId !== 'string' || raw.nextId.length === 0)
+      fail(`${ctx} nextId must be a non-empty string or null`)
+    nextId = raw.nextId
+  }
+
   // enhanceCost / successRate 는 둘 다 null 이면 최종 단계(terminal)다.
   // 한쪽만 null 이면 데이터 오류로 본다.
   const costNull = raw.enhanceCost === null
@@ -143,6 +155,8 @@ function parseSword(raw: unknown): ParsedSword {
   const nameKey = `sword.${level}.name` as TranslationKey
 
   return {
+    id,
+    nextId,
     level,
     nameKey,
     enhanceCost,
@@ -171,21 +185,20 @@ export function parseSwords(raw: unknown): SwordData[] {
   const parsed = raw.map(parseSword)
 
   const levels = new Set<number>()
+  const ids = new Set<string>()
   for (const s of parsed) {
     if (levels.has(s.level)) fail(`duplicate stage: +${s.level}`)
     levels.add(s.level)
+    if (ids.has(s.id)) fail(`duplicate sword id: ${s.id}`)
+    ids.add(s.id)
   }
 
-  // 재료검 참조 무결성: itemId 가 sword_<level> 형태면 그 단계 검이 존재해야 한다.
-  // (잡템 itemId 는 아이템 카탈로그가 생기는 스프린트에서 검증한다.)
+  // 진행 체인 무결성: nextId 는 null(최종 단계)이거나 실재하는 검 id 를 가리켜야 한다.
+  // (검 재료 itemId 오타 검증은 검과 잡템이 itemId 네임스페이스를 공유해 패턴으로 구분할 수 없으므로
+  //  여기서 하지 않는다 — 아이템 카탈로그 스프린트에서 전체 itemId 를 검증하며 그쪽으로 이관한다.)
   for (const s of parsed) {
-    if (s.enhanceCost?.kind === 'item') {
-      const lvl = swordItemLevel(s.enhanceCost.itemId)
-      if (lvl !== null && !levels.has(lvl))
-        fail(
-          `+${s.level} enhance material references a non-existent sword stage: ${s.enhanceCost.itemId}`,
-        )
-    }
+    if (s.nextId !== null && !ids.has(s.nextId))
+      fail(`${s.id} nextId references a non-existent sword: ${s.nextId}`)
   }
 
   const sorted = parsed.sort((a, b) => a.level - b.level)

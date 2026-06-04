@@ -22,9 +22,13 @@ const alwaysFails = () => 1
 
 // 검 정의 픽스처. 엔진 테스트에 필요한 필드만 골라 덮어쓴다.
 function sword(over: Partial<SwordData> = {}): SwordData {
+  const level = over.level ?? 10
   return {
-    level: 10,
-    nameKey: 'sword.10.name',
+    id: `sword_${level}`,
+    nextId: `sword_${level + 1}`,
+    level,
+    // 엔진은 nameKey를 읽지 않지만, level override 시에도 id/nextId/level과 어긋나지 않도록 파생한다.
+    nameKey: `sword.${level}.name` as SwordData['nameKey'],
     enhanceCost: { kind: 'gold', amount: 100 },
     successRate: 0.5,
     sellPrice: 1000,
@@ -124,7 +128,7 @@ describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
     })
     const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
     expect(r.outcome).toBe('destroyed')
-    expect(r.toLevel).toBeNull()
+    expect(r.toId).toBeNull()
     expect(r.drops).toEqual([{ itemId: 'evil_soul', count: 1 }])
   })
 
@@ -165,7 +169,7 @@ describe('Enhancer — 파괴 방지권 (req 4)', () => {
       useProtection: true,
     })
     expect(r.outcome).toBe('protected')
-    expect(r.toLevel).toBe(14) // 단계 유지
+    expect(r.toId).toBe('sword_14') // 같은 검 유지(id)
     expect(r.drops).toEqual([]) // 방지 시 드랍 없음
     if (r.outcome === 'protected') {
       expect(r.protectionUsed).toBe(3)

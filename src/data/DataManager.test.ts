@@ -8,21 +8,24 @@ describe('DataManager', () => {
   it('load() 호출 전 조회하면 에러를 던진다', () => {
     const dm = new DataManager()
     expect(() => dm.getSwords()).toThrow()
-    expect(() => dm.getSwordByLevel(0)).toThrow()
+    expect(() => dm.getSwordById('sword_0')).toThrow()
   })
 
   it('load() 후 전체 검 데이터를 조회할 수 있다', () => {
     const dm = new DataManager()
     dm.load()
     expect(dm.getSwords()).toHaveLength(loadSwords().length)
-    expect(dm.getSwordByLevel(0)?.level).toBe(0)
-    expect(dm.getSwordByLevel(29)?.level).toBe(29)
   })
 
-  it('존재하지 않는 단계 조회 시 undefined를 반환한다', () => {
+  it('id로 검을 조회한다(정식·유일 식별 경로) — 없는 id·잡템은 undefined', () => {
     const dm = new DataManager()
     dm.load()
-    expect(dm.getSwordByLevel(999)).toBeUndefined()
+    expect(dm.getSwordById('sword_0')?.id).toBe('sword_0')
+    expect(dm.getSwordById('sword_0')?.level).toBe(0)
+    expect(dm.getSwordById('sword_29')?.level).toBe(29)
+    expect(dm.getSwordById('sword_29')?.nextId).toBeNull()
+    expect(dm.getSwordById('sword_999')).toBeUndefined()
+    expect(dm.getSwordById('protection_ticket')).toBeUndefined()
   })
 
   it('load() 호출 전 상점 조회하면 에러를 던진다', () => {

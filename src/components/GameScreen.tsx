@@ -46,7 +46,7 @@ const ANNOUNCE_KEY: Record<string, TranslationKey> = {
 export function GameScreen() {
   const t = useT()
   const gold = useGameStore((s) => s.gold)
-  const currentSwordLevel = useGameStore((s) => s.currentSwordLevel)
+  const currentSwordId = useGameStore((s) => s.currentSwordId)
   const items = useGameStore((s) => s.items)
   const enhance = useGameStore((s) => s.enhance)
   const canEnhanceFn = useGameStore((s) => s.canEnhance)
@@ -62,8 +62,8 @@ export function GameScreen() {
   const running = useEffectStore((s) => s.running)
 
   const sword =
-    currentSwordLevel !== null
-      ? dataManager.getSwordByLevel(currentSwordLevel)
+    currentSwordId !== null
+      ? dataManager.getSwordById(currentSwordId)
       : undefined
 
   // 방지권 사용(armed) 가능 조건: 단계가 방지권을 허용(number>0)하고, 요구 수량 이상 보유.
@@ -113,22 +113,21 @@ export function GameScreen() {
       })
 
     if (result.outcome === 'success') {
-      // 성공 = 황금빛 파티클 분출(잠금X) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 도달 단계(toLevel)에 비례.
+      // 성공 = 황금빛 파티클 분출(잠금X) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 도달 검(toId)의 단계에 비례.
+      const next = dataManager.getSwordById(result.toId)
       enqueueEffect({
         kind: 'successBurst',
         exclusive: false,
         locksEnhance: false,
         durationMs: SUCCESS_DURATION_MS,
-        payload: { particleCount: particleCount(result.toLevel) },
+        payload: { particleCount: particleCount(next?.level ?? 0) },
       })
       lockEnhance()
     } else if (result.outcome === 'destroyed') {
-      // 파괴 = 폭발 연출(잠금X·~1초) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 파괴된 단계(fromLevel)에 비례.
-      // 스프라이트(fromLevel)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
+      // 파괴 = 폭발 연출(잠금X·~1초) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 파괴된 검(fromId)의 단계에 비례.
+      // 스프라이트(fromId)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
       const target = destructionTargetOf(result)
-      const destroyed = target
-        ? dataManager.getSwordByLevel(target.level)
-        : undefined
+      const destroyed = target ? dataManager.getSwordById(target.id) : undefined
       if (target && destroyed) {
         enqueueEffect({
           kind: 'destruction',
@@ -137,7 +136,7 @@ export function GameScreen() {
           durationMs: DESTRUCTION_DURATION_MS,
           payload: {
             spriteUrl: swordSpriteUrl(destroyed.sprite),
-            particleCount: particleCount(target.level),
+            particleCount: particleCount(destroyed.level),
           },
         })
         // 새 검(+0) 등장을 떨림 구간(0.4s)만 가린다 — 파괴 연출 전체(~1초)가 아니라.
@@ -210,7 +209,7 @@ export function GameScreen() {
             <div className="min-h-0 flex-1">
               <InventoryPanel
                 sword={sword}
-                level={currentSwordLevel}
+                level={sword?.level ?? null}
                 items={items}
               />
             </div>
@@ -220,7 +219,7 @@ export function GameScreen() {
           <div className="relative flex items-center justify-center">
             <SwordStage
               sword={sword}
-              level={currentSwordLevel}
+              level={sword?.level ?? null}
               ownedTickets={ownedTickets}
               armed={effectiveProtection}
               canArm={canArm}

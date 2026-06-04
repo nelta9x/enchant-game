@@ -20,11 +20,11 @@ describe('gameStore — 강화 적용 (seam)', () => {
     const store = createGameStore({
       enhancer: ALWAYS_SUCCESS(),
       gold: 1000,
-      currentSwordLevel: 0,
+      currentSwordId: 'sword_0',
     })
     const r = store.getState().enhance(false)
     expect(r?.outcome).toBe('success')
-    expect(store.getState().currentSwordLevel).toBe(1)
+    expect(store.getState().currentSwordId).toBe('sword_1')
     expect(store.getState().gold).toBe(700)
   })
 
@@ -33,12 +33,12 @@ describe('gameStore — 강화 적용 (seam)', () => {
     const store = createGameStore({
       enhancer: ALWAYS_SUCCESS(),
       gold: 0,
-      currentSwordLevel: 21,
+      currentSwordId: 'sword_21',
       items: [{ itemId: 'sword_19', count: 2 }],
     })
     const r = store.getState().enhance(false)
     expect(r?.outcome).toBe('success')
-    expect(store.getState().currentSwordLevel).toBe(22)
+    expect(store.getState().currentSwordId).toBe('sword_22')
     expect(countOf(store.getState().items, 'sword_19')).toBe(1)
   })
 
@@ -47,14 +47,14 @@ describe('gameStore — 강화 적용 (seam)', () => {
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 5000,
-      currentSwordLevel: 6,
+      currentSwordId: 'sword_6',
       items: [],
     })
     const r = store.getState().enhance(false)
-    // 엔진 이벤트는 파괴(toLevel null)지만, 상태는 낡은 단검(+0)으로 재시작한다.
+    // 엔진 이벤트는 파괴(toId null)지만, 상태는 낡은 단검(+0)으로 재시작한다.
     expect(r?.outcome).toBe('destroyed')
-    expect(r?.toLevel).toBeNull()
-    expect(store.getState().currentSwordLevel).toBe(0)
+    expect(r?.toId).toBeNull()
+    expect(store.getState().currentSwordId).toBe('sword_0')
     expect(store.getState().gold).toBe(3000)
     expect(store.getState().items).toContainEqual({
       itemId: 'iron_scrap',
@@ -66,12 +66,12 @@ describe('gameStore — 강화 적용 (seam)', () => {
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 5000,
-      currentSwordLevel: 6,
+      currentSwordId: 'sword_6',
       items: [{ itemId: 'sword_19', count: 1 }],
     })
     const r = store.getState().enhance(false)
     expect(r?.outcome).toBe('destroyed')
-    expect(store.getState().currentSwordLevel).toBe(19)
+    expect(store.getState().currentSwordId).toBe('sword_19')
     expect(countOf(store.getState().items, 'sword_19')).toBe(0)
     // 드랍은 그대로 들어온다.
     expect(countOf(store.getState().items, 'iron_scrap')).toBe(1)
@@ -81,7 +81,7 @@ describe('gameStore — 강화 적용 (seam)', () => {
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 5000,
-      currentSwordLevel: 6,
+      currentSwordId: 'sword_6',
       items: [{ itemId: 'iron_scrap', count: 3 }],
     })
     store.getState().enhance(false)
@@ -93,12 +93,12 @@ describe('gameStore — 강화 적용 (seam)', () => {
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 200000,
-      currentSwordLevel: 14,
+      currentSwordId: 'sword_14',
       items: [{ itemId: PROTECTION_TICKET_ID, count: 5 }],
     })
     const r = store.getState().enhance(true)
     expect(r?.outcome).toBe('protected')
-    expect(store.getState().currentSwordLevel).toBe(14)
+    expect(store.getState().currentSwordId).toBe('sword_14')
     expect(store.getState().gold).toBe(100000)
     expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(2)
     // 방지 시 드랍 없음.
@@ -108,22 +108,22 @@ describe('gameStore — 강화 적용 (seam)', () => {
 
 describe('gameStore — canEnhance 게이팅', () => {
   it('골드가 부족하면 강화 불가 + enhance는 null(상태 불변)', () => {
-    const store = createGameStore({ gold: 100, currentSwordLevel: 0 })
+    const store = createGameStore({ gold: 100, currentSwordId: 'sword_0' })
     expect(store.getState().canEnhance(false)).toBe(false)
     expect(store.getState().enhance(false)).toBeNull()
     expect(store.getState().gold).toBe(100)
-    expect(store.getState().currentSwordLevel).toBe(0)
+    expect(store.getState().currentSwordId).toBe('sword_0')
   })
 
   it('보유 검이 없으면(null) 강화 불가', () => {
-    const store = createGameStore({ currentSwordLevel: null, gold: 999_999 })
+    const store = createGameStore({ currentSwordId: null, gold: 999_999 })
     expect(store.getState().canEnhance(false)).toBe(false)
     expect(store.getState().enhance(false)).toBeNull()
   })
 
   it('최종 단계(+29)는 강화 불가', () => {
     const store = createGameStore({
-      currentSwordLevel: 29,
+      currentSwordId: 'sword_29',
       gold: 999_999_999,
     })
     expect(store.getState().canEnhance(false)).toBe(false)
@@ -132,7 +132,7 @@ describe('gameStore — canEnhance 게이팅', () => {
   it('재료검이 없으면 강화 불가', () => {
     // level 21 비용 sword_19 ×1을 보유하지 않음.
     const store = createGameStore({
-      currentSwordLevel: 21,
+      currentSwordId: 'sword_21',
       gold: 0,
       items: [],
     })
@@ -143,52 +143,52 @@ describe('gameStore — canEnhance 게이팅', () => {
 describe('gameStore — 판매', () => {
   it('판매가만큼 골드를 받고, 인벤토리에 검이 없으면 낡은 단검(+0)을 배치한다', () => {
     // level 5: 판매가 1600. 인벤토리에 검 없음.
-    const store = createGameStore({ gold: 1000, currentSwordLevel: 5 })
+    const store = createGameStore({ gold: 1000, currentSwordId: 'sword_5' })
     expect(store.getState().canSell()).toBe(true)
     const got = store.getState().sell()
     expect(got).toBe(1600)
     expect(store.getState().gold).toBe(2600)
-    expect(store.getState().currentSwordLevel).toBe(0)
+    expect(store.getState().currentSwordId).toBe('sword_0')
   })
 
   it('판매 후 인벤토리에 검이 있으면 그 검을 장착하고 인벤토리에서 뺀다', () => {
     const store = createGameStore({
       gold: 0,
-      currentSwordLevel: 5, // 판매가 1600
+      currentSwordId: 'sword_5', // 판매가 1600
       items: [{ itemId: 'sword_19', count: 1 }],
     })
     const got = store.getState().sell()
     expect(got).toBe(1600)
     expect(store.getState().gold).toBe(1600)
-    expect(store.getState().currentSwordLevel).toBe(19)
+    expect(store.getState().currentSwordId).toBe('sword_19')
     expect(countOf(store.getState().items, 'sword_19')).toBe(0)
   })
 
   it('인벤토리에 검이 여럿이면 최고 레벨을 장착하고 나머지는 남긴다', () => {
     const store = createGameStore({
       gold: 0,
-      currentSwordLevel: 5,
+      currentSwordId: 'sword_5',
       items: [
         { itemId: 'sword_19', count: 1 },
         { itemId: 'sword_21', count: 2 },
       ],
     })
     store.getState().sell()
-    expect(store.getState().currentSwordLevel).toBe(21)
+    expect(store.getState().currentSwordId).toBe('sword_21')
     expect(countOf(store.getState().items, 'sword_21')).toBe(1)
     expect(countOf(store.getState().items, 'sword_19')).toBe(1)
   })
 
   it('판매가가 없는 단계(+0)는 판매 불가 — null, 상태 불변', () => {
-    const store = createGameStore({ gold: 500, currentSwordLevel: 0 })
+    const store = createGameStore({ gold: 500, currentSwordId: 'sword_0' })
     expect(store.getState().canSell()).toBe(false)
     expect(store.getState().sell()).toBeNull()
     expect(store.getState().gold).toBe(500)
-    expect(store.getState().currentSwordLevel).toBe(0)
+    expect(store.getState().currentSwordId).toBe('sword_0')
   })
 
   it('보유 검이 없으면 판매 불가', () => {
-    const store = createGameStore({ currentSwordLevel: null, gold: 0 })
+    const store = createGameStore({ currentSwordId: null, gold: 0 })
     expect(store.getState().canSell()).toBe(false)
     expect(store.getState().sell()).toBeNull()
   })

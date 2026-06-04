@@ -35,6 +35,11 @@ export type SwordNote = 'storable' | 'easyBug'
 // 표시명은 코드에 박지 않고 nameKey(i18n 키)로 두어 표시 시점에 t()로 해석한다.
 // enhanceCost / successRate 가 null 이면 더 이상 강화할 수 없는 최종 단계(terminal)다.
 export type SwordData = {
+  // 검 식별자 = 인벤토리 itemId. 검은 이 id로 조회한다(레벨을 문자열에서 파싱하지 않는다).
+  id: string
+  // 강화 성공 시 되는 검의 id. null = 최종 단계(다음 검 없음). 진행은 level±1이 아니라 이 링크로 결정된다.
+  nextId: string | null
+  // 표시(+N)·밸런스·정렬용 속성(식별자가 아님 — 식별은 id).
   level: number
   nameKey: TranslationKey
   enhanceCost: Material | null // null = 최종 단계(강화 불가)

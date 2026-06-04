@@ -33,9 +33,10 @@ export class DataManager {
     return this.swords
   }
 
-  getSwordByLevel(level: number): SwordData | undefined {
+  // 검 식별자(id = 인벤토리 itemId)로 조회. 검의 정식(유일) 조회 경로 — 레벨을 문자열에서 파싱하지 않는다.
+  getSwordById(id: string): SwordData | undefined {
     this.ensureLoaded()
-    return this.swords.find((s) => s.level === level)
+    return this.swords.find((s) => s.id === id)
   }
 
   // 상점 판매 목록(데이터 순서 유지). 상점 UI가 그대로 순회해 렌더한다.

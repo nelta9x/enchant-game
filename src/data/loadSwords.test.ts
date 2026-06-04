@@ -4,8 +4,11 @@ import { parseSwords, assertNameKeysResolve, loadSwords } from './loadSwords'
 // 최소 유효 행 헬퍼. override 로 개별 필드만 바꿔 검증 경로를 테스트한다.
 // parseSwords 는 unknown 을 받으므로 의도적으로 잘못된 값도 흘려보낼 수 있다.
 function row(over: Record<string, unknown> = {}): Record<string, unknown> {
+  const level = typeof over.level === 'number' ? over.level : 0
   return {
-    level: 0,
+    id: `sword_${level}`,
+    nextId: null,
+    level,
     enhanceCost: { kind: 'gold', amount: 300 },
     successRate: 1,
     sellPrice: null,
@@ -144,42 +147,48 @@ describe('parseSwords — dropOnFail 구조 검증', () => {
   })
 })
 
-describe('parseSwords — 재료검 참조 무결성', () => {
-  it('존재하는 검 단계를 재료로 참조하면 통과', () => {
+describe('parseSwords — 진행 체인(nextId) · id 무결성', () => {
+  it('nextId가 null(최종 단계)이거나 실재하는 검 id면 통과', () => {
     const swords = parseSwords([
-      row({ level: 19 }),
-      row({
-        level: 21,
-        enhanceCost: { kind: 'item', itemId: 'sword_19', count: 1 },
-        successRate: 0.4,
-        sellPrice: 1,
-      }),
+      row({ level: 0, id: 'sword_0', nextId: 'sword_1' }),
+      row({ level: 1, id: 'sword_1', nextId: null }),
     ])
     expect(swords).toHaveLength(2)
+    expect(swords[0].nextId).toBe('sword_1')
+    expect(swords[1].nextId).toBeNull()
   })
 
-  it('존재하지 않는 검 단계를 재료로 참조하면 throw', () => {
+  it('nextId가 존재하지 않는 검을 가리키면 throw', () => {
     expect(() =>
-      parseSwords([
-        row({ level: 0 }),
-        row({
-          level: 21,
-          enhanceCost: { kind: 'item', itemId: 'sword_99', count: 1 },
-          successRate: 0.4,
-          sellPrice: 1,
-        }),
-      ]),
+      parseSwords([row({ level: 0, id: 'sword_0', nextId: 'sword_99' })]),
     ).toThrow()
   })
 
-  it('잡템 itemId는 참조 무결성 검사를 하지 않는다(통과)', () => {
+  it('중복 id면 throw', () => {
+    expect(() =>
+      parseSwords([row({ level: 0, id: 'dup' }), row({ level: 1, id: 'dup' })]),
+    ).toThrow()
+  })
+
+  it('id가 비었으면 throw', () => {
+    expect(() => parseSwords([row({ id: '' })])).toThrow()
+  })
+
+  // 검 재료(enhanceCost item)의 itemId 오타 검증은 여기서 하지 않는다 — 검과 잡템이 itemId
+  // 네임스페이스를 공유해 패턴으로 구분할 수 없으므로, 전체 itemId 검증은 아이템 카탈로그
+  // 스프린트로 이관한다. 따라서 검 id든 잡템 slug든 구조만 맞으면 통과한다.
+  it('enhanceCost 아이템 참조는 무결성 검사를 하지 않는다(검·잡템 모두 통과)', () => {
     const swords = parseSwords([
       row({
         level: 0,
         enhanceCost: { kind: 'item', itemId: 'evil_soul', count: 8 },
       }),
+      row({
+        level: 1,
+        enhanceCost: { kind: 'item', itemId: 'sword_99', count: 1 },
+      }),
     ])
-    expect(swords).toHaveLength(1)
+    expect(swords).toHaveLength(2)
   })
 })
 
@@ -248,6 +257,19 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     const last = loadSwords().find((s) => s.level === 29)
     expect(last?.enhanceCost).toBeNull()
     expect(last?.successRate).toBeNull()
+  })
+
+  it('진행 체인(nextId)이 +0에서 시작해 +29(최종)까지 끊김 없이 이어진다', () => {
+    const byId = new Map(loadSwords().map((s) => [s.id, s]))
+    let cur = byId.get('sword_0')
+    let hops = 0
+    while (cur && cur.nextId !== null) {
+      cur = byId.get(cur.nextId)
+      hops++
+    }
+    expect(hops).toBe(29) // 0→1→…→29
+    expect(cur?.id).toBe('sword_29')
+    expect(cur?.nextId).toBeNull()
   })
 
   it('이지버그 단계(+26~+28)는 방지권 사용 불가다', () => {

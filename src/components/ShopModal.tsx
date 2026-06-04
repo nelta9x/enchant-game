@@ -8,12 +8,7 @@ import { dataManager } from '../data/DataManager'
 import type { Material, ShopItem } from '../data/types'
 import { useI18nStore, useT, type Lang, type TranslationKey } from '../i18n'
 import { formatGold } from '../lib/format'
-import {
-  countOf,
-  itemDisplayName,
-  PROTECTION_TICKET_ID,
-  swordItemLevel,
-} from '../lib/items'
+import { countOf, itemDisplayName, PROTECTION_TICKET_ID } from '../lib/items'
 import { swordSpriteUrl } from '../lib/sprites'
 import { useGameStore } from '../store/gameStore'
 import { Coin } from './Coin'
@@ -231,8 +226,7 @@ function PriceTag({
 // 보석 아이콘이 기본. 고유 아이콘이 필요한 새 아이템은 이 분기를 늘린다.
 // (인벤토리 패널과 시각 규약은 같으나 컴포넌트는 의도적으로 분리해 둔다.)
 function ShopThumb({ itemId, alt }: { itemId: string; alt: string }) {
-  const lvl = swordItemLevel(itemId)
-  const sword = lvl !== null ? dataManager.getSwordByLevel(lvl) : undefined
+  const sword = dataManager.getSwordById(itemId)
   if (sword) {
     return (
       <img
