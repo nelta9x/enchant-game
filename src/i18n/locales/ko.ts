@@ -18,9 +18,11 @@ export const ko = {
   'cost.sell': '판매가격',
   'cost.free': '무료',
 
-  // 강화 / 판매 동작
+  // 강화 / 판매 / 보관 / 장착 동작
   'action.enhance': '강화',
   'action.sell': '판매',
+  'action.store': '보관',
+  'action.equip': '장착',
 
   // 방지권 사용(armed) 토글
   'protection.toggle': '방지권 사용 전환',
@@ -34,7 +36,6 @@ export const ko = {
 
   // 인벤토리
   'inventory.title': '인벤토리',
-  'inventory.equipped': '장착 중',
 
   // 강화 결과 토스트
   'toast.success': '강화 성공',

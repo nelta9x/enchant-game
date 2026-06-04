@@ -21,6 +21,7 @@ import { GoldDisplay } from './GoldDisplay'
 import { InventoryPanel } from './InventoryPanel'
 import { particleCount } from './particles'
 import { SellButton } from './SellButton'
+import { StoreButton } from './StoreButton'
 import { SHAKE_SEC } from './shake'
 import { ShopModal } from './ShopModal'
 import {
@@ -52,6 +53,9 @@ export function GameScreen() {
   const canEnhanceFn = useGameStore((s) => s.canEnhance)
   const sell = useGameStore((s) => s.sell)
   const canSellFn = useGameStore((s) => s.canSell)
+  const store = useGameStore((s) => s.store)
+  const equip = useGameStore((s) => s.equip)
+  const canStoreFn = useGameStore((s) => s.canStore)
 
   const protectionArmed = useUiStore((s) => s.protectionArmed)
   const toggleProtection = useUiStore((s) => s.toggleProtection)
@@ -76,6 +80,7 @@ export function GameScreen() {
   const effectiveProtection = protectionArmed && canArm
   const canEnhance = canEnhanceFn(effectiveProtection)
   const canSell = canSellFn()
+  const canStore = canStoreFn()
 
   // 상점 팝업 열림 상태.
   const [shopOpen, setShopOpen] = useState(false)
@@ -230,6 +235,7 @@ export function GameScreen() {
                 sword={sword}
                 level={sword?.level ?? null}
                 items={items}
+                onEquip={equip}
               />
             </div>
           </div>
@@ -279,6 +285,7 @@ export function GameScreen() {
                   onEnhance={handleEnhance}
                 />
                 <SellButton disabled={!canSell} onSell={handleSell} />
+                <StoreButton disabled={!canStore} onStore={store} />
               </div>
             </div>
             <div ref={goldRef}>

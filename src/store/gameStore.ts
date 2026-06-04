@@ -27,6 +27,17 @@ type GameActions = {
   // qty개 인벤토리에 적재한다. 불가(항목 없음 / 가격 부족 / qty 비정상)면 null(변화 없음).
   // 반환값 = 구매한 상점 항목(ShopItem).
   buy: (shopId: string, qty?: number) => ShopItem | null
+  // 보관 가능 여부(현재 검이 있고 시작 검이 아님). UI 게이팅용.
+  canStore: () => boolean
+  // 현재 검을 인벤토리에 보관하고 시작 검(낡은 단검)으로 되돌린다.
+  // 보관 불가(검 없음 / 이미 시작 검)면 아무 변화 없음.
+  store: () => void
+  // 가방의 검(itemId)을 강화 슬롯에 장착한다. 현재 검은 가방으로 보관하고(시작 검이면 버림),
+  // itemId 1개를 가방에서 뺀다. 검이 아니거나 미보유면 아무 변화 없음(방어).
+  // canStore 와 달리 canEquip 게이트는 두지 않는다 — 가방에 렌더되는 검 행은 항상 보유(count>0)
+  // 하는 실제 검이라 장착이 늘 유효하다(게이팅할 무효 상태가 없음). 판매·강화처럼 무효 상태가
+  // 발생할 수 있는 동작만 canX 게이트를 둔다.
+  equip: (itemId: string) => void
 }
 
 export type GameState = PlayerState & GameActions
@@ -117,6 +128,19 @@ function equipNextFromBag(items: readonly ItemStack[]): {
     id: best.id,
     items: subtractItems(items, [{ itemId: best.id, count: 1 }]),
   }
+}
+
+// 강화 슬롯에서 빠지는 검(outgoingId)을 가방에 보관한다(보관·장착 공통).
+// 불변식: 가방엔 시작 검(낡은 단검)이 없다 — equipNextFromBag 이 시작 검을 '생성'할 뿐
+// 보관하지 않는 것과 동일하게, 시작 검(과 null=검 없음)은 가방에 두지 않고 버린다.
+function bankOutgoing(
+  items: readonly ItemStack[],
+  outgoingId: string | null,
+): ItemStack[] {
+  if (outgoingId === null || outgoingId === INITIAL_SWORD_ID) {
+    return items.map((i) => ({ ...i }))
+  }
+  return addItems(items, [{ itemId: outgoingId, count: 1 }])
 }
 
 // 게임 진행 상태 store 팩토리. 기본 인스턴스(useGameStore)는 Math.random 엔진을 쓰고,
@@ -233,6 +257,36 @@ export function createGameStore(opts: CreateOpts = {}) {
           }
         })
         return entry
+      },
+
+      canStore: () => {
+        const id = get().currentSwordId
+        return id !== null && id !== INITIAL_SWORD_ID
+      },
+
+      store: () => {
+        const id = get().currentSwordId
+        // 게이트는 canStore 와 동일 조건(시작 검·검 없음이면 보관할 게 없음).
+        if (id === null || id === INITIAL_SWORD_ID) return
+        set((state) => ({
+          currentSwordId: INITIAL_SWORD_ID,
+          items: bankOutgoing(state.items, id),
+        }))
+      },
+
+      equip: (itemId) => {
+        // 방어적 전제: 검으로 해석되고 1개 이상 보유해야 한다(아니면 무변화).
+        if (dataManager.getSwordById(itemId) === undefined) return
+        if (countOf(get().items, itemId) <= 0) return
+        set((state) => ({
+          currentSwordId: itemId,
+          // 현재 검을 가방으로 보관(시작 검이면 버림) → 장착할 검 1개를 가방에서 뺀다.
+          // itemId === 현재 검이어도 보관 +1 / 차감 -1 이 상쇄돼 안전한 무변화다.
+          items: subtractItems(
+            bankOutgoing(state.items, state.currentSwordId),
+            [{ itemId, count: 1 }],
+          ),
+        }))
       },
     }
   })

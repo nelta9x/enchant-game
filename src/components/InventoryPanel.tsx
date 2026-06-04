@@ -3,19 +3,26 @@ import { useT, type TranslationKey } from '../i18n'
 import type { SwordData } from '../data/types'
 import type { ItemStack } from '../game/types'
 import { itemDisplayName, PROTECTION_TICKET_ID } from '../lib/items'
-import { formatRate } from '../lib/format'
 import { swordSpriteUrl } from '../lib/sprites'
 
-// 보유 인벤토리 패널: 맨 위 장착 중인 검(선택 행) + 그 아래 보유 아이템 행들.
-// 행 내용은 itemId 유형으로 분기한다 — 검 재료(sword_<level>)는 스프라이트+레벨,
-// 그 외(방지권·잡템)는 아이콘+수량.
+// 보유 인벤토리 패널 = 무기 관리 표면: 맨 위 장착 중인 검(금색 하이라이트 행) + 그 아래 보유 아이템 행들.
+// 행 내용은 itemId 유형으로 분기한다 — 검 재료(sword_<level>)는 스프라이트+레벨이며 클릭하면 장착,
+// 그 외(방지권·잡템)는 아이콘+수량의 정적 행이다. (로직은 store에 있고 여기선 렌더+위임만 — 원칙 3)
+// 장착 중인 검은 금색 하이라이트로만 표시한다(별도 배지 없음). 보관 동작은 우측 액션 열(보관 버튼)에 둔다.
 type InventoryPanelProps = {
   sword: SwordData | undefined
   level: number | null
   items: ItemStack[]
+  // 가방의 검(itemId) 행을 클릭하면 장착한다.
+  onEquip: (itemId: string) => void
 }
 
-export function InventoryPanel({ sword, level, items }: InventoryPanelProps) {
+export function InventoryPanel({
+  sword,
+  level,
+  items,
+  onEquip,
+}: InventoryPanelProps) {
   const t = useT()
   const equipped = sword !== undefined && level !== null
   const count = (equipped ? 1 : 0) + items.length
@@ -32,51 +39,29 @@ export function InventoryPanel({ sword, level, items }: InventoryPanelProps) {
       </div>
 
       <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-        {equipped && (
-          <EquippedRow
-            sword={sword}
-            level={level}
-            equippedLabel={t('inventory.equipped')}
-          />
-        )}
+        {equipped && <EquippedRow sword={sword} level={level} />}
         {items.map((it) => (
-          <ItemRow key={it.itemId} item={it} t={t} />
+          <ItemRow key={it.itemId} item={it} t={t} onEquip={onEquip} />
         ))}
       </ul>
     </div>
   )
 }
 
-function EquippedRow({
-  sword,
-  level,
-  equippedLabel,
-}: {
-  sword: SwordData
-  level: number
-  equippedLabel: string
-}) {
+// 장착 중인 검 — 금색 하이라이트가 곧 "장착 중" 표시다(별도 배지·버튼·성공률 없음).
+function EquippedRow({ sword, level }: { sword: SwordData; level: number }) {
   const t = useT()
-  const rate = sword.successRate !== null ? formatRate(sword.successRate) : '—'
   return (
     <li className="flex items-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5 py-1.5">
       <SpriteThumb src={swordSpriteUrl(sword.sprite)} alt={t(sword.nameKey)} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold text-on-dark">
-            {t(sword.nameKey)}
-          </span>
-          <span className="shrink-0 text-xs font-bold tabular-nums text-gold">
-            +{level}
-          </span>
-        </div>
-        <div className="text-[11px] text-on-dark-soft">
-          {t('stat.successRate')} {rate}
-        </div>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <span className="truncate text-sm font-semibold text-on-dark">
+          {t(sword.nameKey)}
+        </span>
+        <span className="shrink-0 text-xs font-bold tabular-nums text-gold">
+          +{level}
+        </span>
       </div>
-      <span className="shrink-0 rounded bg-gold/20 px-1.5 py-0.5 text-[10px] font-semibold text-gold">
-        {equippedLabel}
-      </span>
     </li>
   )
 }
@@ -84,34 +69,63 @@ function EquippedRow({
 function ItemRow({
   item,
   t,
+  onEquip,
 }: {
   item: ItemStack
   t: (key: TranslationKey) => string
+  onEquip: (itemId: string) => void
 }) {
   const sword = dataManager.getSwordById(item.itemId)
   const lvl = sword?.level ?? null
   const name = itemDisplayName(item.itemId, t)
 
-  return (
-    <li className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5 hover:bg-panel-soft/60">
-      {sword ? (
-        <SpriteThumb src={swordSpriteUrl(sword.sprite)} alt={name} />
-      ) : (
-        <TokenThumb itemId={item.itemId} />
-      )}
-      <div className="min-w-0 flex-1">
-        <span className="truncate text-sm font-medium text-on-dark">
-          {name}
+  const thumb = sword ? (
+    <SpriteThumb src={swordSpriteUrl(sword.sprite)} alt={name} />
+  ) : (
+    <TokenThumb itemId={item.itemId} />
+  )
+  const label = (
+    <div className="min-w-0 flex-1 text-left">
+      <span className="truncate text-sm font-medium text-on-dark">{name}</span>
+      {lvl !== null && (
+        <span className="ml-1.5 text-xs font-bold tabular-nums text-on-dark-soft">
+          +{lvl}
         </span>
-        {lvl !== null && (
-          <span className="ml-1.5 text-xs font-bold tabular-nums text-on-dark-soft">
-            +{lvl}
-          </span>
-        )}
-      </div>
-      <span className="shrink-0 text-xs font-semibold tabular-nums text-on-dark-soft">
-        ×{item.count}
-      </span>
+      )}
+    </div>
+  )
+  const count = (
+    <span className="shrink-0 text-xs font-semibold tabular-nums text-on-dark-soft">
+      ×{item.count}
+    </span>
+  )
+
+  // 검 행은 클릭하면 곧바로 장착(현재 검은 가방으로 보관) — 실제 버튼으로 만들어 키보드/스크린리더
+  // 접근성을 유지하고, 호버 하이라이트가 클릭 가능 표시다(별도 장착 칩 없음).
+  // 가방에 렌더되는 검 행은 항상 보유(count>0)하는 실제 검이라 장착이 늘 유효 → per-row 비활성 게이트 불필요.
+  if (sword) {
+    return (
+      <li>
+        <button
+          type="button"
+          onClick={() => onEquip(item.itemId)}
+          aria-label={`${t('action.equip')}: ${name}`}
+          className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 hover:bg-panel-soft/60"
+        >
+          {thumb}
+          {label}
+          {count}
+        </button>
+      </li>
+    )
+  }
+
+  // 검이 아닌 아이템(방지권·잡템)은 정적 표시(클릭 동작 없음).
+  return (
+    <li className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5">
+      {thumb}
+      {label}
+      {count}
     </li>
   )
 }

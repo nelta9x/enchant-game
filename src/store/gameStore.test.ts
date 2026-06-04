@@ -194,6 +194,141 @@ describe('gameStore — 판매', () => {
   })
 })
 
+describe('gameStore — 보관 / 장착', () => {
+  it('canStore: 시작 검(+0)·검 없음은 보관 불가, 그 외 검은 가능', () => {
+    expect(
+      createGameStore({ currentSwordId: 'sword_0' }).getState().canStore(),
+    ).toBe(false)
+    expect(
+      createGameStore({ currentSwordId: null }).getState().canStore(),
+    ).toBe(false)
+    expect(
+      createGameStore({ currentSwordId: 'sword_5' }).getState().canStore(),
+    ).toBe(true)
+  })
+
+  it('보관: 현재 검을 가방에 넣고 시작 검(+0)으로 되돌린다', () => {
+    const store = createGameStore({ currentSwordId: 'sword_5', items: [] })
+    store.getState().store()
+    expect(store.getState().currentSwordId).toBe('sword_0')
+    expect(countOf(store.getState().items, 'sword_5')).toBe(1)
+  })
+
+  it('보관: 같은 검을 또 보관하면 가방 스택이 합산된다', () => {
+    const store = createGameStore({
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'sword_5', count: 1 }],
+    })
+    store.getState().store()
+    expect(countOf(store.getState().items, 'sword_5')).toBe(2)
+  })
+
+  it('보관: 시작 검(+0)·검 없음은 무변화(no-op)', () => {
+    const atStart = createGameStore({ currentSwordId: 'sword_0', items: [] })
+    atStart.getState().store()
+    expect(atStart.getState().currentSwordId).toBe('sword_0')
+    expect(atStart.getState().items).toEqual([])
+
+    const empty = createGameStore({ currentSwordId: null, items: [] })
+    empty.getState().store()
+    expect(empty.getState().currentSwordId).toBeNull()
+  })
+
+  it('장착: 가방의 검을 장착하고 현재 검은 가방으로 보관(스왑)', () => {
+    const store = createGameStore({
+      currentSwordId: 'sword_3',
+      items: [{ itemId: 'sword_8', count: 1 }],
+    })
+    store.getState().equip('sword_8')
+    expect(store.getState().currentSwordId).toBe('sword_8')
+    expect(countOf(store.getState().items, 'sword_8')).toBe(0)
+    expect(countOf(store.getState().items, 'sword_3')).toBe(1)
+    // 빠진 sword_8 슬롯은 0 잔여 없이 제거된다(유령 슬롯 방지).
+    expect(store.getState().items).toHaveLength(1)
+  })
+
+  it('장착: 현재 검과 같은 검을 장착하면 안전한 무변화(보관 +1 / 차감 -1 상쇄)', () => {
+    const store = createGameStore({
+      currentSwordId: 'sword_8',
+      items: [{ itemId: 'sword_8', count: 2 }],
+    })
+    store.getState().equip('sword_8')
+    expect(store.getState().currentSwordId).toBe('sword_8')
+    expect(store.getState().items).toEqual([{ itemId: 'sword_8', count: 2 }])
+  })
+
+  it('장착: 시작 검(+0)을 들고 있으면 빠지는 시작 검은 버린다(가방에 +0 안 쌓임)', () => {
+    const store = createGameStore({
+      currentSwordId: 'sword_0',
+      items: [{ itemId: 'sword_8', count: 1 }],
+    })
+    store.getState().equip('sword_8')
+    expect(store.getState().currentSwordId).toBe('sword_8')
+    expect(countOf(store.getState().items, 'sword_0')).toBe(0)
+    expect(store.getState().items).toEqual([])
+  })
+
+  it('장착 라운드트립: 보관 → 다시 장착하면 가방이 비고 시작 검(+0) 잔여가 없다', () => {
+    const store = createGameStore({ currentSwordId: 'sword_5', items: [] })
+    store.getState().store() // +5 → 가방, 장착 +0
+    store.getState().equip('sword_5') // +5 다시 장착, +0 폐기
+    expect(store.getState().currentSwordId).toBe('sword_5')
+    expect(store.getState().items).toEqual([])
+  })
+
+  it('장착: 같은 레벨이 여럿이면 1개만 빠진다(스택)', () => {
+    const store = createGameStore({
+      currentSwordId: 'sword_3',
+      items: [{ itemId: 'sword_8', count: 2 }],
+    })
+    store.getState().equip('sword_8')
+    expect(store.getState().currentSwordId).toBe('sword_8')
+    expect(countOf(store.getState().items, 'sword_8')).toBe(1)
+    expect(countOf(store.getState().items, 'sword_3')).toBe(1)
+    // 스택 1개만 차감 + 보관된 sword_3 → 슬롯 2개(유령 슬롯 없음).
+    expect(store.getState().items).toHaveLength(2)
+  })
+
+  it('장착: 검이 없을 때(null)도 보관 없이 장착된다', () => {
+    const store = createGameStore({
+      currentSwordId: null,
+      items: [{ itemId: 'sword_8', count: 1 }],
+    })
+    store.getState().equip('sword_8')
+    expect(store.getState().currentSwordId).toBe('sword_8')
+    expect(store.getState().items).toEqual([])
+  })
+
+  it('장착: 검이 아닌 itemId·미보유 검은 무변화(방어)', () => {
+    const store = createGameStore({
+      currentSwordId: 'sword_3',
+      items: [{ itemId: PROTECTION_TICKET_ID, count: 2 }],
+    })
+    store.getState().equip(PROTECTION_TICKET_ID) // 방지권은 검이 아님 → 무시
+    store.getState().equip('sword_8') // 보유하지 않은 검 → 무시
+    expect(store.getState().currentSwordId).toBe('sword_3')
+    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(2)
+  })
+
+  it('보관→장착→판매 시퀀스: "가방엔 +0 없음" 불변식이 연산 경계를 넘어 유지된다', () => {
+    // sword_5 장착 중 + 가방에 sword_8 보유.
+    const store = createGameStore({
+      gold: 0,
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'sword_8', count: 1 }],
+    })
+    store.getState().equip('sword_8') // sword_8 장착, sword_5 가방으로
+    expect(store.getState().currentSwordId).toBe('sword_8')
+    expect(countOf(store.getState().items, 'sword_5')).toBe(1)
+    // sword_8 판매 → 빈 슬롯을 가방의 sword_5 로 채운다(낡은 단검 아님).
+    const got = store.getState().sell()
+    expect(got).toBe(10000)
+    expect(store.getState().currentSwordId).toBe('sword_5')
+    expect(countOf(store.getState().items, 'sword_0')).toBe(0)
+    expect(store.getState().items).toEqual([])
+  })
+})
+
 describe('gameStore — 상점 구매', () => {
   // shop.json: protection_ticket_gold(골드 100만), protection_ticket_scrap(철조각 10개)
   it('골드 구매: 골드 차감 + 방지권 적재', () => {

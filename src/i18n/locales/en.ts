@@ -19,9 +19,11 @@ export const en: Record<TranslationKey, string> = {
   'cost.sell': 'Sell Price',
   'cost.free': 'Free',
 
-  // 강화 / 판매 동작
+  // 강화 / 판매 / 보관 / 장착 동작
   'action.enhance': 'Enhance',
   'action.sell': 'Sell',
+  'action.store': 'Store',
+  'action.equip': 'Equip',
 
   // 방지권 사용(armed) 토글
   'protection.toggle': 'Toggle protection',
@@ -35,7 +37,6 @@ export const en: Record<TranslationKey, string> = {
 
   // 인벤토리
   'inventory.title': 'Inventory',
-  'inventory.equipped': 'Equipped',
 
   // 강화 결과 토스트
   'toast.success': 'Enhanced',
