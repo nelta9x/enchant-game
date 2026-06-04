@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { dataManager } from '../data/DataManager'
 import { PROTECTION_TICKET_ID } from '../game/enhancer'
 import { useT, type TranslationKey } from '../i18n'
@@ -15,6 +15,8 @@ import {
   type DestructionEvent,
 } from './DestructionEffect'
 import { destructionTargetOf } from './destruction'
+import { coinCount } from './coins'
+import { CoinFlight, COIN_FLIGHT_MS, type CoinFlightEvent } from './CoinFlight'
 import { EnhanceButton } from './EnhanceButton'
 import { GoldDisplay } from './GoldDisplay'
 import { InventoryPanel } from './InventoryPanel'
@@ -80,6 +82,23 @@ export function GameScreen() {
   const [shopOpen, setShopOpen] = useState(false)
   const openShop = useCallback(() => setShopOpen(true), [])
   const closeShop = useCallback(() => setShopOpen(false), [])
+
+  // 판매 코인 연출의 출발점(검 박스)·도착점(골드창) 측정용 ref.
+  const swordBoxRef = useRef<HTMLDivElement>(null)
+  const goldRef = useRef<HTMLDivElement>(null)
+
+  const handleSell = () => {
+    const price = sell()
+    if (price === null || price <= 0) return
+    // 판매 = 검에서 코인이 뿜어져 골드창으로 빨려 들어가는 연출(잠금 없음·병렬). 코인 수는 판매가에 비례.
+    enqueueEffect({
+      kind: 'coinFlight',
+      exclusive: false,
+      locksEnhance: false,
+      durationMs: COIN_FLIGHT_MS,
+      payload: { coinCount: coinCount(price) },
+    })
+  }
 
   const handleEnhance = () => {
     const result = enhance(effectiveProtection)
@@ -161,6 +180,10 @@ export function GameScreen() {
       ? { id: fx.id, particleCount: fx.payload?.particleCount ?? 0 }
       : null
   }, [running])
+  const coinFlightEvent = useMemo<CoinFlightEvent | null>(() => {
+    const fx = latestRunning(running, 'coinFlight')
+    return fx ? { id: fx.id, coinCount: fx.payload?.coinCount ?? 0 } : null
+  }, [running])
   const shakeKey = latestRunning(running, 'protectedShake')?.id ?? 0
 
   // 결과를 스크린리더에 알린다(시각 연출은 aria-hidden). 가장 최근 알림 대상 효과의 문구.
@@ -216,6 +239,8 @@ export function GameScreen() {
               }
               // 방지 시 실제 검을 떨게 한다(파괴와 구분 — 폭발 없이 떨림만).
               shakeKey={shakeKey}
+              // 판매 코인이 뿜어져 나올 출발점(검 박스) 측정용.
+              swordBoxRef={swordBoxRef}
             />
             {/* 결과 음성 알림(시각 연출은 aria-hidden) — 화면엔 보이지 않는 라이브 리전. */}
             <div
@@ -236,12 +261,26 @@ export function GameScreen() {
                   disabled={!canEnhance || lockCount > 0}
                   onEnhance={handleEnhance}
                 />
-                <SellButton disabled={!canSell} onSell={sell} />
+                <SellButton disabled={!canSell} onSell={handleSell} />
               </div>
             </div>
-            <GoldDisplay gold={gold} />
+            <div ref={goldRef}>
+              <GoldDisplay
+                gold={gold}
+                pulseKey={coinFlightEvent?.id ?? 0}
+                coinCount={coinFlightEvent?.coinCount ?? 0}
+              />
+            </div>
           </div>
         </div>
+
+        {/* 판매 코인 연출 — 카드 전체를 덮는 오버레이(검 → 골드창, 컬럼 가로지름). 자리만 차지하지
+            않도록 absolute. 출발/도착은 swordBoxRef·goldRef 로 측정한다. */}
+        <CoinFlight
+          event={coinFlightEvent}
+          sourceRef={swordBoxRef}
+          targetRef={goldRef}
+        />
       </div>
 
       {/* 상점 팝업 (전체 화면 오버레이 — 열렸을 때만 렌더) */}

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, type ReactNode, type Ref } from 'react'
 import { motion, useAnimationControls } from 'motion/react'
 import { useT } from '../i18n'
 import type { SwordData } from '../data/types'
@@ -23,6 +23,8 @@ type SwordStageProps = {
   // 방지권으로 살아남았을 때 "떨림만" 재생하는 트리거. 값이 바뀔 때마다 실제 검 스프라이트가
   // 한 번 덜덜 떤다(파괴 잔상과 같은 공유 SHAKE). 파괴 시에는 올리지 않는다(이중 떨림 방지).
   shakeKey?: number
+  // 검 스프라이트 박스에 대한 ref — 판매 코인 연출이 "코인이 뿜어져 나올 출발점"을 측정하는 데 쓴다.
+  swordBoxRef?: Ref<HTMLDivElement>
 }
 
 // 양피지 위에 얹는 가로 육각형 배너 클립.
@@ -39,6 +41,7 @@ export function SwordStage({
   spriteOverlay,
   entranceDelay = 0,
   shakeKey = 0,
+  swordBoxRef,
 }: SwordStageProps) {
   const t = useT()
   const hasSword = sword !== undefined && level !== null
@@ -60,7 +63,10 @@ export function SwordStage({
   return (
     <div className="flex flex-col items-center gap-5">
       {/* 검 + 글로우 + 마법진 */}
-      <div className="relative flex h-52 w-52 items-center justify-center sm:h-60 sm:w-60">
+      <div
+        ref={swordBoxRef}
+        className="relative flex h-52 w-52 items-center justify-center sm:h-60 sm:w-60"
+      >
         {/* 따뜻한 골드 글로우 */}
         <div
           className="pointer-events-none absolute inset-0"

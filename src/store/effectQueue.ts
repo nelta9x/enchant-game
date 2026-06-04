@@ -12,6 +12,7 @@
 export type EffectPayload = {
   spriteUrl?: string // 파괴 잔상 스프라이트(파괴 전용)
   particleCount?: number // 분출할 파티클 수(파괴·성공 — 단계에 비례)
+  coinCount?: number // 분출할 코인 수(판매 — 판매가에 비례)
 }
 
 // 효과 명세(호출 측이 enqueue 에 넘기는 것 — id 는 시스템이 부여).
