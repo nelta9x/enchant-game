@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code — 머신/개인용 로컬 설정은 추적 제외(launch.json 등 공유 설정은 커밋)
+.claude/settings.local.json
