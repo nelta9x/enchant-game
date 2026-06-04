@@ -70,7 +70,7 @@ export function GameScreen() {
       ? dataManager.getSwordById(currentSwordId)
       : undefined
 
-  // 방지권 사용(armed) 가능 조건: 단계가 방지권을 허용(number>0)하고, 요구 수량 이상 보유.
+  // 파괴보호장치 사용(armed) 가능 조건: 단계가 파괴보호장치를 허용(number>0)하고, 요구 수량 이상 보유.
   const ownedTickets = countOf(items, PROTECTION_TICKET_ID)
   const canArm =
     sword !== undefined &&
@@ -173,7 +173,7 @@ export function GameScreen() {
       }
       lockEnhance()
     } else if (result.outcome === 'protected') {
-      // 방지 = 떨림만(잠금·폭발 없음) → 방지권 덕분에 살아남았음을 인지시킨다.
+      // 방지 = 떨림만(잠금·폭발 없음) → 파괴보호장치 덕분에 살아남았음을 인지시킨다.
       enqueueEffect({
         kind: 'protectedShake',
         exclusive: false,

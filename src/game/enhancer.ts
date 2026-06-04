@@ -1,10 +1,10 @@
 import type { SwordData } from '../data/types'
 import type { ConsumedMaterials, EnhanceResult, ItemStack } from './types'
 
-// 방지권 아이템 itemId 규약(게임 도메인 items 인벤토리와 동일).
+// 파괴보호장치 아이템 itemId 규약(게임 도메인 items 인벤토리와 동일).
 export const PROTECTION_TICKET_ID = 'protection_ticket'
 
-// 강화기 입력: 강화할 검 + 제공 재료(골드/아이템) + 방지권 사용 여부.
+// 강화기 입력: 강화할 검 + 제공 재료(골드/아이템) + 파괴보호장치 사용 여부.
 // 엔진은 supply 를 변경하지 않는다 — 소모분은 결과(consumed)로 돌려주고 호출자가 적용한다.
 export type EnhanceInput = {
   sword: SwordData
@@ -91,7 +91,7 @@ export class Enhancer {
       }
     }
 
-    // 실패. 방지권 사용 시 검 보존(방지권만 추가 소모, 드랍 없음), 아니면 파괴.
+    // 실패. 파괴보호장치 사용 시 검 보존(파괴보호장치만 추가 소모, 드랍 없음), 아니면 파괴.
     if (useProtection === true) {
       const used = sword.protectionTickets as number // validate 가 number>0 보장
       return {

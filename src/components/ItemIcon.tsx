@@ -2,7 +2,7 @@ import { dataManager } from '../data/DataManager'
 import { itemSpriteName, PROTECTION_TICKET_ID } from '../lib/items'
 import { itemSpriteUrl, swordSpriteUrl } from '../lib/sprites'
 
-// 아이템 한 칸의 아이콘 — 검은 전용 스프라이트, 그 외(방지권·잡템)도 전용 스프라이트가 있으면 그것을,
+// 아이템 한 칸의 아이콘 — 검은 전용 스프라이트, 그 외(파괴보호장치·잡템)도 전용 스프라이트가 있으면 그것을,
 // 없으면 토큰 아이콘(방패/보석)으로 폴백한다. "검이냐 / 스프라이트가 있냐" 결정을 한 곳에 둔다
 // (원칙 2: 검 조회는 DataManager, 아이템 스프라이트는 lib/items 매핑). 크기는 className(h-*/w-*)으로 지정.
 // alt 는 스프라이트의 대체 텍스트 — 인접 텍스트가 이름을 이미 읽어 주는 곳에선 빈 문자열로 둔다.
@@ -31,7 +31,7 @@ export function ItemIcon({
       />
     )
   }
-  // 전용 스프라이트가 없는 아이템 — 방지권은 방패, 그 외 잡템은 보석 아이콘으로 폴백.
+  // 전용 스프라이트가 없는 아이템 — 파괴보호장치는 방패, 그 외 잡템은 보석 아이콘으로 폴백.
   const isTicket = itemId === PROTECTION_TICKET_ID
   return (
     <span

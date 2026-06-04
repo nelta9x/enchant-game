@@ -120,7 +120,7 @@ describe('Enhancer — 재료 부족 (req 2)', () => {
 })
 
 describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
-  it('방지권 없이 실패하면 파괴되고 dropOnFail 이 drops 로 산출된다', () => {
+  it('파괴보호장치 없이 실패하면 파괴되고 dropOnFail 이 drops 로 산출된다', () => {
     const s = sword({
       successRate: 0.5,
       dropOnFail: { itemId: 'iron_scrap', count: 1 },
@@ -150,7 +150,7 @@ describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
   })
 })
 
-describe('Enhancer — 파괴 방지권 (req 4)', () => {
+describe('Enhancer — 파괴보호장치 (req 4)', () => {
   const protectable = sword({
     level: 14,
     successRate: 0.5,
@@ -162,7 +162,7 @@ describe('Enhancer — 파괴 방지권 (req 4)', () => {
     items: [{ itemId: PROTECTION_TICKET_ID, count: 5 }],
   }
 
-  it('방지권 사용 시 실패해도 보존되고, 드랍이 없으며, 방지권이 소모된다', () => {
+  it('파괴보호장치 사용 시 실패해도 보존되고, 드랍이 없으며, 파괴보호장치가 소모된다', () => {
     const r = new Enhancer(alwaysFails).enhance({
       sword: protectable,
       supply: withTickets,
@@ -180,7 +180,7 @@ describe('Enhancer — 파괴 방지권 (req 4)', () => {
     }
   })
 
-  it('성공 시에는 (useProtection=true 라도) 방지권을 소모하지 않는다', () => {
+  it('성공 시에는 (useProtection=true 라도) 파괴보호장치를 소모하지 않는다', () => {
     const r = new Enhancer(alwaysSucceeds).enhance({
       sword: protectable,
       supply: withTickets,
@@ -192,7 +192,7 @@ describe('Enhancer — 파괴 방지권 (req 4)', () => {
     ).toBeUndefined()
   })
 
-  it('방지권이 부족하면 throw', () => {
+  it('파괴보호장치가 부족하면 throw', () => {
     const supply: EnhanceInput['supply'] = {
       gold: 1000,
       items: [{ itemId: PROTECTION_TICKET_ID, count: 2 }],

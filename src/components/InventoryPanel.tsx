@@ -8,7 +8,7 @@ import { ItemIcon } from './ItemIcon'
 
 // 보유 인벤토리 패널 = 무기 관리 표면: 맨 위 장착 중인 검(금색 하이라이트 행) + 그 아래 보유 아이템 행들.
 // 행 내용은 itemId 유형으로 분기한다 — 검 재료(sword_<level>)는 스프라이트+레벨이며 클릭하면 장착,
-// 그 외(방지권·잡템)는 아이콘+수량의 정적 행이다. (로직은 store에 있고 여기선 렌더+위임만 — 원칙 3)
+// 그 외(파괴보호장치·잡템)는 아이콘+수량의 정적 행이다. (로직은 store에 있고 여기선 렌더+위임만 — 원칙 3)
 // 장착 중인 검은 금색 하이라이트로만 표시한다(별도 배지 없음). 보관 동작은 우측 액션 열(보관 버튼)에 둔다.
 type InventoryPanelProps = {
   sword: SwordData | undefined
@@ -118,7 +118,7 @@ function ItemRow({
     )
   }
 
-  // 검이 아닌 아이템(방지권·잡템)은 정적 표시(클릭 동작 없음).
+  // 검이 아닌 아이템(파괴보호장치·잡템)은 정적 표시(클릭 동작 없음).
   return (
     <li className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5">
       {thumb}

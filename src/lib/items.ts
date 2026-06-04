@@ -3,12 +3,12 @@ import { PROTECTION_TICKET_ID } from '../game/enhancer'
 import type { TranslationKey } from '../i18n'
 import type { ItemStack } from '../game/types'
 
-// 방지권 itemId 의 정식 출처는 엔진(enhancer)이다. 엔진은 DataManager 비의존이라
+// 파괴보호장치 itemId 의 정식 출처는 엔진(enhancer)이다. 엔진은 DataManager 비의존이라
 // 상수를 거기 두고, 뷰·아이템 어휘 계층은 엔진을 직접 import 하지 않고 이 허브를
 // 통해 같은 상수를 참조한다(재노출).
 export { PROTECTION_TICKET_ID }
 
-// 검이 아닌 아이템(방지권 · 잡템) → 표시명 i18n 키 매핑.
+// 검이 아닌 아이템(파괴보호장치 · 잡템) → 표시명 i18n 키 매핑.
 // 동적 문자열로 t()를 호출하면 TranslationKey 타입을 벗어나므로, 알려진 itemId만
 // 리터럴 키로 매핑해 타입 안전하게 해석한다. (검 재료는 SwordData.nameKey로 해석)
 const ITEM_NAME_KEYS: Record<string, TranslationKey> = {
@@ -18,7 +18,7 @@ const ITEM_NAME_KEYS: Record<string, TranslationKey> = {
   flame_sword_handle: 'item.flame_sword_handle',
 }
 
-// 검이 아닌 아이템(방지권·잡템) → 전용 스프라이트 파일명(public/sprites/items/) 매핑.
+// 검이 아닌 아이템(파괴보호장치·잡템) → 전용 스프라이트 파일명(public/sprites/items/) 매핑.
 // 전용 PNG 가 있는 아이템만 등록한다 — 미등록 아이템은 ItemIcon 이 토큰 아이콘(방패/보석)으로 폴백한다.
 // (검 스프라이트는 SwordData.sprite, 골드 코인은 Coin 컴포넌트가 직접 참조)
 const ITEM_SPRITES: Record<string, string> = {
@@ -39,7 +39,7 @@ export function countOf(items: readonly ItemStack[], itemId: string): number {
 }
 
 // itemId → 표시명. 검(getSwordById로 해석)은 DataManager의 검 이름으로,
-// 그 외(방지권·잡템)는 item.<id> 키로 해석한다. 미지의 id는 원문 그대로(방어).
+// 그 외(파괴보호장치·잡템)는 item.<id> 키로 해석한다. 미지의 id는 원문 그대로(방어).
 export function itemDisplayName(
   itemId: string,
   t: (key: TranslationKey) => string,

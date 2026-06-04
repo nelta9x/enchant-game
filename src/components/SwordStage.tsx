@@ -7,7 +7,7 @@ import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, SHAKE_TRANSITION } from './shake'
 
 // 중앙 검 스테이지: 글로우 + 마법진 + 스프라이트 + 레벨 뱃지 + 이름 배너 + 스탯 바.
-// 방지권 스탯은 보유·단계 조건이 맞을 때(canArm) 사용(armed) 토글 버튼으로 동작한다.
+// 파괴보호장치 스탯은 보유·단계 조건이 맞을 때(canArm) 사용(armed) 토글 버튼으로 동작한다.
 type SwordStageProps = {
   sword: SwordData | undefined
   level: number | null
@@ -21,7 +21,7 @@ type SwordStageProps = {
   // 검 스프라이트 등장(fade-in) 시작 지연(초). 파괴 연출 중 새 검이 떨림 위로 비쳐 보이지
   // 않도록 호출 측이 연출 길이만큼 지연시킨다(기본 0 = 즉시 등장).
   entranceDelay?: number
-  // 방지권으로 살아남았을 때 "떨림만" 재생하는 트리거. 값이 바뀔 때마다 실제 검 스프라이트가
+  // 파괴보호장치로 살아남았을 때 "떨림만" 재생하는 트리거. 값이 바뀔 때마다 실제 검 스프라이트가
   // 한 번 덜덜 떤다(파괴 잔상과 같은 공유 SHAKE). 파괴 시에는 올리지 않는다(이중 떨림 방지).
   shakeKey?: number
   // 검 스프라이트 박스에 대한 ref — 판매 코인 연출이 "코인이 뿜어져 나올 출발점"을 측정하는 데 쓴다.
@@ -146,7 +146,7 @@ export function SwordStage({
         </div>
       </div>
 
-      {/* 스탯 바: 방지권(토글) | 성공률 */}
+      {/* 스탯 바: 파괴보호장치(토글) | 성공률 */}
       <div className="flex items-stretch overflow-hidden rounded-lg border border-parchment-line bg-parchment/85">
         <ProtectionStat
           count={ownedTickets}

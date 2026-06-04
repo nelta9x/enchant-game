@@ -272,7 +272,7 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     expect(cur?.nextId).toBeNull()
   })
 
-  it('이지버그 단계(+26~+28)는 방지권 사용 불가다', () => {
+  it('이지버그 단계(+26~+28)는 파괴보호장치 사용 불가다', () => {
     const swords = loadSwords()
     for (const level of [26, 27, 28]) {
       expect(swords.find((s) => s.level === level)?.protectionTickets).toBe(

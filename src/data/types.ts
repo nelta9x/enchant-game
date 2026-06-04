@@ -45,7 +45,7 @@ export type SwordData = {
   enhanceCost: Material | null // null = 최종 단계(강화 불가)
   successRate: number | null // 0~1, null = 최종 단계
   sellPrice: number | null // null = 판매 불가
-  protectionTickets: number | 'disabled' // 'disabled' = 방지권 사용 불가
+  protectionTickets: number | 'disabled' // 'disabled' = 파괴보호장치 사용 불가
   dropOnFail: Drop | null // 파괴 시 드랍되는 아이템 + 수량, null = 없음
   notes: SwordNote[]
   // 스프라이트 파일명(예: 'rusty_dagger.png'). 전용 스프라이트가 없는 단계는

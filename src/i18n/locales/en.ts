@@ -25,7 +25,7 @@ export const en: Record<TranslationKey, string> = {
   'action.store': 'Store',
   'action.equip': 'Equip',
 
-  // 방지권 사용(armed) 토글
+  // 파괴보호장치 사용(armed) 토글
   'protection.toggle': 'Toggle protection',
   'protection.on': 'Armed',
 

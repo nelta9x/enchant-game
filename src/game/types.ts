@@ -19,7 +19,7 @@ export type ItemStack = { itemId: string; count: number }
 // itemId 네임스페이스 규약(아이템 카탈로그 = 스프린트 4 에서 타입/런타임으로 제약 예정):
 //   - 검:    검 자신의 id(SwordData.id)    (예: `sword_19` — 검은 id로 조회, 레벨을 파싱하지 않는다)
 //   - 잡템:  고유 slug                  (예: `iron_scrap` — swords.json 의 드랍/재료 itemId와 동일)
-//   - 방지권: `protection_ticket`
+//   - 파괴보호장치: `protection_ticket`
 //   - 워프권: `warp_ticket_<level>`      (스프린트 5)
 //
 // gold(통화)와 currentSwordId(강화 슬롯에 장착된 검)은 인벤토리와 구분해 둔다.
@@ -28,12 +28,12 @@ export type PlayerState = {
   gold: number
   // 현재 강화 슬롯의 검 id. null = 보유 검 없음(시작 전 · 파산). 정의는 DataManager.getSwordById로 해석.
   currentSwordId: string | null
-  // 모든 보유 아이템(재료 검 · 잡템 · 방지권 · 워프권 등) — itemId로 식별.
+  // 모든 보유 아이템(재료 검 · 잡템 · 파괴보호장치 · 워프권 등) — itemId로 식별.
   items: ItemStack[]
 }
 
 // 강화 1회 시도에 소모되는 재료(호출자가 인벤토리에서 차감하는 데 사용).
-// 골드 + 아이템(강화비용 아이템 · 소모된 방지권 등).
+// 골드 + 아이템(강화비용 아이템 · 소모된 파괴보호장치 등).
 export type ConsumedMaterials = { gold: number; items: ItemStack[] }
 
 // 강화 1회 시도의 결과 — '새 상태'가 아니라 '무슨 일이 일어났는가'를 서술하는 이벤트.
@@ -54,11 +54,11 @@ export type EnhanceResult =
       drops: ItemStack[] // 항상 [] — 성공 시 드랍 없음
     }
   | {
-      // 실패했으나 방지권으로 검 보존(같은 검 유지).
+      // 실패했으나 파괴보호장치로 검 보존(같은 검 유지).
       outcome: 'protected'
       fromId: string
       toId: string // = fromId (보존)
-      consumed: ConsumedMaterials // 강화비용 + 소모된 방지권
+      consumed: ConsumedMaterials // 강화비용 + 소모된 파괴보호장치
       protectionUsed: number
       drops: ItemStack[] // 항상 [] — 방지 시 드랍 없음
     }

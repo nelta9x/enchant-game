@@ -88,8 +88,8 @@ describe('gameStore — 강화 적용 (seam)', () => {
     expect(countOf(store.getState().items, 'iron_scrap')).toBe(4)
   })
 
-  it('방지: 단계 유지 + 방지권 차감 + 드랍 없음', () => {
-    // level 14: 골드 100000, 방지권 소모 3, dropOnFail = iron_scrap ×10.
+  it('방지: 단계 유지 + 파괴보호장치 차감 + 드랍 없음', () => {
+    // level 14: 골드 100000, 파괴보호장치 소모 3, dropOnFail = iron_scrap ×10.
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 200000,
@@ -304,7 +304,7 @@ describe('gameStore — 보관 / 장착', () => {
       currentSwordId: 'sword_3',
       items: [{ itemId: PROTECTION_TICKET_ID, count: 2 }],
     })
-    store.getState().equip(PROTECTION_TICKET_ID) // 방지권은 검이 아님 → 무시
+    store.getState().equip(PROTECTION_TICKET_ID) // 파괴보호장치는 검이 아님 → 무시
     store.getState().equip('sword_8') // 보유하지 않은 검 → 무시
     expect(store.getState().currentSwordId).toBe('sword_3')
     expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(2)
@@ -331,7 +331,7 @@ describe('gameStore — 보관 / 장착', () => {
 
 describe('gameStore — 상점 구매', () => {
   // shop.json: protection_ticket_gold(골드 100만), protection_ticket_scrap(철조각 10개)
-  it('골드 구매: 골드 차감 + 방지권 적재', () => {
+  it('골드 구매: 골드 차감 + 파괴보호장치 적재', () => {
     const store = createGameStore({ gold: 2_500_000 })
     expect(store.getState().canBuy('protection_ticket_gold')).toBe(true)
     expect(store.getState().buy('protection_ticket_gold')).not.toBeNull()
@@ -339,7 +339,7 @@ describe('gameStore — 상점 구매', () => {
     expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(1)
   })
 
-  it('아이템 구매: 철조각 10개 차감 + 방지권 적재(골드 불변)', () => {
+  it('아이템 구매: 철조각 10개 차감 + 파괴보호장치 적재(골드 불변)', () => {
     const store = createGameStore({
       gold: 0,
       items: [{ itemId: 'iron_scrap', count: 25 }],

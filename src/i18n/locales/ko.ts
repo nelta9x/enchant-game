@@ -24,7 +24,7 @@ export const ko = {
   'action.store': '보관',
   'action.equip': '장착',
 
-  // 방지권 사용(armed) 토글
+  // 파괴보호장치 사용(armed) 토글
   'protection.toggle': '파괴보호장치 사용 전환',
   'protection.on': '사용 중',
 
