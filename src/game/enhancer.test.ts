@@ -124,11 +124,11 @@ describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
   it('dropOnFail 수량이 1보다 크면 그 수량만큼 drops 로 산출된다', () => {
     const s = sword({
       successRate: 0.5,
-      dropOnFail: { itemId: 'unknown_iron_scrap', count: 10 },
+      dropOnFail: { itemId: 'iron_scrap', count: 10 },
     })
     const r = new Enhancer(() => 0.9999).enhance({ sword: s, supply: RICH })
     expect(r.outcome).toBe('destroyed')
-    expect(r.drops).toEqual([{ itemId: 'unknown_iron_scrap', count: 10 }])
+    expect(r.drops).toEqual([{ itemId: 'iron_scrap', count: 10 }])
   })
 
   it('dropOnFail 이 없으면 파괴돼도 drops 가 비어 있다', () => {

@@ -18,7 +18,7 @@ describe('parseShop — 구조 검증', () => {
       row(),
       row({
         id: 'ticket_scrap',
-        price: { kind: 'item', itemId: 'unknown_iron_scrap', count: 10 },
+        price: { kind: 'item', itemId: 'iron_scrap', count: 10 },
       }),
     ])
     expect(items).toHaveLength(2)
@@ -29,7 +29,7 @@ describe('parseShop — 구조 검증', () => {
     })
     expect(items[1].price).toEqual({
       kind: 'item',
-      itemId: 'unknown_iron_scrap',
+      itemId: 'iron_scrap',
       count: 10,
     })
   })
@@ -70,7 +70,7 @@ describe('parseShop — 구조 검증', () => {
       row({ id: 'a' }),
       row({
         id: 'b',
-        price: { kind: 'item', itemId: 'unknown_iron_scrap', count: 10 },
+        price: { kind: 'item', itemId: 'iron_scrap', count: 10 },
       }),
     ])
     expect(items).toHaveLength(2)
@@ -88,7 +88,7 @@ describe('loadShop — 실제 번들 데이터(shop.json)', () => {
     expect(scrap?.itemId).toBe('protection_ticket')
     expect(scrap?.price).toEqual({
       kind: 'item',
-      itemId: 'unknown_iron_scrap',
+      itemId: 'iron_scrap',
       count: 10,
     })
   })

@@ -24,7 +24,7 @@ describe('destructionTargetOf — 연출 대상 판정(순수 로직)', () => {
       fromLevel: 14,
       toLevel: null,
       consumed,
-      drops: [{ itemId: 'unknown_iron_scrap', count: 10 }],
+      drops: [{ itemId: 'iron_scrap', count: 10 }],
     }
     expect(destructionTargetOf(result)?.level).toBe(14)
   })

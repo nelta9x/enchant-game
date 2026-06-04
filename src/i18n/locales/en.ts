@@ -44,14 +44,10 @@ export const en: Record<TranslationKey, string> = {
 
   // 아이템 표시명
   'item.protection_ticket': 'Protection Ticket',
-  'item.unknown_iron_scrap': 'Unknown Iron Scrap',
-  'item.tau_bone_fragment': 'Tau Bone Fragment',
+  'item.iron_scrap': 'Iron Scrap',
   'item.faded_fluorescent': 'Faded Fluorescent',
-  'item.swiss_iron_scrap': 'Swiss Iron Scrap',
   'item.flame_sword_handle': 'Flame Sword Handle',
   'item.evil_soul': 'Evil Soul',
-  'item.axe_dust': 'Axe Dust',
-  'item.invisible_matter': 'Invisible Matter',
 
   // 검 이름
   'sword.0.name': 'Rusty Dagger',

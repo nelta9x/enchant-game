@@ -115,10 +115,10 @@ describe('parseSwords — 구조 검증', () => {
 describe('parseSwords — dropOnFail 구조 검증', () => {
   it('유효한 dropOnFail(아이템 + 수량)을 파싱한다', () => {
     const swords = parseSwords([
-      row({ dropOnFail: { itemId: 'unknown_iron_scrap', count: 10 } }),
+      row({ dropOnFail: { itemId: 'iron_scrap', count: 10 } }),
     ])
     expect(swords[0].dropOnFail).toEqual({
-      itemId: 'unknown_iron_scrap',
+      itemId: 'iron_scrap',
       count: 10,
     })
   })

@@ -10,14 +10,10 @@ const SWORD_ITEM_RE = /^sword_(\d+)$/
 // 리터럴 키로 매핑해 타입 안전하게 해석한다. (검 재료는 SwordData.nameKey로 해석)
 const ITEM_NAME_KEYS: Record<string, TranslationKey> = {
   protection_ticket: 'item.protection_ticket',
-  unknown_iron_scrap: 'item.unknown_iron_scrap',
-  tau_bone_fragment: 'item.tau_bone_fragment',
+  iron_scrap: 'item.iron_scrap',
   faded_fluorescent: 'item.faded_fluorescent',
-  swiss_iron_scrap: 'item.swiss_iron_scrap',
   flame_sword_handle: 'item.flame_sword_handle',
   evil_soul: 'item.evil_soul',
-  axe_dust: 'item.axe_dust',
-  invisible_matter: 'item.invisible_matter',
 }
 
 // 인벤토리에서 특정 itemId 보유 수량 조회(없으면 0).

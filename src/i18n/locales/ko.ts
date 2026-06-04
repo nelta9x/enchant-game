@@ -44,14 +44,10 @@ export const ko = {
   // 아이템 표시명 (방지권 · 잡템 — 인벤토리/드랍 표시에 사용)
   // 재료로 쓰이는 검(sword_<level>)은 검 이름 키(sword.N.name)로 해석한다.
   'item.protection_ticket': '방지권',
-  'item.unknown_iron_scrap': '국적불분명 철조각',
-  'item.tau_bone_fragment': '타우의 뼈 부스러기',
+  'item.iron_scrap': '철조각',
   'item.faded_fluorescent': '빛 바랜 형광물질',
-  'item.swiss_iron_scrap': '스위스산 철조각',
   'item.flame_sword_handle': '불꽃마검 손잡이',
   'item.evil_soul': '사악한 영혼',
-  'item.axe_dust': '도끼 가루',
-  'item.invisible_matter': '투명 물질',
 
   // 검 이름 (게임 데이터의 표시명 — DataManager의 nameKey가 이 키를 가리킨다)
   // 보관필요/이지버그 등 특수 플래그는 이름이 아니라 SwordData.notes로 둔다.
