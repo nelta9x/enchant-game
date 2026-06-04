@@ -3,6 +3,7 @@ import {
   emptyEffectQueue,
   enqueue,
   finish,
+  latestRunning,
   pump,
   startable,
   type Effect,
@@ -82,6 +83,22 @@ describe('pump — 시작 전이 + lockCount', () => {
     const { state, started } = pump(s)
     expect(started).toEqual([])
     expect(state).toBe(s)
+  })
+})
+
+describe('latestRunning — 같은 kind 중 최신(id 최댓값)', () => {
+  it('같은 kind 가 겹쳐 있으면 가장 최근(최대 id)을 고른다', () => {
+    const running = [
+      fx(3, { kind: 'shake' }),
+      fx(7, { kind: 'shake' }),
+      fx(5, { kind: 'other' }),
+    ]
+    expect(latestRunning(running, 'shake')?.id).toBe(7)
+  })
+
+  it('해당 kind 가 없으면 null', () => {
+    expect(latestRunning([fx(1, { kind: 'a' })], 'b')).toBeNull()
+    expect(latestRunning([], 'a')).toBeNull()
   })
 })
 

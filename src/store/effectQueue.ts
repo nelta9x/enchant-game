@@ -9,7 +9,10 @@
 //  - 생명주기: 시작(locksEnhance 면 lockCount++) → 진행(durationMs, 뷰가 running 을 보고 연출) → 종료(lockCount--).
 //  - 종료 시 next 가 있으면 그 후속 효과를 다시 큐에 넣는다(체이닝 — 다단계 시퀀스 구성용).
 
-export type EffectPayload = { spriteUrl: string }
+export type EffectPayload = {
+  spriteUrl?: string // 파괴 잔상 스프라이트(파괴 전용)
+  particleCount?: number // 분출할 파티클 수(파괴·성공 — 단계에 비례)
+}
 
 // 효과 명세(호출 측이 enqueue 에 넘기는 것 — id 는 시스템이 부여).
 export type EffectSpec = {
@@ -83,6 +86,16 @@ export function pump(state: EffectQueueState): {
     },
     started,
   }
+}
+
+// 같은 kind 중 "가장 최근"(id 최댓값) running 효과를 고른다(없으면 null). id 는 단조 증가하므로
+// 최댓값이 최신 — 뷰가 트리거를 뽑을 때 first-match(find) 대신 써야 겹친 새 효과가 유실되지 않는다.
+export function latestRunning(running: Effect[], kind: string): Effect | null {
+  let best: Effect | null = null
+  for (const e of running) {
+    if (e.kind === kind && (best === null || e.id > best.id)) best = e
+  }
+  return best
 }
 
 // 효과 종료: running 에서 제거 + 잠금 효과면 lockCount 감소 + next 가 있으면 큐에 다시 넣는다. 순수.

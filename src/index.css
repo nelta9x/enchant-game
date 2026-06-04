@@ -36,10 +36,11 @@
   --color-enhance: #2f93c8;
   --color-enhance-glow: #63d2ff;
 
-  /* 강화 결과 색(토스트 · 스프라이트 피드백) */
+  /* 강화 결과 색(연출 파티클) */
   --color-success: #4caf6e;
   --color-danger: #d8654f;
   --color-danger-glow: #ff7a5c; /* 파괴 연출 파티클 코어(밝은 적색) */
+  --color-gold-glow: #ffe79a; /* 성공 연출 파티클 코어(밝은 황금색) */
 }
 
 :root {

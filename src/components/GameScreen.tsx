@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { dataManager } from '../data/DataManager'
 import { PROTECTION_TICKET_ID } from '../game/enhancer'
+import { useT, type TranslationKey } from '../i18n'
 import { countOf } from '../lib/items'
 import { swordSpriteUrl } from '../lib/sprites'
 import { useEffectStore } from '../store/effectStore'
+import { latestRunning } from '../store/effectQueue'
 import { useGameStore } from '../store/gameStore'
 import { useUiStore } from '../store/uiStore'
 import { CostCard } from './CostCard'
@@ -13,20 +15,35 @@ import {
   type DestructionEvent,
 } from './DestructionEffect'
 import { destructionTargetOf } from './destruction'
-import { SHAKE_SEC } from './shake'
 import { EnhanceButton } from './EnhanceButton'
 import { GoldDisplay } from './GoldDisplay'
 import { InventoryPanel } from './InventoryPanel'
-import { ResultToast, type EnhanceFeedback } from './ResultToast'
+import { particleCount } from './particles'
 import { SellButton } from './SellButton'
+import { SHAKE_SEC } from './shake'
 import { ShopModal } from './ShopModal'
+import {
+  SuccessEffect,
+  SUCCESS_DURATION_MS,
+  type SuccessEvent,
+} from './SuccessEffect'
 import { SwordStage } from './SwordStage'
 import { TopControls } from './TopControls'
 
+// 강화 결과를 스크린리더에 알릴 i18n 키(연출 kind → 결과 문구). 시각 연출은 aria-hidden 이라
+// 별도의 sr-only 라이브 리전으로 결과를 음성 전달한다(시각 토스트는 연출로 대체되어 제거됨).
+const ANNOUNCE_KEY: Record<string, TranslationKey> = {
+  successBurst: 'toast.success',
+  destruction: 'toast.destroyed',
+  protectedShake: 'toast.protected',
+}
+
 // 메인 강화 화면. 레퍼런스 레이아웃을 따른 가로 스테이지:
 //   상단(언어·난이도 / 상점·닫기) · 좌(비용카드·인벤토리) · 중앙(검 스테이지) · 우(강화·골드).
-// 게임 상태는 gameStore, 강화 1회 결과는 토스트로 잠깐 보여 준다.
+// 강화 1회 결과는 연출(성공=황금 파티클 / 파괴=폭발 / 방지=떨림)로 보여 주고,
+// 결과 문구는 화면에 보이지 않는 sr-only 라이브 리전으로 음성 전달한다.
 export function GameScreen() {
+  const t = useT()
   const gold = useGameStore((s) => s.gold)
   const currentSwordLevel = useGameStore((s) => s.currentSwordLevel)
   const items = useGameStore((s) => s.items)
@@ -64,45 +81,57 @@ export function GameScreen() {
   const openShop = useCallback(() => setShopOpen(true), [])
   const closeShop = useCallback(() => setShopOpen(false), [])
 
-  // 강화 결과 피드백(자동 소멸).
-  const [feedback, setFeedback] = useState<EnhanceFeedback | null>(null)
-  const nextId = useRef(0)
-  useEffect(() => {
-    if (!feedback) return
-    const tid = setTimeout(() => setFeedback(null), 1400)
-    return () => clearTimeout(tid)
-  }, [feedback])
-
   const handleEnhance = () => {
     const result = enhance(effectiveProtection)
     if (!result) return
-    nextId.current += 1
-    const fb = { result, id: nextId.current }
-    setFeedback(fb)
 
-    if (result.outcome === 'destroyed') {
-      // 파괴 = 두 효과를 "병렬"로 큐잉: (1) 폭발 연출(잠금X·연출 길이) ∥ (2) 강화 버튼 잠금(0.4s).
-      // 잠금은 떨림 구간(SHAKE_SEC)만 걸려 이전 동작을 유지하고, 연출은 끊김 없이 ~1초 재생된다.
-      // 스프라이트(파괴된 fromLevel)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
-      const target = destructionTargetOf(fb)
-      const destroyed = target
-        ? dataManager.getSwordByLevel(target.level)
-        : undefined
-      if (destroyed) {
-        enqueueEffect({
-          kind: 'destruction',
-          exclusive: false,
-          locksEnhance: false,
-          durationMs: DESTRUCTION_DURATION_MS,
-          payload: { spriteUrl: swordSpriteUrl(destroyed.sprite) },
-        })
-      }
+    // 강화 버튼 잠금(0.4s)은 성공·파괴 공통 — 연출과 별개의 병렬 효과(lockCount). SHAKE_SEC 가 단일 출처.
+    const lockEnhance = () =>
       enqueueEffect({
         kind: 'enhanceLock',
         exclusive: false,
         locksEnhance: true,
         durationMs: SHAKE_SEC * 1000,
       })
+
+    if (result.outcome === 'success') {
+      // 성공 = 황금빛 파티클 분출(잠금X) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 도달 단계(toLevel)에 비례.
+      enqueueEffect({
+        kind: 'successBurst',
+        exclusive: false,
+        locksEnhance: false,
+        durationMs: SUCCESS_DURATION_MS,
+        payload: { particleCount: particleCount(result.toLevel) },
+      })
+      lockEnhance()
+    } else if (result.outcome === 'destroyed') {
+      // 파괴 = 폭발 연출(잠금X·~1초) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 파괴된 단계(fromLevel)에 비례.
+      // 스프라이트(fromLevel)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
+      const target = destructionTargetOf(result)
+      const destroyed = target
+        ? dataManager.getSwordByLevel(target.level)
+        : undefined
+      if (target && destroyed) {
+        enqueueEffect({
+          kind: 'destruction',
+          exclusive: false,
+          locksEnhance: false,
+          durationMs: DESTRUCTION_DURATION_MS,
+          payload: {
+            spriteUrl: swordSpriteUrl(destroyed.sprite),
+            particleCount: particleCount(target.level),
+          },
+        })
+        // 새 검(+0) 등장을 떨림 구간(0.4s)만 가린다 — 파괴 연출 전체(~1초)가 아니라.
+        // 그래야 잠금 해제(0.4s) 후 +0 을 재강화해 성공해도 새 검이 0.4s 사라지지 않는다.
+        enqueueEffect({
+          kind: 'entranceSuppress',
+          exclusive: false,
+          locksEnhance: false,
+          durationMs: SHAKE_SEC * 1000,
+        })
+      }
+      lockEnhance()
     } else if (result.outcome === 'protected') {
       // 방지 = 떨림만(잠금·폭발 없음) → 방지권 덕분에 살아남았음을 인지시킨다.
       enqueueEffect({
@@ -114,20 +143,33 @@ export function GameScreen() {
     }
   }
 
-  // 연출 트리거는 effectStore 의 running 에서 가져온다(생명주기·타이밍은 Effect 시스템이 소유).
-  //  - 파괴 잔상 오버레이: 실행 중인 'destruction' 효과(스프라이트 payload).
-  //  - 방지 떨림: 실행 중인 'protectedShake' 효과의 id(0 = 없음 → 떨지 않음).
+  // 연출 트리거는 effectStore 의 running 에서 "가장 최근"으로 뽑는다(latestRunning — 겹친 새 효과 유실 방지).
+  // 생명주기·타이밍은 Effect 시스템이 소유한다.
   const destructionEvent = useMemo<DestructionEvent | null>(() => {
-    const fx = running.find((e) => e.kind === 'destruction')
-    return fx?.payload ? { id: fx.id, spriteUrl: fx.payload.spriteUrl } : null
+    const fx = latestRunning(running, 'destruction')
+    return fx?.payload?.spriteUrl
+      ? {
+          id: fx.id,
+          spriteUrl: fx.payload.spriteUrl,
+          particleCount: fx.payload.particleCount ?? 0,
+        }
+      : null
   }, [running])
-  // 떨림 트리거는 "가장 최근" protectedShake 의 id(0 = 없음). find(첫 일치)가 아니라 max 인 이유:
-  // 방지는 버튼을 잠그지 않으므로 400ms 안에 두 번째 방지가 겹칠 수 있는데, id 는 단조 증가하므로
-  // 최댓값이 곧 최신 → shakeKey 가 바뀌어 SwordStage 가 다시 떤다(겹친 두 번째 떨림 유실 방지).
-  const shakeKey = Math.max(
-    0,
-    ...running.filter((e) => e.kind === 'protectedShake').map((e) => e.id),
-  )
+  const successEvent = useMemo<SuccessEvent | null>(() => {
+    const fx = latestRunning(running, 'successBurst')
+    return fx
+      ? { id: fx.id, particleCount: fx.payload?.particleCount ?? 0 }
+      : null
+  }, [running])
+  const shakeKey = latestRunning(running, 'protectedShake')?.id ?? 0
+
+  // 결과를 스크린리더에 알린다(시각 연출은 aria-hidden). 가장 최근 알림 대상 효과의 문구.
+  let announceFx: { id: number; kind: string } | null = null
+  for (const e of running) {
+    if (e.kind in ANNOUNCE_KEY && (announceFx === null || e.id > announceFx.id))
+      announceFx = e
+  }
+  const announcement = announceFx ? t(ANNOUNCE_KEY[announceFx.kind]) : ''
 
   return (
     <div className="flex min-h-svh items-center justify-center overflow-auto bg-bezel p-3 sm:p-6">
@@ -152,7 +194,7 @@ export function GameScreen() {
             </div>
           </div>
 
-          {/* 중앙: 검 스테이지 + 결과 토스트 */}
+          {/* 중앙: 검 스테이지 + 결과 연출(오버레이) */}
           <div className="relative flex items-center justify-center">
             <SwordStage
               sword={sword}
@@ -161,21 +203,28 @@ export function GameScreen() {
               armed={effectiveProtection}
               canArm={canArm}
               onToggleProtection={toggleProtection}
-              spriteOverlay={<DestructionEffect event={destructionEvent} />}
-              // 파괴 연출 중에는 새 검 등장을 떨림 길이만큼 미뤄, 떨리는 잔상 위로 비치지 않게 한다.
-              entranceDelay={destructionEvent ? SHAKE_SEC : 0}
+              spriteOverlay={
+                <>
+                  <DestructionEffect event={destructionEvent} />
+                  <SuccessEffect event={successEvent} />
+                </>
+              }
+              // 새 검 등장 지연은 "떨림 구간"에만(entranceSuppress 효과의 수명 = 0.4s) — 파괴 연출
+              // 전체가 아니라. 그래야 연출 도중 재강화로 마운트되는 새 검이 잘못 지연돼 사라지지 않는다.
+              entranceDelay={
+                latestRunning(running, 'entranceSuppress') ? SHAKE_SEC : 0
+              }
               // 방지 시 실제 검을 떨게 한다(파괴와 구분 — 폭발 없이 떨림만).
               shakeKey={shakeKey}
             />
-            {/* 상시 마운트되는 라이브 리전 — 강화 결과를 스크린리더에 알린다
-                (토스트 노드 자체는 AnimatePresence로 마운트/언마운트되므로 래퍼에 둔다). */}
+            {/* 결과 음성 알림(시각 연출은 aria-hidden) — 화면엔 보이지 않는 라이브 리전. */}
             <div
               role="status"
               aria-live="polite"
               aria-atomic="true"
-              className="pointer-events-none absolute inset-x-0 top-1 flex justify-center"
+              className="sr-only"
             >
-              <ResultToast feedback={feedback} />
+              {announcement}
             </div>
           </div>
 
