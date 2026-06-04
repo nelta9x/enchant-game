@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { dataManager } from '../data/DataManager'
 import type { Material, ShopItem } from '../data/types'
 import { useI18nStore, useT, type Lang, type TranslationKey } from '../i18n'
-import { formatGold } from '../lib/format'
+import { formatAmount, formatGold } from '../lib/format'
 import { countOf, itemDisplayName, PROTECTION_TICKET_ID } from '../lib/items'
 import { swordSpriteUrl } from '../lib/sprites'
 import { useGameStore } from '../store/gameStore'
@@ -103,9 +103,13 @@ export function ShopModal({ open, onClose }: ShopModalProps) {
                 {t('shop.title')}
               </h2>
               <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1.5 text-sm font-bold tabular-nums text-gold">
+                {/* 보유 골드 — 금화 아이콘이 통화를 대신하므로 단위 없이 금액만(aria-label 엔 formatGold). */}
+                <span
+                  className="flex items-center gap-1.5 text-sm font-bold tabular-nums text-gold"
+                  aria-label={formatGold(gold, lang)}
+                >
                   <Coin variant="gold" className="h-4 w-4 shrink-0" />
-                  {formatGold(gold, lang)}
+                  {formatAmount(gold)}
                 </span>
                 <button
                   ref={closeRef}

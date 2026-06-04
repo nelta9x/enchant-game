@@ -11,7 +11,7 @@ export function StoreButton({ disabled, onStore }: StoreButtonProps) {
       type="button"
       onClick={onStore}
       disabled={disabled}
-      className={`flex items-center gap-1.5 rounded-lg border px-5 py-2 text-sm font-bold transition-opacity ${
+      className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-5 py-2 text-sm font-bold transition-opacity ${
         disabled
           ? 'cursor-not-allowed border-panel-edge bg-panel text-on-dark-soft opacity-40'
           : 'cursor-pointer border-frame/50 bg-panel text-on-dark hover:opacity-90'

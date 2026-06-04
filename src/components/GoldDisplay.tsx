@@ -6,7 +6,7 @@ import {
   useTransform,
 } from 'motion/react'
 import { useI18nStore } from '../i18n'
-import { formatGold } from '../lib/format'
+import { formatAmount, formatGold } from '../lib/format'
 import { Coin } from './Coin'
 import { COIN_ARRIVAL_SEC, coinArrivalTimes } from './coins'
 
@@ -27,7 +27,8 @@ export function GoldDisplay({
 
   // 표시 숫자(명령형으로만 갱신 — React 재렌더 없이 textContent 만 바뀐다).
   const display = useMotionValue(gold)
-  const text = useTransform(display, (v) => formatGold(Math.round(v), lang))
+  // 표시 텍스트는 은화 아이콘이 통화를 대신하므로 단위 없이 금액만. 통화 맥락은 컨테이너 aria-label(formatGold)로 보존.
+  const text = useTransform(display, (v) => formatAmount(Math.round(v)))
 
   // 코인별 타격(통통통). 도착마다 통 튀고 backOut 으로 살짝 반동 후 제자리 — 빠르게 겹치면 활기찬
   // 연타, 코인이 적으면 또렷한 틱.
@@ -86,7 +87,8 @@ export function GoldDisplay({
   return (
     <motion.div
       animate={punch}
-      className="relative flex items-center gap-2 rounded-lg border border-panel-edge bg-panel px-4 py-2.5 shadow-md"
+      aria-label={formatGold(gold, lang)}
+      className="relative flex w-full items-center justify-center gap-2 rounded-lg border border-panel-edge bg-panel px-3 py-2.5 shadow-md"
     >
       {/* 도달 글로우 — 코인이 빨려 들어오는 동안 테두리에서 황금빛이 번진다(스트림처럼 두 번 일렁). */}
       <motion.span
@@ -99,8 +101,10 @@ export function GoldDisplay({
         }
         transition={{ delay: COIN_ARRIVAL_SEC, duration: 0.7, ease: 'easeOut' }}
       />
-      <Coin variant="silver" className="h-6 w-6 shrink-0" />
-      <motion.span className="text-lg font-bold tabular-nums text-on-dark">
+      <Coin variant="silver" className="h-5 w-5 shrink-0" />
+      {/* 금액 슬롯 고정(min-w) — 보유 골드가 수십억으로 늘어도 표시 폭이 변하지 않게 자리를 미리 잡는다.
+          (자릿수에 무관히 흔들리지 않도록 고정 text-sm + tabular-nums + 가운데 정렬) */}
+      <motion.span className="min-w-[7.5rem] whitespace-nowrap text-center text-sm font-bold tabular-nums text-on-dark">
         {text}
       </motion.span>
     </motion.div>

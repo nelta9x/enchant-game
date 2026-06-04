@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { dataManager } from '../data/DataManager'
+import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useT, type TranslationKey } from '../i18n'
 import { countOf, PROTECTION_TICKET_ID } from '../lib/items'
 import { swordSpriteUrl } from '../lib/sprites'
@@ -7,7 +8,6 @@ import { useEffectStore } from '../store/effectStore'
 import { latestRunning } from '../store/effectQueue'
 import { useGameStore } from '../store/gameStore'
 import { useUiStore } from '../store/uiStore'
-import { CostCard } from './CostCard'
 import {
   DestructionEffect,
   DESTRUCTION_DURATION_MS,
@@ -81,6 +81,9 @@ export function GameScreen() {
   const canEnhance = canEnhanceFn(effectiveProtection)
   const canSell = canSellFn()
   const canStore = canStoreFn()
+
+  // 강화 버튼과 스페이스 단축키가 공유하는 단일 게이트(강화 불가거나 연출 잠금 중이면 비활성).
+  const enhanceDisabled = !canEnhance || lockCount > 0
 
   // 상점 팝업 열림 상태.
   const [shopOpen, setShopOpen] = useState(false)
@@ -180,6 +183,13 @@ export function GameScreen() {
     }
   }
 
+  // 데스크탑에서 스페이스바 = 강화(상점이 닫혀 있을 때만, 강화 버튼과 동일한 게이트를 따른다).
+  useEnhanceHotkey({
+    enabled: !shopOpen,
+    disabled: enhanceDisabled,
+    onEnhance: handleEnhance,
+  })
+
   // 연출 트리거는 effectStore 의 running 에서 "가장 최근"으로 뽑는다(latestRunning — 겹친 새 효과 유실 방지).
   // 생명주기·타이밍은 Effect 시스템이 소유한다.
   const destructionEvent = useMemo<DestructionEvent | null>(() => {
@@ -223,13 +233,9 @@ export function GameScreen() {
 
         {/* 모바일(<sm)은 단일 컬럼으로 스택 — 좁은 화면에서 고정폭 검 스테이지가
             좁은 트랙에 눌려 좌우 패널과 겹치는 것을 방지(반응형 폴리시는 스프린트 6). */}
-        <div className="mt-3 grid grid-cols-1 gap-4 sm:min-h-[34rem] sm:grid-cols-[minmax(9.5rem,13rem)_minmax(0,1fr)_minmax(7rem,10rem)]">
-          {/* 좌: 비용 카드 + 인벤토리 */}
-          <div className="flex min-h-0 flex-col gap-3">
-            <CostCard
-              enhanceCost={sword?.enhanceCost ?? null}
-              sellPrice={sword?.sellPrice ?? null}
-            />
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:min-h-[34rem] sm:grid-cols-[minmax(9.5rem,13rem)_minmax(0,1fr)_minmax(11rem,13rem)]">
+          {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음) */}
+          <div className="flex min-h-0 flex-col">
             <div className="min-h-0 flex-1">
               <InventoryPanel
                 sword={sword}
@@ -276,19 +282,24 @@ export function GameScreen() {
             </div>
           </div>
 
-          {/* 우: 강화 버튼 + 그 아래 판매 버튼(세로 중앙) + 골드(하단) */}
+          {/* 우: 강화 카드(비용 포함) + 판매 버튼(판매가 포함) + 보관 버튼(세로 중앙) + 골드(하단) */}
           <div className="flex flex-col items-center justify-between gap-4">
-            <div className="grid flex-1 place-items-center">
-              <div className="flex flex-col items-center gap-3">
+            <div className="grid w-full flex-1 place-items-center">
+              <div className="flex w-full flex-col items-center gap-3">
                 <EnhanceButton
-                  disabled={!canEnhance || lockCount > 0}
+                  disabled={enhanceDisabled}
                   onEnhance={handleEnhance}
+                  enhanceCost={sword?.enhanceCost ?? null}
                 />
-                <SellButton disabled={!canSell} onSell={handleSell} />
+                <SellButton
+                  disabled={!canSell}
+                  onSell={handleSell}
+                  sellPrice={sword?.sellPrice ?? null}
+                />
                 <StoreButton disabled={!canStore} onStore={store} />
               </div>
             </div>
-            <div ref={goldRef}>
+            <div ref={goldRef} className="w-full">
               <GoldDisplay
                 gold={gold}
                 pulseKey={coinFlightEvent?.id ?? 0}
