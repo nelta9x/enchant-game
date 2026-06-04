@@ -39,6 +39,7 @@
   /* 강화 결과 색(토스트 · 스프라이트 피드백) */
   --color-success: #4caf6e;
   --color-danger: #d8654f;
+  --color-danger-glow: #ff7a5c; /* 파괴 연출 파티클 코어(밝은 적색) */
 }
 
 :root {
