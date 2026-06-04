@@ -41,7 +41,7 @@ const ANNOUNCE_KEY: Record<string, TranslationKey> = {
 
 // 메인 강화 화면. 레퍼런스 레이아웃을 따른 가로 스테이지:
 //   상단(언어·난이도 / 상점·닫기) · 좌(비용카드·인벤토리) · 중앙(검 스테이지) · 우(강화·골드).
-// 강화 1회 결과는 연출(성공=황금 파티클 / 파괴=폭발 / 방지=떨림)로 보여 주고,
+// 강화 1회 결과는 연출(성공=떨림 후 황금 파티클 / 파괴=떨림 후 폭발 / 방지=떨림)로 보여 주고,
 // 결과 문구는 화면에 보이지 않는 sr-only 라이브 리전으로 음성 전달한다.
 export function GameScreen() {
   const t = useT()
@@ -113,15 +113,30 @@ export function GameScreen() {
       })
 
     if (result.outcome === 'success') {
-      // 성공 = 황금빛 파티클 분출(잠금X) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 도달 검(toId)의 단계에 비례.
+      // 성공 = (실패와 동일 안무) 떨림 → 황금 파티클 분출 + 상위 검 등장(잠금X) ∥ 강화 버튼 잠금(0.4s).
+      // 잔상은 강화 전 검(fromId), 파티클 수는 도달 검(toId)의 단계에 비례 — 둘 다 이 뷰 경계에서 해석(원칙 2).
+      const from = dataManager.getSwordById(result.fromId)
       const next = dataManager.getSwordById(result.toId)
-      enqueueEffect({
-        kind: 'successBurst',
-        exclusive: false,
-        locksEnhance: false,
-        durationMs: SUCCESS_DURATION_MS,
-        payload: { particleCount: particleCount(next?.level ?? 0) },
-      })
+      if (from) {
+        enqueueEffect({
+          kind: 'successBurst',
+          exclusive: false,
+          locksEnhance: false,
+          durationMs: SUCCESS_DURATION_MS,
+          payload: {
+            spriteUrl: swordSpriteUrl(from.sprite),
+            particleCount: particleCount(next?.level ?? 0),
+          },
+        })
+        // 새(상위) 검 등장을 떨림 구간(0.4s)만 가린다 — 파괴와 동일(분출에서 드러나듯 등장).
+        // 잠금 해제(0.4s) 후 재강화로 마운트되는 새 검이 잘못 지연돼 사라지지 않도록 연출 전체가 아닌 0.4s만.
+        enqueueEffect({
+          kind: 'entranceSuppress',
+          exclusive: false,
+          locksEnhance: false,
+          durationMs: SHAKE_SEC * 1000,
+        })
+      }
       lockEnhance()
     } else if (result.outcome === 'destroyed') {
       // 파괴 = 폭발 연출(잠금X·~1초) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 파괴된 검(fromId)의 단계에 비례.
@@ -174,8 +189,12 @@ export function GameScreen() {
   }, [running])
   const successEvent = useMemo<SuccessEvent | null>(() => {
     const fx = latestRunning(running, 'successBurst')
-    return fx
-      ? { id: fx.id, particleCount: fx.payload?.particleCount ?? 0 }
+    return fx?.payload?.spriteUrl
+      ? {
+          id: fx.id,
+          spriteUrl: fx.payload.spriteUrl,
+          particleCount: fx.payload.particleCount ?? 0,
+        }
       : null
   }, [running])
   const coinFlightEvent = useMemo<CoinFlightEvent | null>(() => {

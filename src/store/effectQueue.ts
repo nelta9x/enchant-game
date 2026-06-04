@@ -10,7 +10,7 @@
 //  - 종료 시 next 가 있으면 그 후속 효과를 다시 큐에 넣는다(체이닝 — 다단계 시퀀스 구성용).
 
 export type EffectPayload = {
-  spriteUrl?: string // 파괴 잔상 스프라이트(파괴 전용)
+  spriteUrl?: string // 떨림 잔상 스프라이트(파괴·성공 공용)
   particleCount?: number // 분출할 파티클 수(파괴·성공 — 단계에 비례)
   coinCount?: number // 분출할 코인 수(판매 — 판매가에 비례)
 }
