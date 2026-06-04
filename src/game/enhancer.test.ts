@@ -123,13 +123,13 @@ describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
   it('방지권 없이 실패하면 파괴되고 dropOnFail 이 drops 로 산출된다', () => {
     const s = sword({
       successRate: 0.5,
-      dropOnFail: { itemId: 'evil_soul', count: 1 },
+      dropOnFail: { itemId: 'iron_scrap', count: 1 },
       protectionTickets: 3,
     })
     const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
     expect(r.outcome).toBe('destroyed')
     expect(r.toId).toBeNull()
-    expect(r.drops).toEqual([{ itemId: 'evil_soul', count: 1 }])
+    expect(r.drops).toEqual([{ itemId: 'iron_scrap', count: 1 }])
   })
 
   it('dropOnFail 수량이 1보다 크면 그 수량만큼 drops 로 산출된다', () => {
@@ -154,7 +154,7 @@ describe('Enhancer — 파괴 방지권 (req 4)', () => {
   const protectable = sword({
     level: 14,
     successRate: 0.5,
-    dropOnFail: { itemId: 'evil_soul', count: 1 },
+    dropOnFail: { itemId: 'iron_scrap', count: 1 },
     protectionTickets: 3,
   })
   const withTickets: EnhanceInput['supply'] = {

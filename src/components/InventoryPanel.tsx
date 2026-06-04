@@ -2,8 +2,9 @@ import { dataManager } from '../data/DataManager'
 import { useT, type TranslationKey } from '../i18n'
 import type { SwordData } from '../data/types'
 import type { ItemStack } from '../game/types'
-import { itemDisplayName, PROTECTION_TICKET_ID } from '../lib/items'
+import { itemDisplayName } from '../lib/items'
 import { swordSpriteUrl } from '../lib/sprites'
+import { ItemIcon } from './ItemIcon'
 
 // 보유 인벤토리 패널 = 무기 관리 표면: 맨 위 장착 중인 검(금색 하이라이트 행) + 그 아래 보유 아이템 행들.
 // 행 내용은 itemId 유형으로 분기한다 — 검 재료(sword_<level>)는 스프라이트+레벨이며 클릭하면 장착,
@@ -79,11 +80,8 @@ function ItemRow({
   const lvl = sword?.level ?? null
   const name = itemDisplayName(item.itemId, t)
 
-  const thumb = sword ? (
-    <SpriteThumb src={swordSpriteUrl(sword.sprite)} alt={name} />
-  ) : (
-    <TokenThumb itemId={item.itemId} />
-  )
+  // 검·아이템 스프라이트·토큰 폴백 규약은 ItemIcon 한 곳에 둔다(잡템도 전용 스프라이트가 있으면 표시).
+  const thumb = <ItemIcon itemId={item.itemId} alt={name} className="h-7 w-7" />
   const label = (
     <div className="min-w-0 flex-1 text-left">
       <span className="truncate text-sm font-medium text-on-dark">{name}</span>
@@ -139,26 +137,5 @@ function SpriteThumb({ src, alt }: { src: string; alt: string }) {
       style={{ imageRendering: 'pixelated' }}
       draggable={false}
     />
-  )
-}
-
-// 스프라이트가 없는 아이템(방지권·잡템)용 대체 아이콘 — 방지권은 방패, 잡템은 보석.
-function TokenThumb({ itemId }: { itemId: string }) {
-  const isTicket = itemId === PROTECTION_TICKET_ID
-  return (
-    <span className="grid h-7 w-7 shrink-0 place-items-center rounded bg-panel-soft text-on-dark-soft">
-      <svg
-        viewBox="0 0 24 24"
-        className="h-4 w-4"
-        fill="currentColor"
-        aria-hidden
-      >
-        {isTicket ? (
-          <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" />
-        ) : (
-          <path d="M6 3h12l3 6-9 12L3 9l3-6Z" />
-        )}
-      </svg>
-    </span>
   )
 }

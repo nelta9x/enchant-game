@@ -48,7 +48,6 @@ export const en: Record<TranslationKey, string> = {
   'item.iron_scrap': 'Iron Scrap',
   'item.faded_fluorescent': 'Faded Fluorescent',
   'item.flame_sword_handle': 'Flame Sword Handle',
-  'item.evil_soul': 'Evil Soul',
 
   // 검 이름
   'sword.0.name': 'Rusty Dagger',

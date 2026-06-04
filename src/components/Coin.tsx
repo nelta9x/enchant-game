@@ -1,25 +1,19 @@
-// 금화 / 은화 아이콘(별이 박힌 동전). 색은 토큰(text-gold / text-silver)으로,
-// 크기는 부모가 className(h-*/w-*)으로 지정한다.
-type CoinProps = { variant?: 'gold' | 'silver'; className?: string }
+import { itemSpriteUrl } from '../lib/sprites'
 
-export function Coin({ variant = 'gold', className = '' }: CoinProps) {
-  const color = variant === 'gold' ? 'text-gold' : 'text-silver'
+// 골드 코인 아이콘 — 판매 코인 연출(CoinFlight)과 "동일한" gold_coin.png 스프라이트를 쓴다.
+// 픽셀아트가 또렷하게 보이도록 imageRendering: pixelated + object-contain 으로 연출 코인과 시각 일치.
+// 크기는 부모가 className(h-*/w-*)으로 지정. 통화 맥락(aria-label)은 인접 컨테이너가 들고 있어
+// 여기선 장식용(alt="")으로 둔다.
+type CoinProps = { className?: string }
+
+export function Coin({ className = '' }: CoinProps) {
   return (
-    <svg viewBox="0 0 24 24" className={`${color} ${className}`} aria-hidden>
-      <circle cx="12" cy="12" r="10" fill="currentColor" />
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        fill="none"
-        strokeWidth="1.4"
-        className="stroke-black/15"
-      />
-      {/* 4각 반짝임(별) — 어둡게 음각 처리 */}
-      <path
-        d="M12 6.4 13.2 10.8 17.6 12 13.2 13.2 12 17.6 10.8 13.2 6.4 12 10.8 10.8Z"
-        className="fill-black/20"
-      />
-    </svg>
+    <img
+      src={itemSpriteUrl('gold_coin.png')}
+      alt=""
+      draggable={false}
+      className={`${className} shrink-0 object-contain`}
+      style={{ imageRendering: 'pixelated' }}
+    />
   )
 }

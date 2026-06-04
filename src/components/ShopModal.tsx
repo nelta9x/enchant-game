@@ -8,10 +8,10 @@ import { dataManager } from '../data/DataManager'
 import type { Material, ShopItem } from '../data/types'
 import { useI18nStore, useT, type Lang, type TranslationKey } from '../i18n'
 import { formatAmount, formatGold } from '../lib/format'
-import { countOf, itemDisplayName, PROTECTION_TICKET_ID } from '../lib/items'
-import { swordSpriteUrl } from '../lib/sprites'
+import { countOf, itemDisplayName } from '../lib/items'
 import { useGameStore } from '../store/gameStore'
 import { Coin } from './Coin'
+import { ItemIcon } from './ItemIcon'
 
 // 상점 팝업(모달). 상점 버튼으로 열고, ESC·백드롭·닫기 버튼으로 닫는다.
 // 판매 목록은 DataManager.getShopItems()를 그대로 순회해 렌더한다 — 새 아이템은
@@ -108,7 +108,7 @@ export function ShopModal({ open, onClose }: ShopModalProps) {
                   className="flex items-center gap-1.5 text-sm font-bold tabular-nums text-gold"
                   aria-label={formatGold(gold, lang)}
                 >
-                  <Coin variant="gold" className="h-4 w-4 shrink-0" />
+                  <Coin className="h-4 w-4" />
                   {formatAmount(gold)}
                 </span>
                 <button
@@ -211,7 +211,7 @@ function PriceTag({
   if (price.kind === 'gold') {
     return (
       <>
-        <Coin variant="gold" className="h-3.5 w-3.5 shrink-0" />
+        <Coin className="h-3.5 w-3.5" />
         <span className="tabular-nums">{formatGold(price.amount, lang)}</span>
       </>
     )
@@ -226,39 +226,9 @@ function PriceTag({
   return <span>{t('cost.free')}</span>
 }
 
-// 상점 아이템 썸네일(자체 포함). 검 재료는 스프라이트, 방지권은 방패, 그 외(잡템 등)는
-// 보석 아이콘이 기본. 고유 아이콘이 필요한 새 아이템은 이 분기를 늘린다.
-// (인벤토리 패널과 시각 규약은 같으나 컴포넌트는 의도적으로 분리해 둔다.)
+// 상점 아이템 썸네일 — ItemIcon 에 위임해 검/아이템 스프라이트·토큰 폴백 규약을 공유한다(상점 칸 크기 h-10 w-10).
 function ShopThumb({ itemId, alt }: { itemId: string; alt: string }) {
-  const sword = dataManager.getSwordById(itemId)
-  if (sword) {
-    return (
-      <img
-        src={swordSpriteUrl(sword.sprite)}
-        alt={alt}
-        className="h-10 w-10 shrink-0 object-contain"
-        style={{ imageRendering: 'pixelated' }}
-        draggable={false}
-      />
-    )
-  }
-  const isTicket = itemId === PROTECTION_TICKET_ID
-  return (
-    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-panel text-on-dark-soft">
-      <svg
-        viewBox="0 0 24 24"
-        className="h-5 w-5"
-        fill="currentColor"
-        aria-hidden
-      >
-        {isTicket ? (
-          <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" />
-        ) : (
-          <path d="M6 3h12l3 6-9 12L3 9l3-6Z" />
-        )}
-      </svg>
-    </span>
-  )
+  return <ItemIcon itemId={itemId} alt={alt} className="h-10 w-10" />
 }
 
 function CloseIcon() {

@@ -23,7 +23,7 @@ describe('parseSwords — 구조 검증', () => {
       row({ level: 0 }),
       row({
         level: 1,
-        enhanceCost: { kind: 'item', itemId: 'evil_soul', count: 8 },
+        enhanceCost: { kind: 'item', itemId: 'iron_scrap', count: 8 },
         successRate: 0.4,
         sellPrice: 100,
         protectionTickets: 'disabled',
@@ -40,7 +40,7 @@ describe('parseSwords — 구조 검증', () => {
     expect(swords[0].nameKey).toBe('sword.0.name')
     expect(swords[1].enhanceCost).toEqual({
       kind: 'item',
-      itemId: 'evil_soul',
+      itemId: 'iron_scrap',
       count: 8,
     })
     expect(swords[1].protectionTickets).toBe('disabled')
@@ -131,7 +131,7 @@ describe('parseSwords — dropOnFail 구조 검증', () => {
   })
 
   it('dropOnFail 이 객체가 아니면 throw (문자열 등)', () => {
-    expect(() => parseSwords([row({ dropOnFail: 'evil_soul' })])).toThrow()
+    expect(() => parseSwords([row({ dropOnFail: 'iron_scrap' })])).toThrow()
   })
 
   it('dropOnFail itemId가 비었거나 count가 양의 정수가 아니면 throw', () => {
@@ -181,7 +181,7 @@ describe('parseSwords — 진행 체인(nextId) · id 무결성', () => {
     const swords = parseSwords([
       row({
         level: 0,
-        enhanceCost: { kind: 'item', itemId: 'evil_soul', count: 8 },
+        enhanceCost: { kind: 'item', itemId: 'iron_scrap', count: 8 },
       }),
       row({
         level: 1,

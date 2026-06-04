@@ -18,7 +18,7 @@ export type ItemStack = { itemId: string; count: number }
 //
 // itemId 네임스페이스 규약(아이템 카탈로그 = 스프린트 4 에서 타입/런타임으로 제약 예정):
 //   - 검:    검 자신의 id(SwordData.id)    (예: `sword_19` — 검은 id로 조회, 레벨을 파싱하지 않는다)
-//   - 잡템:  고유 slug                  (예: `evil_soul` — swords.json 의 드랍/재료 itemId와 동일)
+//   - 잡템:  고유 slug                  (예: `iron_scrap` — swords.json 의 드랍/재료 itemId와 동일)
 //   - 방지권: `protection_ticket`
 //   - 워프권: `warp_ticket_<level>`      (스프린트 5)
 //

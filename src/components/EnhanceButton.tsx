@@ -31,7 +31,7 @@ export function EnhanceButton({
     const { icon, qty, label } =
       enhanceCost.kind === 'gold'
         ? {
-            icon: <Coin variant="gold" className="h-5 w-5 shrink-0" />,
+            icon: <Coin className="h-5 w-5" />,
             // 금화 아이콘이 통화를 대신하므로 단위 없이 금액만 표시. aria-label 엔 단위 포함(formatGold).
             qty: formatAmount(enhanceCost.amount),
             label: formatGold(enhanceCost.amount, lang),

@@ -16,7 +16,21 @@ const ITEM_NAME_KEYS: Record<string, TranslationKey> = {
   iron_scrap: 'item.iron_scrap',
   faded_fluorescent: 'item.faded_fluorescent',
   flame_sword_handle: 'item.flame_sword_handle',
-  evil_soul: 'item.evil_soul',
+}
+
+// 검이 아닌 아이템(방지권·잡템) → 전용 스프라이트 파일명(public/sprites/items/) 매핑.
+// 전용 PNG 가 있는 아이템만 등록한다 — 미등록 아이템은 ItemIcon 이 토큰 아이콘(방패/보석)으로 폴백한다.
+// (검 스프라이트는 SwordData.sprite, 골드 코인은 Coin 컴포넌트가 직접 참조)
+const ITEM_SPRITES: Record<string, string> = {
+  [PROTECTION_TICKET_ID]: 'protection_ticket.png',
+  iron_scrap: 'iron_scrap.png',
+  faded_fluorescent: 'faded_fluorescent.png',
+  flame_sword_handle: 'flame_sword_handle.png',
+}
+
+// itemId → 전용 스프라이트 파일명(없으면 undefined). URL 조립은 호출 측(ItemIcon)이 itemSpriteUrl 로 한다.
+export function itemSpriteName(itemId: string): string | undefined {
+  return ITEM_SPRITES[itemId]
 }
 
 // 인벤토리에서 특정 itemId 보유 수량 조회(없으면 0).

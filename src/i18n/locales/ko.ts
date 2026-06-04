@@ -25,11 +25,11 @@ export const ko = {
   'action.equip': '장착',
 
   // 방지권 사용(armed) 토글
-  'protection.toggle': '방지권 사용 전환',
+  'protection.toggle': '파괴보호장치 사용 전환',
   'protection.on': '사용 중',
 
   // 검 스테이지 스탯
-  'stat.protection': '방지권',
+  'stat.protection': '파괴보호장치',
   'stat.successRate': '성공률',
   'sword.none': '검 없음',
   'sword.maxLevel': '최종 단계',
@@ -39,16 +39,15 @@ export const ko = {
 
   // 강화 결과 토스트
   'toast.success': '강화 성공',
-  'toast.protected': '방지권으로 보호',
+  'toast.protected': '파괴보호장치로 보호',
   'toast.destroyed': '검 파괴',
 
-  // 아이템 표시명 (방지권 · 잡템 — 인벤토리/드랍 표시에 사용)
+  // 아이템 표시명 (파괴보호장치 · 잡템 — 인벤토리/드랍 표시에 사용)
   // 재료로 쓰이는 검(sword_<level>)은 검 이름 키(sword.N.name)로 해석한다.
-  'item.protection_ticket': '방지권',
+  'item.protection_ticket': '파괴보호장치',
   'item.iron_scrap': '철조각',
   'item.faded_fluorescent': '빛 바랜 형광물질',
   'item.flame_sword_handle': '불꽃마검 손잡이',
-  'item.evil_soul': '사악한 영혼',
 
   // 검 이름 (게임 데이터의 표시명 — DataManager의 nameKey가 이 키를 가리킨다)
   // 보관필요/이지버그 등 특수 플래그는 이름이 아니라 SwordData.notes로 둔다.

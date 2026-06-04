@@ -6,15 +6,15 @@
 // → 데이터/로직은 환경 비의존(테스트 용이)으로 유지하고, URL 조립만 뷰 경계에서 처리.
 
 const SWORD_SPRITE_DIR = 'sprites/swords/'
-// UI 스프라이트(코인 등 비-검 자산)는 public/sprites/ui/ 에 둔다.
-const UI_SPRITE_DIR = 'sprites/ui/'
+// 아이템 스프라이트(코인 등 비-검 자산)는 public/sprites/items/ 에 둔다.
+const ITEM_SPRITE_DIR = 'sprites/items/'
 
 // BASE_URL 은 항상 '/'로 끝난다(Vite 규약). GitHub Pages 등 하위 경로 배포에서도 동작.
 export function swordSpriteUrl(filename: string): string {
   return `${import.meta.env.BASE_URL}${SWORD_SPRITE_DIR}${filename}`
 }
 
-// UI 스프라이트(예: 'gold_coin.png') URL. 검과 동일하게 BASE_URL 을 여기서 해석한다.
-export function uiSpriteUrl(filename: string): string {
-  return `${import.meta.env.BASE_URL}${UI_SPRITE_DIR}${filename}`
+// 아이템 스프라이트(예: 'gold_coin.png') URL. 검과 동일하게 BASE_URL 을 여기서 해석한다.
+export function itemSpriteUrl(filename: string): string {
+  return `${import.meta.env.BASE_URL}${ITEM_SPRITE_DIR}${filename}`
 }

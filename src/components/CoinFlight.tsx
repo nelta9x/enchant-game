@@ -6,7 +6,7 @@ import {
   type RefObject,
 } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { uiSpriteUrl } from '../lib/sprites'
+import { itemSpriteUrl } from '../lib/sprites'
 import {
   COIN_FLIGHT_MS,
   COIN_FLIGHT_SEC,
@@ -27,7 +27,7 @@ import { useOneShot } from './useOneShot'
 // 같은 PNG 한 장을 50개가 공유(1회 디코드). "가장 최근" 한 번만 렌더하므로(latestRunning 으로
 // 뽑은 event) 판매를 연타해도 화면에 쌓이는 코인 수가 상한(MAX_COINS)으로 묶인다.
 
-const COIN_SPRITE = uiSpriteUrl('gold_coin.png')
+const COIN_SPRITE = itemSpriteUrl('gold_coin.png')
 
 export type CoinFlightEvent = { id: number; coinCount: number }
 export { COIN_FLIGHT_MS }

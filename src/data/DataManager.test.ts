@@ -1,8 +1,10 @@
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { DataManager, dataManager } from './DataManager'
 import { loadSwords } from './loadSwords'
 import { ko } from '../i18n/locales/ko'
-import { isDisplayableItemId } from '../lib/items'
+import { isDisplayableItemId, itemSpriteName } from '../lib/items'
 
 describe('DataManager', () => {
   it('load() 호출 전 조회하면 에러를 던진다', () => {
@@ -72,6 +74,37 @@ describe('상점 데이터 ↔ i18n 무결성', () => {
       expect(isDisplayableItemId(item.itemId)).toBe(true)
       if (item.price.kind === 'item')
         expect(isDisplayableItemId(item.price.itemId)).toBe(true)
+    }
+  })
+})
+
+// 아이콘 무결성: 라이브 데이터에 등장하는 모든 비-검 아이템(강화 재료·실패 드랍·상점 지급/가격)은
+// 전용 스프라이트로 표시돼야 한다(원칙1: 토큰 폴백이 아닌 실제 아이콘). itemSpriteName 매핑이 있는지
+// + 그 PNG 가 public/sprites/items/ 에 실제로 존재하는지까지 검증한다(파일명 오타·누락 → 깨진 이미지 방지).
+// 검 itemId 는 SwordData.sprite 로 표시되므로 제외한다.
+describe('아이템 아이콘 ↔ 스프라이트 무결성', () => {
+  it('라이브 데이터의 모든 비-검 아이템에 전용 스프라이트 파일이 존재한다', () => {
+    dataManager.load()
+    const ids = new Set<string>()
+    for (const sword of dataManager.getSwords()) {
+      if (sword.enhanceCost?.kind === 'item') ids.add(sword.enhanceCost.itemId)
+      if (sword.dropOnFail) ids.add(sword.dropOnFail.itemId)
+    }
+    for (const item of dataManager.getShopItems()) {
+      ids.add(item.itemId)
+      if (item.price.kind === 'item') ids.add(item.price.itemId)
+    }
+    const nonSword = [...ids].filter(
+      (id) => dataManager.getSwordById(id) === undefined,
+    )
+    expect(nonSword.length).toBeGreaterThan(0) // 검증 대상이 비어 통과하는 일이 없게 가드
+    for (const id of nonSword) {
+      const file = itemSpriteName(id)
+      expect(file, `'${id}' 에 매핑된 스프라이트가 없다`).toBeDefined()
+      expect(
+        existsSync(resolve('public/sprites/items', file as string)),
+        `'${id}' 스프라이트 파일이 없다: ${file}`,
+      ).toBe(true)
     }
   })
 })
