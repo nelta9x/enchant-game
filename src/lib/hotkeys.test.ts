@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   commissionHotkeySlot,
+  isEnhanceHotkeyContext,
   isEnhanceHotkeyEvent,
   isShopHotkeyEvent,
   modifierActionForKey,
@@ -86,6 +87,26 @@ describe('isEnhanceHotkeyEvent — 스페이스 강화 단축키 판정', () => 
     expect(isEnhanceHotkeyEvent(makeEvent({ target: { tagName: null } }))).toBe(
       true,
     )
+  })
+})
+
+describe('isEnhanceHotkeyContext — 스페이스 강화 "컨텍스트" 판정(반복 무관)', () => {
+  it('반복(꾹 누름)이어도 컨텍스트로 본다 — preventDefault(스크롤·버튼 활성 차단)는 반복에도 적용', () => {
+    // isEnhanceHotkeyEvent 와 달리 repeat 를 보지 않는다: 연사 발동 시점이 아니라 "기본 동작을 막을 상황"인가.
+    expect(isEnhanceHotkeyContext(makeEvent({ repeat: true }))).toBe(true)
+    expect(isEnhanceHotkeyContext(makeEvent({ repeat: false }))).toBe(true)
+  })
+
+  it('스페이스가 아니거나 수정자가 눌리면 컨텍스트가 아니다', () => {
+    expect(isEnhanceHotkeyContext(makeEvent({ code: 'Enter' }))).toBe(false)
+    expect(isEnhanceHotkeyContext(makeEvent({ ctrlKey: true }))).toBe(false)
+    expect(isEnhanceHotkeyContext(makeEvent({ altKey: true }))).toBe(false)
+  })
+
+  it('편집 입력 포커스면 컨텍스트가 아니다(네이티브 입력 보존)', () => {
+    expect(
+      isEnhanceHotkeyContext(makeEvent({ target: { tagName: 'INPUT' } })),
+    ).toBe(false)
   })
 })
 

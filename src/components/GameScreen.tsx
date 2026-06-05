@@ -246,13 +246,15 @@ export function GameScreen() {
       }
       lockEnhance()
     } else if (result.outcome === 'protected') {
-      // 방지 = 떨림만(잠금·폭발 없음) → 파괴보호장치 덕분에 살아남았음을 인지시킨다.
+      // 방지 = 떨림만(폭발 없음) → 파괴보호장치 덕분에 살아남았음을 인지시킨다.
       enqueueEffect({
         kind: 'protectedShake',
         exclusive: false,
         locksEnhance: false,
         durationMs: SHAKE_SEC * 1000,
       })
+      // 강화 버튼 잠금(0.4s)은 성공·파괴와 동일하게 건다 — 마우스·스페이스 모두 강화 딜레이가 일관되도록.
+      lockEnhance()
     }
   }
 

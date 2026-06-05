@@ -22,14 +22,21 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   return typeof el.tagName === 'string' && EDITABLE_TAGS.has(el.tagName)
 }
 
-// 이 keydown 을 "스페이스 강화 단축키"로 처리해야 하는가.
-// 스페이스 키 · 수정자(ctrl/meta/alt/shift) 없음 · 키 반복(꾹 누름) 아님 ·
-// 포커스가 편집 입력(INPUT/TEXTAREA/SELECT/contentEditable)이 아닐 때만 true.
-export function isEnhanceHotkeyEvent(e: KeyboardEvent): boolean {
+// 이 keydown 이 "스페이스 강화 단축키" 컨텍스트인가 — 반복(꾹 누름) 여부는 보지 않는다.
+// 스페이스 키 · 수정자(ctrl/meta/alt/shift) 없음 · 포커스가 편집 입력이 아님.
+// 꾹 누름 동안의 OS 키반복(e.repeat)에도 스크롤·포커스버튼 활성을 막아야(preventDefault) 하므로,
+// "반복도 막을 컨텍스트"와 "강화를 시작/연사할 시점(아래 isEnhanceHotkeyEvent)"을 분리한다.
+export function isEnhanceHotkeyContext(e: KeyboardEvent): boolean {
   if (e.code !== ENHANCE_HOTKEY_CODE) return false
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return false
-  if (e.repeat) return false
   return !isEditableTarget(e.target)
+}
+
+// 이 keydown 을 "스페이스 강화"의 (첫) 발동으로 처리해야 하는가 — 컨텍스트 + 반복 아님.
+// 꾹 누름 연사는 OS 키반복이 아니라 자체 타이머가 구동하므로, 여기선 반복을 제외한다.
+export function isEnhanceHotkeyEvent(e: KeyboardEvent): boolean {
+  if (e.repeat) return false
+  return isEnhanceHotkeyContext(e)
 }
 
 // 의뢰 납품 단축키: 숫자 1·2·3(상단 행 또는 숫자패드) → 의뢰 슬롯 0·1·2.
