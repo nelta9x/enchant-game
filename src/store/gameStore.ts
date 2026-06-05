@@ -45,6 +45,12 @@ type GameActions = {
   // 남은 pendingDrops 전체를 items 로 합산하고 비운다(연출 종료 시 미수집분 유실 방지). 멱등 —
   // 대기분이 없으면 무변화라 종료 트리거가 여러 번 와도 안전하다.
   flushDrops: () => void
+  // 의뢰 완료 가능 여부(요구 검을 가방에 보유했거나 현재 장착 중). 의뢰 카드 게이팅용.
+  canFulfill: (swordId: string) => boolean
+  // 의뢰 완료: 요구 검 1개를 소모하고 reward 골드를 지급한다(가방 우선 → 없으면 장착 검).
+  // reward 는 의뢰가 생성 시 freeze 한 값을 그대로 받는다(store 에서 재계산하지 않는다 — 단일 출처).
+  // 완료 성공이면 true, 미보유면 false(아무 변화 없음).
+  fulfillCommission: (swordId: string, reward: number) => boolean
 }
 
 export type GameState = PlayerState & GameActions
@@ -148,6 +154,23 @@ function bankOutgoing(
     return items.map((i) => ({ ...i }))
   }
   return addItems(items, [{ itemId: outgoingId, count: 1 }])
+}
+
+// 플레이어가 보유한 검 중 최고 레벨(장착 검 + 가방 검). 보유 검이 없으면 0.
+// 가방이 장착 검보다 높은 검을 가질 수 있어 둘 다 본다 — 의뢰 출제 풀의 "진행도" 기준이다.
+// gameStore 밖(commissionStore)에서 PlayerState 만으로 호출하므로 순수 함수로 분리해 export 한다.
+export function playerMaxLevel(state: PlayerState): number {
+  let max = 0
+  const equipped =
+    state.currentSwordId !== null
+      ? dataManager.getSwordById(state.currentSwordId)
+      : undefined
+  if (equipped) max = equipped.level
+  for (const it of state.items) {
+    const sword = dataManager.getSwordById(it.itemId)
+    if (sword && sword.level > max) max = sword.level
+  }
+  return max
 }
 
 // 게임 진행 상태 store 팩토리. 기본 인스턴스(useGameStore)는 Math.random 엔진을 쓰고,
@@ -321,6 +344,32 @@ export function createGameStore(opts: CreateOpts = {}) {
                 pendingDrops: [],
               },
         )
+      },
+
+      canFulfill: (swordId) =>
+        countOf(get().items, swordId) > 0 || get().currentSwordId === swordId,
+
+      fulfillCommission: (swordId, reward) => {
+        const state = get()
+        // 가방 우선: 가방에 있으면 거기서 1개 차감하고 장착 슬롯은 건드리지 않는다.
+        if (countOf(state.items, swordId) > 0) {
+          set({
+            gold: state.gold + reward,
+            items: subtractItems(state.items, [{ itemId: swordId, count: 1 }]),
+          })
+          return true
+        }
+        // 가방에 없고 현재 장착 검이 요구 검이면 그것을 소모하고 빈 슬롯을 채운다(판매와 동일 규칙).
+        if (state.currentSwordId === swordId) {
+          const next = equipNextFromBag(state.items)
+          set({
+            gold: state.gold + reward,
+            currentSwordId: next.id,
+            items: next.items,
+          })
+          return true
+        }
+        return false // 미보유 — 변화 없음
       },
     }
   })

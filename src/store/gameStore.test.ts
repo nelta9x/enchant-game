@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { createGameStore } from './gameStore'
+import { createGameStore, playerMaxLevel } from './gameStore'
 import { dataManager } from '../data/DataManager'
 import { Enhancer, PROTECTION_TICKET_ID } from '../game/enhancer'
 import { countOf } from '../lib/items'
@@ -476,5 +476,86 @@ describe('gameStore — 상점 구매', () => {
     expect(store.getState().canBuy('protection_ticket_gold', 1.5)).toBe(false)
     expect(store.getState().buy('protection_ticket_gold', 0)).toBeNull()
     expect(store.getState().gold).toBe(10_000_000)
+  })
+})
+
+describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
+  it('가방 보유 검: 가방에서 차감, 장착 슬롯 불변, gold += reward', () => {
+    const store = createGameStore({
+      gold: 1000,
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'sword_3', count: 2 }],
+    })
+    expect(store.getState().canFulfill('sword_3')).toBe(true)
+    expect(store.getState().fulfillCommission('sword_3', 5000)).toBe(true)
+    expect(store.getState().gold).toBe(6000)
+    expect(countOf(store.getState().items, 'sword_3')).toBe(1)
+    expect(store.getState().currentSwordId).toBe('sword_5') // 장착 불변
+  })
+
+  it('장착 검(가방 없음): 소모 후 낡은 단검(+0)으로 리필', () => {
+    const store = createGameStore({
+      gold: 1000,
+      currentSwordId: 'sword_5',
+      items: [],
+    })
+    expect(store.getState().fulfillCommission('sword_5', 5000)).toBe(true)
+    expect(store.getState().gold).toBe(6000)
+    expect(store.getState().currentSwordId).toBe('sword_0') // equipNextFromBag 리필
+  })
+
+  it('장착 검(가방에 다른 검 보유): 소모 후 가방의 검을 장착', () => {
+    const store = createGameStore({
+      gold: 1000,
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'sword_2', count: 1 }],
+    })
+    expect(store.getState().fulfillCommission('sword_5', 5000)).toBe(true)
+    expect(store.getState().gold).toBe(6000)
+    expect(store.getState().currentSwordId).toBe('sword_2')
+    expect(countOf(store.getState().items, 'sword_2')).toBe(0)
+  })
+
+  it('미보유 검: false, 아무 변화 없음', () => {
+    const store = createGameStore({
+      gold: 1000,
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'sword_3', count: 1 }],
+    })
+    expect(store.getState().canFulfill('sword_9')).toBe(false)
+    expect(store.getState().fulfillCommission('sword_9', 5000)).toBe(false)
+    expect(store.getState().gold).toBe(1000)
+    expect(store.getState().currentSwordId).toBe('sword_5')
+    expect(countOf(store.getState().items, 'sword_3')).toBe(1)
+  })
+
+  it('가방·장착 둘 다 요구 검이면 가방을 우선 소모(장착 불변)', () => {
+    const store = createGameStore({
+      gold: 1000,
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'sword_5', count: 1 }],
+    })
+    expect(store.getState().fulfillCommission('sword_5', 5000)).toBe(true)
+    expect(store.getState().gold).toBe(6000)
+    expect(store.getState().currentSwordId).toBe('sword_5') // 장착분 유지
+    expect(countOf(store.getState().items, 'sword_5')).toBe(0) // 가방분 소모
+  })
+})
+
+describe('playerMaxLevel — 진행도 산출', () => {
+  it('장착 검과 가방 검 중 최고 레벨(가방이 더 높을 수 있음)', () => {
+    const store = createGameStore({
+      currentSwordId: 'sword_5',
+      items: [
+        { itemId: 'sword_8', count: 1 },
+        { itemId: 'iron_scrap', count: 3 }, // 검 아닌 아이템은 무시
+      ],
+    })
+    expect(playerMaxLevel(store.getState())).toBe(8)
+  })
+
+  it('보유 검이 없으면 0', () => {
+    const store = createGameStore({ currentSwordId: null, items: [] })
+    expect(playerMaxLevel(store.getState())).toBe(0)
   })
 })

@@ -1,0 +1,12 @@
+{
+  "maxCommissions": 3,
+  "durationMinMs": 30000,
+  "durationMaxMs": 60000,
+  "incentiveMin": 0.1,
+  "incentiveMax": 2.0,
+  "respawnDelayMs": 10000,
+  "tickIntervalMs": 250,
+  "minLevel": 8,
+  "poolLevelBelow": 5,
+  "poolLevelAbove": 2
+}

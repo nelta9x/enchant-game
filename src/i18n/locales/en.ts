@@ -38,6 +38,12 @@ export const en: Record<TranslationKey, string> = {
   // 인벤토리
   'inventory.title': 'Inventory',
 
+  // 의뢰(Commission)
+  'commission.title': 'Commissions',
+  'commission.reward': 'Reward',
+  'commission.fulfill': 'Deliver',
+  'commission.empty': 'Pending',
+
   // 강화 결과 토스트
   'toast.success': 'Enhanced',
   'toast.protected': 'Protected',

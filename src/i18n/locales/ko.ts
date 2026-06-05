@@ -37,6 +37,12 @@ export const ko = {
   // 인벤토리
   'inventory.title': '인벤토리',
 
+  // 의뢰(Commission)
+  'commission.title': '의뢰',
+  'commission.reward': '보상',
+  'commission.fulfill': '납품',
+  'commission.empty': '준비 중',
+
   // 강화 결과 토스트
   'toast.success': '강화 성공',
   'toast.protected': '파괴보호장치로 보호',

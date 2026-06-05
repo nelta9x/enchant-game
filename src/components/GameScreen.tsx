@@ -7,7 +7,10 @@ import { swordSpriteUrl } from '../lib/sprites'
 import { useEffectStore } from '../store/effectStore'
 import { latestRunning } from '../store/effectQueue'
 import { useGameStore } from '../store/gameStore'
+import { useCommissionStore } from '../store/commissionStore'
+import type { Commission } from '../store/commissionQueue'
 import { useUiStore } from '../store/uiStore'
+import { CommissionBar } from './CommissionBar'
 import {
   DestructionEffect,
   DESTRUCTION_DURATION_MS,
@@ -99,6 +102,38 @@ export function GameScreen() {
   // 파괴 드롭 수집 연출의 도착점(인벤토리창) 측정용 ref(출발점은 검 박스 = swordBoxRef).
   const inventoryRef = useRef<HTMLDivElement>(null)
 
+  // 의뢰 완료 코인 연출 — 출발점이 클릭한 의뢰 카드(판매의 검 박스와 다름)라 별도 CoinFlight 인스턴스를 쓴다.
+  // 클릭 순간 카드의 viewport rect 를 캡처해 fixed anchor 에 박아 두면, 카드가 active 에서 빠져 사라져도
+  // 출발 좌표가 유효하다(언마운트 타이밍에 의존하지 않음). coinKeyRef 는 같은 효과를 연타로 재생할 키.
+  const [commissionCoin, setCommissionCoin] = useState<{
+    id: number
+    rect: DOMRect
+    coinCount: number
+  } | null>(null)
+  const commissionAnchorRef = useRef<HTMLDivElement>(null)
+  const commissionCoinKey = useRef(0)
+
+  // 골드창 상승 연출(통통통 + 숫자 카운트업)은 GoldDisplay 의 pulseKey 변화로만 구동된다.
+  // 판매와 의뢰 완료가 공유하는 단일 펄스 — 둘 다 골드를 늘리므로 같은 카운터를 올린다.
+  // (코인 비행 자체는 출발점이 달라 각자 다른 CoinFlight 인스턴스로 그리지만, 골드 상승은 한 경로로 모은다.)
+  const [goldPulse, setGoldPulse] = useState<{ key: number; count: number }>({
+    key: 0,
+    count: 0,
+  })
+
+  const handleFulfill = (commission: Commission, cardEl: HTMLElement) => {
+    const rect = cardEl.getBoundingClientRect()
+    // 생명주기·검 소모는 store 가 소유 — 수락(true)일 때만 코인 연출을 띄운다.
+    if (!useCommissionStore.getState().fulfill(commission.id)) return
+    commissionCoinKey.current += 1
+    setCommissionCoin({
+      id: commissionCoinKey.current,
+      rect,
+      coinCount: coinCount(commission.reward),
+    })
+    setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(commission.reward) }))
+  }
+
   const handleSell = () => {
     const price = sell()
     if (price === null || price <= 0) return
@@ -110,6 +145,7 @@ export function GameScreen() {
       durationMs: COIN_FLIGHT_MS,
       payload: { coinCount: coinCount(price) },
     })
+    setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(price) }))
   }
 
   const handleEnhance = () => {
@@ -258,6 +294,9 @@ export function GameScreen() {
       <div className="relative w-full max-w-5xl rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5">
         <TopControls onOpenShop={openShop} />
 
+        {/* 상단 의뢰 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
+        <CommissionBar onFulfill={handleFulfill} />
+
         {/* 모바일(<sm)은 단일 컬럼으로 스택 — 좁은 화면에서 고정폭 검 스테이지가
             좁은 트랙에 눌려 좌우 패널과 겹치는 것을 방지(반응형 폴리시는 스프린트 6). */}
         <div className="mt-3 grid grid-cols-1 gap-4 sm:min-h-[34rem] sm:grid-cols-[minmax(9.5rem,13rem)_minmax(0,1fr)_minmax(11rem,13rem)]">
@@ -330,8 +369,8 @@ export function GameScreen() {
             <div ref={goldRef} className="w-full">
               <GoldDisplay
                 gold={gold}
-                pulseKey={coinFlightEvent?.id ?? 0}
-                coinCount={coinFlightEvent?.coinCount ?? 0}
+                pulseKey={goldPulse.key}
+                coinCount={goldPulse.count}
               />
             </div>
           </div>
@@ -342,6 +381,31 @@ export function GameScreen() {
         <CoinFlight
           event={coinFlightEvent}
           sourceRef={swordBoxRef}
+          targetRef={goldRef}
+        />
+
+        {/* 의뢰 완료 코인 연출 — 출발점은 클릭한 의뢰 카드(아래 fixed anchor 로 좌표 고정), 도착점은 골드창.
+            anchor 는 보이지 않는 영점 크기 요소로, 카드가 사라진 뒤에도 측정한 출발 좌표를 유지한다. */}
+        {commissionCoin && (
+          <div
+            ref={commissionAnchorRef}
+            aria-hidden
+            className="pointer-events-none fixed"
+            style={{
+              left: commissionCoin.rect.left + commissionCoin.rect.width / 2,
+              top: commissionCoin.rect.top + commissionCoin.rect.height / 2,
+              width: 0,
+              height: 0,
+            }}
+          />
+        )}
+        <CoinFlight
+          event={
+            commissionCoin
+              ? { id: commissionCoin.id, coinCount: commissionCoin.coinCount }
+              : null
+          }
+          sourceRef={commissionAnchorRef}
           targetRef={goldRef}
         />
 

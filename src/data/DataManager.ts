@@ -1,6 +1,7 @@
-import type { ShopItem, SwordData } from './types'
+import type { CommissionConfig, ShopItem, SwordData } from './types'
 import { loadSwords } from './loadSwords'
 import { loadShop } from './loadShop'
+import { loadCommission } from './loadCommission'
 
 // 중앙 데이터 관리자.
 // 게임이 켜질 때 load()로 데이터를 적재하고, 모든 게임 데이터는
@@ -8,6 +9,7 @@ import { loadShop } from './loadShop'
 export class DataManager {
   private swords: readonly SwordData[] = []
   private shop: readonly ShopItem[] = []
+  private commission: CommissionConfig | null = null
   private loaded = false
 
   // 데이터 파일(sources/*.json)을 검증·적재한다(동기).
@@ -17,6 +19,7 @@ export class DataManager {
   load(): void {
     this.swords = loadSwords()
     this.shop = loadShop()
+    this.commission = loadCommission()
     this.loaded = true
   }
 
@@ -49,6 +52,13 @@ export class DataManager {
   getShopItem(id: string): ShopItem | undefined {
     this.ensureLoaded()
     return this.shop.find((s) => s.id === id)
+  }
+
+  // 의뢰 시스템 튜닝 설정. commissionStore 셸이 읽어 순수 reducer 에 주입한다(load 이후 호출 보장).
+  getCommissionConfig(): CommissionConfig {
+    this.ensureLoaded()
+    // loaded 면 commission 은 항상 채워져 있다(load 가 셋 다 적재). 방어적 non-null.
+    return this.commission as CommissionConfig
   }
 }
 
