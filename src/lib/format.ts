@@ -15,6 +15,13 @@ export function formatAmount(amount: number): string {
   return amount.toLocaleString('en-US')
 }
 
+// 골드 획득 플로팅 텍스트(뷰 경계) — 부호(+)를 붙인 금액만. 단위('원'/'G')는 검 위 황금 텍스트라는
+// 시각 맥락으로 충분하므로 생략한다(formatAmount 와 같이 lang 무관). 연출은 aria-hidden 이라 통화
+// 맥락은 GoldDisplay 의 aria-label(formatGold)이 따로 보존한다.
+export function formatGoldGain(amount: number): string {
+  return `+${formatAmount(amount)}`
+}
+
 // 성공률(0~1) → 정수 백분율 표시 문자열(뷰 경계). 백분율은 로케일 무관이라 formatGold 와
 // 달리 lang 인자가 없다. null/검없음 등 부재 처리는 호출 측 책임이다(뷰마다 의미가 다르다:
 // 최종 단계 vs 검 없음).

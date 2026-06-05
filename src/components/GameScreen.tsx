@@ -23,6 +23,7 @@ import { CoinFlight, COIN_FLIGHT_MS, type CoinFlightEvent } from './CoinFlight'
 import { DropScatter, DROP_LIFETIME_MS, type DropEvent } from './DropScatter'
 import { EnhanceButton } from './EnhanceButton'
 import { GoldDisplay } from './GoldDisplay'
+import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import { InventoryPanel } from './InventoryPanel'
 import { particleCount } from './particles'
 import { SellButton } from './SellButton'
@@ -122,6 +123,15 @@ export function GameScreen() {
     count: 0,
   })
 
+  // 골드 획득 플로팅 텍스트("+금액") — 판매·의뢰완료가 공유하는 단일 연출. 검 박스 위에 황금색으로
+  // 떠오르며, 글자 크기는 획득 골드가 많을수록 커진다(goldTextSize). id 단조 증가로 연타도 재생된다.
+  const [goldGain, setGoldGain] = useState<GoldGainEvent | null>(null)
+  const goldGainKey = useRef(0)
+  const showGoldGain = useCallback((amount: number) => {
+    goldGainKey.current += 1
+    setGoldGain({ id: goldGainKey.current, amount })
+  }, [])
+
   const handleFulfill = (commission: Commission, cardEl: HTMLElement) => {
     const rect = cardEl.getBoundingClientRect()
     // 생명주기·검 소모는 store 가 소유 — 수락(true)일 때만 코인 연출을 띄운다.
@@ -133,6 +143,7 @@ export function GameScreen() {
       coinCount: coinCount(commission.reward),
     })
     setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(commission.reward) }))
+    showGoldGain(commission.reward)
   }
 
   const handleSell = () => {
@@ -147,6 +158,7 @@ export function GameScreen() {
       payload: { coinCount: coinCount(price) },
     })
     setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(price) }))
+    showGoldGain(price)
   }
 
   const handleEnhance = () => {
@@ -348,6 +360,9 @@ export function GameScreen() {
               // 판매 코인이 뿜어져 나올 출발점(검 박스) 측정용.
               swordBoxRef={swordBoxRef}
             />
+            {/* 골드 획득 텍스트("+금액") — 검 박스 위로 떠오르는 황금색 연출(SwordStage 위에 그려 전면 표시).
+                판매·의뢰완료 공유. 출발점은 항상 검 박스(swordBoxRef) — "장착 무기가 있던 위치". */}
+            <GoldGainText event={goldGain} anchorRef={swordBoxRef} />
             {/* 결과 음성 알림(시각 연출은 aria-hidden) — 화면엔 보이지 않는 라이브 리전. */}
             <div
               role="status"
