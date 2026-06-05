@@ -7,6 +7,7 @@ import {
 } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { itemSpriteUrl } from '../lib/sprites'
+import { sound } from '../lib/sound'
 import {
   COIN_FLIGHT_MS,
   COIN_FLIGHT_SEC,
@@ -181,6 +182,9 @@ function CoinChip({
         times: [0, 0.15, spec.hold, 1],
         ease: ['backOut', 'easeInOut', 'backIn'],
       }}
+      // 흡수가 끝나는 순간(애니메이션 완료 = 골드창 도달) 코인마다 'coin_pickup'을 울린다 —
+      // 코인은 stagger 로 시간차를 두고 도착하므로 동전 쏟아지듯 차르륵 연달아 난다(풀이 보이스 상한으로 묶음).
+      onAnimationComplete={() => sound.playSfx('coin_pickup')}
     />
   )
 }

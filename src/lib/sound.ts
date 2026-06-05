@@ -15,6 +15,7 @@ const AUDIO_DIR = 'audio/'
 // ── 사운드 레지스트리 — 여기만 고치면 사운드가 늘어난다 ──────────────────────────
 const SFX_FILES = {
   enhance: 'enhance_kang.wav', // 강화 '캉!' 타격음
+  coin_pickup: 'coin_pickup.wav', // 코인 1개가 골드창에 흡수될 때(코인마다 1회)
 } as const
 
 const BGM_FILES = {
