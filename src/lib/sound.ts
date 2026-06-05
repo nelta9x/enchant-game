@@ -16,6 +16,7 @@ const AUDIO_DIR = 'audio/'
 const SFX_FILES = {
   enhance: 'enhance_kang.wav', // 강화 '캉!' 타격음
   coin_pickup: 'coin_pickup.wav', // 코인 1개가 골드창에 흡수될 때(코인마다 1회)
+  enchant_destroyed: 'enchant_destroyed.wav', // 강화 실패로 검이 파괴(폭발)되는 순간
 } as const
 
 const BGM_FILES = {
@@ -80,6 +81,8 @@ export function acquireVoice<T extends { paused: boolean }>(
 type PlayOptions = {
   // 이 재생 한 번의 상대 볼륨(0~1). 카테고리 마스터 볼륨과 곱해진다.
   volume?: number
+  // 재생을 이만큼(ms) 늦춘다 — 연출과 소리를 맞출 때(예: 떨림 뒤 폭발). 프리로드는 즉시, 재생만 지연.
+  delayMs?: number
 }
 
 class SoundManager {
@@ -100,16 +103,21 @@ class SoundManager {
       pool = [this.createSfxVoice(name)]
       this.sfxPools.set(name, pool)
     }
-    if (this.muted) return
-    const voice = acquireVoice(pool, SFX_POOL_SIZE, () => this.createSfxVoice(name))
-    voice.volume = clamp01((opts.volume ?? 1) * this.sfxVolume)
-    try {
-      // 끝났거나 재생 중인 보이스를 처음부터 다시 튼다(아직 로드 전이면 throw → currentTime 은 이미 0 이라 무시).
-      voice.currentTime = 0
-    } catch {
-      /* 메타데이터 미로드 — 되감을 필요 없음 */
+    // 실제 발성(보이스 빌리기·재생). 지연 재생 시엔 무음 여부를 "재생 시점"에 다시 본다(지연 중 음소거 반영).
+    const fire = () => {
+      if (this.muted) return
+      const voice = acquireVoice(pool, SFX_POOL_SIZE, () => this.createSfxVoice(name))
+      voice.volume = clamp01((opts.volume ?? 1) * this.sfxVolume)
+      try {
+        // 끝났거나 재생 중인 보이스를 처음부터 다시 튼다(아직 로드 전이면 throw → currentTime 은 이미 0 이라 무시).
+        voice.currentTime = 0
+      } catch {
+        /* 메타데이터 미로드 — 되감을 필요 없음 */
+      }
+      void voice.play().catch((e: unknown) => warnPlayFailure('sfx', name, e))
     }
-    void voice.play().catch((e: unknown) => warnPlayFailure('sfx', name, e))
+    if (opts.delayMs && opts.delayMs > 0) setTimeout(fire, opts.delayMs)
+    else fire()
   }
 
   // 풀에 넣을 새 보이스(같은 src). 로드 실패(파일명 오타·404)는 개발 중 경고로 드러낸다.

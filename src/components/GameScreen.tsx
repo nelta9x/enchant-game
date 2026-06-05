@@ -207,6 +207,8 @@ export function GameScreen() {
       }
       lockEnhance()
     } else if (result.outcome === 'destroyed') {
+      // 파괴 폭발 효과음 — 떨림(0.4s)이 끝나 폭발이 터지는 순간에 맞춰 울린다('캉!' 직후가 아닌 분출 시점).
+      sound.playSfx('enchant_destroyed', { delayMs: SHAKE_SEC * 1000 })
       // 파괴 = 폭발 연출(잠금X·~1초) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 파괴된 검(fromId)의 단계에 비례.
       // 스프라이트(fromId)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
       const target = destructionTargetOf(result)
