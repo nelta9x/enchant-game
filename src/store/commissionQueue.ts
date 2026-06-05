@@ -56,7 +56,7 @@ function nextSpawnTime(
 // 현재 의뢰 레벨에서 허용된 검 단계(swordLevels)에 속하고 sellPrice 가 있는 검만 남긴다.
 //  - swordLevels: 의뢰 레벨이 결정하는 등장 검 단계 목록(commissionProgress.swordLevelsFor 로 해석).
 //  - sellPrice === null 검(낡은 단검 sword_0 · 최종 단계)은 자동 제외된다 — 이는 단순 필터가 아니라
-//    "시작 검 소모 → equipNextFromBag 이 sword_0 재생성 → 무한 골드" 익스플로잇을 막는 load-bearing 조건이다
+//    "시작 검 소모 → 빈 슬롯이 sword_0 재생성 → 무한 골드" 익스플로잇을 막는 load-bearing 조건이다
 //    (레벨 정의가 1~27 단계만 담도록 로더가 강제하므로 실제로 걸릴 일은 없지만 방어적으로 유지).
 // 자격 검이 없으면 [].
 export function commissionPool(

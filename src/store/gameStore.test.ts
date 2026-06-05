@@ -64,7 +64,7 @@ describe('gameStore — 강화 적용 (seam)', () => {
     })
   })
 
-  it('파괴 후 인벤토리에 검이 있으면 그 검(최고 레벨)을 장착한다(판매와 동일 규칙)', () => {
+  it('파괴 후 인벤토리에 검이 있어도 자동 장착하지 않고 낡은 단검(+0)으로 재시작한다(보관 검은 가방에 유지)', () => {
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 5000,
@@ -73,8 +73,9 @@ describe('gameStore — 강화 적용 (seam)', () => {
     })
     const r = store.getState().enhance(false)
     expect(r?.outcome).toBe('destroyed')
-    expect(store.getState().currentSwordId).toBe('sword_19')
-    expect(countOf(store.getState().items, 'sword_19')).toBe(0)
+    // 보관 검(sword_19)을 자동 장착하지 않는다 — 의도치 않은 강화 방지.
+    expect(store.getState().currentSwordId).toBe('sword_0')
+    expect(countOf(store.getState().items, 'sword_19')).toBe(1)
     // 드랍은 대기분으로 — 아직 items 에 없다.
     expect(countOf(store.getState().items, 'iron_scrap')).toBe(0)
     expect(countOf(store.getState().pendingDrops, 'iron_scrap')).toBe(1)
@@ -163,7 +164,7 @@ describe('gameStore — 드랍 수집(collectDrop / flushDrops)', () => {
   })
 
   it('연속 파괴: 드랍이 대기분에 누적된다(merge — 유실 없음)', () => {
-    // sword_6(드랍 ×1) 파괴 → 가방의 sword_9 자동 장착 → sword_9(드랍 ×2) 재파괴.
+    // sword_6(드랍 ×1) 파괴 → 낡은 단검(+0)으로 재시작 → 가방의 sword_9 를 명시적으로 장착 → sword_9(드랍 ×2) 재파괴.
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 1_000_000,
@@ -171,6 +172,11 @@ describe('gameStore — 드랍 수집(collectDrop / flushDrops)', () => {
       items: [{ itemId: 'sword_9', count: 1 }],
     })
     store.getState().enhance(false)
+    // 파괴 후 보관 검은 자동 장착되지 않는다 — 낡은 단검(+0)으로 재시작, sword_9 는 가방에 유지.
+    expect(store.getState().currentSwordId).toBe('sword_0')
+    expect(countOf(store.getState().items, 'sword_9')).toBe(1)
+    // 재파괴를 위해 보관 검을 명시적으로 장착한 뒤 강화한다.
+    store.getState().equip('sword_9')
     expect(store.getState().currentSwordId).toBe('sword_9')
     store.getState().enhance(false)
     // 1 + 2 = 3 이 대기분에 누적, items 엔 아직 0.
@@ -226,7 +232,7 @@ describe('gameStore — 판매', () => {
     expect(store.getState().currentSwordId).toBe('sword_0')
   })
 
-  it('판매 후 인벤토리에 검이 있으면 그 검을 장착하고 인벤토리에서 뺀다', () => {
+  it('판매 후 인벤토리에 검이 있어도 자동 장착하지 않고 낡은 단검(+0)으로 재시작한다(보관 검은 가방에 유지)', () => {
     const store = createGameStore({
       gold: 0,
       currentSwordId: 'sword_5', // 판매가 1600
@@ -235,11 +241,12 @@ describe('gameStore — 판매', () => {
     const got = store.getState().sell()
     expect(got).toBe(1600)
     expect(store.getState().gold).toBe(1600)
-    expect(store.getState().currentSwordId).toBe('sword_19')
-    expect(countOf(store.getState().items, 'sword_19')).toBe(0)
+    // 보관 검(sword_19)을 자동 장착하지 않는다 — 의도치 않은 강화 방지.
+    expect(store.getState().currentSwordId).toBe('sword_0')
+    expect(countOf(store.getState().items, 'sword_19')).toBe(1)
   })
 
-  it('인벤토리에 검이 여럿이면 최고 레벨을 장착하고 나머지는 남긴다', () => {
+  it('판매 후 인벤토리에 검이 여럿 있어도 모두 가방에 그대로 두고 낡은 단검(+0)으로 재시작한다', () => {
     const store = createGameStore({
       gold: 0,
       currentSwordId: 'sword_5',
@@ -249,8 +256,8 @@ describe('gameStore — 판매', () => {
       ],
     })
     store.getState().sell()
-    expect(store.getState().currentSwordId).toBe('sword_21')
-    expect(countOf(store.getState().items, 'sword_21')).toBe(1)
+    expect(store.getState().currentSwordId).toBe('sword_0')
+    expect(countOf(store.getState().items, 'sword_21')).toBe(2)
     expect(countOf(store.getState().items, 'sword_19')).toBe(1)
   })
 
@@ -395,12 +402,13 @@ describe('gameStore — 보관 / 장착', () => {
     store.getState().equip('sword_8') // sword_8 장착, sword_5 가방으로
     expect(store.getState().currentSwordId).toBe('sword_8')
     expect(countOf(store.getState().items, 'sword_5')).toBe(1)
-    // sword_8 판매 → 빈 슬롯을 가방의 sword_5 로 채운다(낡은 단검 아님).
+    // sword_8 판매 → 가방 검(sword_5)을 자동 장착하지 않고 낡은 단검(+0)으로 재시작.
+    // sword_5 는 가방에 그대로 남고, 빠진 +0 은 가방에 쌓이지 않는다("가방엔 +0 없음" 불변식).
     const got = store.getState().sell()
     expect(got).toBe(10000)
-    expect(store.getState().currentSwordId).toBe('sword_5')
+    expect(store.getState().currentSwordId).toBe('sword_0')
     expect(countOf(store.getState().items, 'sword_0')).toBe(0)
-    expect(store.getState().items).toEqual([])
+    expect(store.getState().items).toEqual([{ itemId: 'sword_5', count: 1 }])
   })
 })
 
@@ -501,10 +509,10 @@ describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
     })
     expect(store.getState().fulfillCommission('sword_5', 5000)).toBe(true)
     expect(store.getState().gold).toBe(6000)
-    expect(store.getState().currentSwordId).toBe('sword_0') // equipNextFromBag 리필
+    expect(store.getState().currentSwordId).toBe('sword_0') // 빈 슬롯 리필
   })
 
-  it('장착 검(가방에 다른 검 보유): 소모 후 가방의 검을 장착', () => {
+  it('장착 검(가방에 다른 검 보유): 소모 후에도 가방 검은 자동 장착하지 않고 낡은 단검(+0)으로 재시작', () => {
     const store = createGameStore({
       gold: 1000,
       currentSwordId: 'sword_5',
@@ -512,8 +520,9 @@ describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
     })
     expect(store.getState().fulfillCommission('sword_5', 5000)).toBe(true)
     expect(store.getState().gold).toBe(6000)
-    expect(store.getState().currentSwordId).toBe('sword_2')
-    expect(countOf(store.getState().items, 'sword_2')).toBe(0)
+    // 보관 검(sword_2)을 자동 장착하지 않는다 — 의도치 않은 강화 방지.
+    expect(store.getState().currentSwordId).toBe('sword_0')
+    expect(countOf(store.getState().items, 'sword_2')).toBe(1)
   })
 
   it('미보유 검: false, 아무 변화 없음', () => {

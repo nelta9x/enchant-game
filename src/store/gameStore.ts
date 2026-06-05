@@ -130,30 +130,12 @@ function chargeFor(
   return { gold, items } // free
 }
 
-// 빈 강화 슬롯을 채울 다음 검을 정한다(파괴·판매 공통 규칙).
-//  - 인벤토리에 검(getSwordById 로 해석되는 itemId)이 있으면 최고 레벨을 장착하고 그 스택 1개를 차감,
-//  - 없으면 낡은 단검(INITIAL_SWORD_ID)을 생성해 장착(items 변화 없음).
-function equipNextFromBag(items: readonly ItemStack[]): {
-  id: string
-  items: ItemStack[]
-} {
-  const bagSwords: { id: string; level: number }[] = []
-  for (const it of items) {
-    const sword = dataManager.getSwordById(it.itemId)
-    if (sword) bagSwords.push({ id: sword.id, level: sword.level })
-  }
-  if (bagSwords.length === 0) {
-    return { id: INITIAL_SWORD_ID, items: items.map((i) => ({ ...i })) }
-  }
-  const best = bagSwords.reduce((a, b) => (b.level > a.level ? b : a))
-  return {
-    id: best.id,
-    items: subtractItems(items, [{ itemId: best.id, count: 1 }]),
-  }
-}
+// 빈 강화 슬롯은 항상 낡은 단검(INITIAL_SWORD_ID, +0)으로 재시작한다(파괴·판매·의뢰완료 공통 규칙).
+// 인벤토리에 검이 있어도 자동 장착하지 않는다 — 플레이어가 모르는 사이 보관 검이 강화되는 것을 막기 위함.
+// 보관 검은 가방에 그대로 남고, 다시 쓰려면 명시적으로 equip 해야 한다(items 변화 없음).
 
 // 강화 슬롯에서 빠지는 검(outgoingId)을 가방에 보관한다(보관·장착 공통).
-// 불변식: 가방엔 시작 검(낡은 단검)이 없다 — equipNextFromBag 이 시작 검을 '생성'할 뿐
+// 불변식: 가방엔 시작 검(낡은 단검)이 없다 — 빈 슬롯은 시작 검을 '생성'해 채울 뿐
 // 보관하지 않는 것과 동일하게, 시작 검(과 null=검 없음)은 가방에 두지 않고 버린다.
 function bankOutgoing(
   items: readonly ItemStack[],
@@ -211,14 +193,14 @@ export function createGameStore(opts: CreateOpts = {}) {
           // 소모 적용(골드 + consumed.items). 드랍은 즉시 items 에 넣지 않는다 — "수집 연출"에서
           // 토큰이 인벤토리에 도착할 때 collectDrop 으로 옮긴다(deferred). 그 전까지 pendingDrops 에 둔다.
           const baseItems = subtractItems(state.items, result.consumed.items)
-          // 파괴 시 검을 잃지 않고 인벤토리 검(없으면 낡은 단검)으로 재시작(판매와 동일 규칙).
+          // 파괴 시 낡은 단검(+0)으로 재시작한다(판매·의뢰완료와 동일 규칙).
+          // 인벤토리 검은 자동 장착하지 않고 그대로 둔다 — 보관 검의 의도치 않은 강화 방지.
           // 성공(다음 검)·방지(유지)는 엔진 결과의 toId를 그대로 따른다.
           if (result.outcome === 'destroyed') {
-            const next = equipNextFromBag(baseItems)
             return {
               gold: state.gold - result.consumed.gold,
-              currentSwordId: next.id,
-              items: next.items,
+              currentSwordId: INITIAL_SWORD_ID,
+              items: baseItems,
               // 미수집 대기분에 합산(replace 가 아닌 merge) — 연속 파괴(파괴 후 가방 검 자동 장착 →
               // 같은 연출 창 안에서 재실패) 시에도 이전 잔여분이 유실되지 않는다. flush 가 한도 내에서 정리.
               pendingDrops: addItems(state.pendingDrops, result.drops),
@@ -248,12 +230,12 @@ export function createGameStore(opts: CreateOpts = {}) {
 
         const price = sword.sellPrice
         set((state) => {
-          // 판매 후 빈 슬롯을 인벤토리 검(없으면 낡은 단검)으로 채운다(파괴와 동일 규칙).
-          const next = equipNextFromBag(state.items)
+          // 판매 후 빈 슬롯은 낡은 단검(+0)으로 채운다(파괴·의뢰완료와 동일 규칙).
+          // 인벤토리 검은 자동 장착하지 않고 그대로 둔다 — 보관 검의 의도치 않은 강화 방지.
           return {
             gold: state.gold + price,
-            currentSwordId: next.id,
-            items: next.items,
+            currentSwordId: INITIAL_SWORD_ID,
+            items: state.items.map((i) => ({ ...i })),
           }
         })
         return price
@@ -353,13 +335,12 @@ export function createGameStore(opts: CreateOpts = {}) {
           })
           return true
         }
-        // 가방에 없고 현재 장착 검이 요구 검이면 그것을 소모하고 빈 슬롯을 채운다(판매와 동일 규칙).
+        // 가방에 없고 현재 장착 검이 요구 검이면 그것을 소모하고 낡은 단검(+0)으로 재시작한다
+        // (판매·파괴와 동일 규칙). 가방 검은 자동 장착하지 않고 그대로 둔다 — 보관 검의 의도치 않은 강화 방지.
         if (state.currentSwordId === swordId) {
-          const next = equipNextFromBag(state.items)
           set({
             gold: state.gold + reward,
-            currentSwordId: next.id,
-            items: next.items,
+            currentSwordId: INITIAL_SWORD_ID,
           })
           return true
         }
