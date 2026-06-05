@@ -42,6 +42,7 @@ export const ko = {
   'commission.reward': '보상',
   'commission.fulfill': '납품',
   'commission.empty': '준비 중',
+  'commission.level': '의뢰 Lv.',
 
   // 강화 결과 토스트
   'toast.success': '강화 성공',

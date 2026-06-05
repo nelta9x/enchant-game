@@ -4,94 +4,111 @@ import { useGameStore } from './gameStore'
 import { dataManager } from '../data/DataManager'
 import type { CommissionConfig } from '../data/types'
 
-// 셸(타이머+데이터) 통합 테스트 — 순수 코어(commissionQueue.test)와 달리, setInterval 이 실제로
-// tick 을 돌려 생성/만료가 시간축에서 도는지와, fulfill 이 gameStore 수락 여부에 따라 complete 하는지 본다.
-// 풀은 실제 검 데이터(DataManager)를 쓰되, 설정은 픽스처를 주입해 production 값(minLevel=8 등)과 독립시킨다.
+// 셸(타이머+데이터) 통합 테스트. 풀은 실제 검 데이터(DataManager)를 쓰되, 설정은 픽스처를 주입해
+// production 값과 독립시킨다. 타이밍은 결정적이도록 spawnInterval·duration 의 min==max 로 둔다.
 beforeAll(() => {
   dataManager.load()
 })
 
-beforeEach(() => vi.useFakeTimers())
+beforeEach(() => {
+  vi.useFakeTimers()
+  useGameStore.setState({ commissionLevel: 1, commissionXp: 0 }) // 레벨 1 → 풀 = 검 단계 3,4,5
+})
 afterEach(() => vi.useRealTimers())
 
-// 테스트 설정 픽스처 — minLevel=0 으로 둬 진행도 sword_5 수준에서도 풀이 비지 않는다.
+// 간격 10s, 지속 30s — 0·10·20s 에 1개씩 등장해 20s 에 꽉 차고(정지), 30s 에 첫 의뢰 만료.
 const CONFIG: CommissionConfig = {
   maxCommissions: 3,
   durationMinMs: 30_000,
-  durationMaxMs: 60_000,
+  durationMaxMs: 30_000,
   incentiveMin: 0.1,
   incentiveMax: 2.0,
-  respawnDelayMs: 10_000,
+  spawnIntervalMinMs: 10_000,
+  spawnIntervalMaxMs: 10_000,
   tickIntervalMs: 250,
-  minLevel: 0,
-  poolLevelBelow: 5,
-  poolLevelAbove: 2,
+  xpReward: 34,
+  xpPenalty: 20,
+  levels: [
+    { swordLevels: [3, 4, 5], xpToNext: 100 },
+    { swordLevels: [4, 5, 6], xpToNext: 100 },
+  ],
 }
 
-describe('commissionStore — 타이머 셸 생명주기', () => {
-  it('start 시 즉시 maxCommissions 개 의뢰가 채워진다(진행도 근처 풀)', () => {
-    // 플레이어 진행도를 sword_5 수준으로 → 풀이 비지 않도록.
-    useGameStore.setState({ currentSwordId: 'sword_5', items: [] })
+describe('commissionStore — 단일 스폰 타이머', () => {
+  it('start 는 1개만 즉시 등장, 이후 간격마다 1개씩 채워 꽉 차면 멈춘다', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
-    expect(store.getState().active).toHaveLength(CONFIG.maxCommissions)
-    expect(store.getState().pending).toHaveLength(0)
+    expect(store.getState().active).toHaveLength(1) // 즉시 1개
+    // 레벨 1 풀(검 단계 3,4,5)에서만 출제.
+    for (const c of store.getState().active) {
+      expect(['sword_3', 'sword_4', 'sword_5']).toContain(c.swordId)
+    }
+    vi.advanceTimersByTime(10_000)
+    expect(store.getState().active).toHaveLength(2)
+    vi.advanceTimersByTime(10_000)
+    expect(store.getState().active).toHaveLength(3)
+    expect(store.getState().nextSpawnAt).toBeNull() // 꽉 차서 정지
     store.getState().stop()
   })
 
   it('stop 후 tick 이 더 이상 돌지 않는다', () => {
-    useGameStore.setState({ currentSwordId: 'sword_5', items: [] })
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     store.getState().stop()
-    expect(store.getState().active).toHaveLength(0) // stop 이 큐를 비움
-    vi.advanceTimersByTime(CONFIG.tickIntervalMs * 4)
-    expect(store.getState().active).toHaveLength(0) // 타이머 해제됨 — 재생성 없음
+    expect(store.getState().active).toHaveLength(0)
+    expect(store.getState().nextSpawnAt).toBeNull()
+    vi.advanceTimersByTime(CONFIG.tickIntervalMs * 8)
+    expect(store.getState().active).toHaveLength(0) // 타이머 해제 — 재생성 없음
   })
 
-  it('만료된 의뢰는 시간이 지나면 재생성된다', () => {
-    useGameStore.setState({ currentSwordId: 'sword_5', items: [] })
+  it('의뢰 레벨이 오르면 상위 검 단계 풀에서 출제된다(헤드라인 동작)', () => {
+    useGameStore.setState({ commissionLevel: 2, commissionXp: 0 })
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
-    const firstIds = store.getState().active.map((c) => c.id)
-    // 만료(최대 60s) + 재생성 딜레이(10s)를 모두 지나도록 크게 전진.
-    vi.advanceTimersByTime(80_000)
-    expect(store.getState().active).toHaveLength(CONFIG.maxCommissions)
-    // 새 id 가 발급되어 이전 의뢰와 다르다.
-    const laterIds = store.getState().active.map((c) => c.id)
-    expect(laterIds.some((id) => !firstIds.includes(id))).toBe(true)
+    expect(store.getState().active.length).toBeGreaterThan(0)
+    for (const c of store.getState().active) {
+      expect(['sword_4', 'sword_5', 'sword_6']).toContain(c.swordId) // CONFIG.levels[1]
+    }
     store.getState().stop()
   })
 
-  it('fulfill: gameStore 가 거절(false)하면 complete 하지 않는다', () => {
-    // 플레이어가 요구 검을 전혀 보유하지 않도록 비운다.
-    useGameStore.setState({ currentSwordId: null, items: [], gold: 0 })
+  it('fulfill: gameStore 가 거절(false)하면 complete·경험치 변동 없음', () => {
+    useGameStore.setState({ currentSwordId: null, items: [], gold: 0, commissionXp: 0 })
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     const target = store.getState().active[0]
-    const before = store.getState().active.length
     expect(store.getState().fulfill(target.id)).toBe(false)
-    expect(store.getState().active).toHaveLength(before) // 제거 안 됨
+    expect(store.getState().active.some((c) => c.id === target.id)).toBe(true)
     expect(useGameStore.getState().gold).toBe(0)
+    expect(useGameStore.getState().commissionXp).toBe(0)
     store.getState().stop()
   })
 
-  it('fulfill: 요구 검 보유 시 골드 지급 + active 에서 제거', () => {
+  it('fulfill: 요구 검 보유 시 골드 지급 + active 제거 + 경험치 획득', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     const target = store.getState().active[0]
-    // 플레이어에게 요구 검을 가방에 쥐여 준다.
     useGameStore.setState({
       currentSwordId: null,
       items: [{ itemId: target.swordId, count: 1 }],
       gold: 0,
+      commissionLevel: 1,
+      commissionXp: 0,
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
     expect(useGameStore.getState().gold).toBe(target.reward)
+    expect(useGameStore.getState().commissionXp).toBe(CONFIG.xpReward) // +reward
     expect(store.getState().active.some((c) => c.id === target.id)).toBe(false)
-    expect(store.getState().active.length + store.getState().pending.length).toBe(
-      CONFIG.maxCommissions,
-    )
+    store.getState().stop()
+  })
+
+  it('만료(미달성) 시 만료 건수만큼 경험치 차감', () => {
+    useGameStore.setState({ commissionLevel: 1, commissionXp: 50 })
+    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
+    store.getState().start() // c1 @0 (exp 30000)
+    // 31s 로 전진 → c1(첫 의뢰)만 만료(c2@10s exp40s, c3@20s exp50s 는 아직).
+    vi.advanceTimersByTime(31_000)
+    expect(useGameStore.getState().commissionXp).toBe(50 - CONFIG.xpPenalty) // 1건 만료 → -20
     store.getState().stop()
   })
 })

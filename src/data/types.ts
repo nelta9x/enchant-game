@@ -26,26 +26,37 @@ export type ShopItem = {
   price: Material
 }
 
+// 의뢰 레벨 1단계 정의(언어 중립). 의뢰 레벨이 오를수록 더 높은 단계의 검을 요구한다.
+//  - swordLevels: 이 의뢰 레벨에서 출제될 수 있는 검 단계(level) 목록(판매가 있는 단계만 둔다)
+//  - xpToNext: 이 레벨에서 다음 레벨로 오르기까지 필요한 경험치
+export type CommissionLevel = {
+  swordLevels: number[]
+  xpToNext: number
+}
+
 // 의뢰(Commission) 시스템 튜닝 설정(언어 중립). 코드 상수가 아니라 데이터 파일(commission.json)에 두고
-// DataManager 가 로드 시 검증한다. 순수 reducer(commissionQueue)는 이 값을 인자로 주입받아 쓴다.
-//  - maxCommissions: 동시 유지 의뢰 수(불변식 active+pending === 이 값)
+// DataManager 가 로드 시 검증한다. 순수 reducer(commissionQueue/commissionProgress)는 이 값을 인자로 주입받아 쓴다.
+//  - maxCommissions: 동시 유지 의뢰 수(꽉 차면 스폰 타이머가 멈춘다)
 //  - durationMin/MaxMs: 의뢰 시간 제한 범위(생성 시 이 구간에서 무작위)
 //  - incentiveMin/Max: 판매가 대비 보상 인센티브 범위(예: 0.1~2.0 = +10%~+200%)
-//  - respawnDelayMs: 의뢰가 사라진 뒤 빈 슬롯이 다시 채워지기까지의 딜레이
+//  - spawnIntervalMin/MaxMs: 의뢰 1개가 등장하는 간격 범위(이 구간에서 무작위). 슬롯이 꽉 차면
+//    타이머가 멈췄다가, 한 자리가 비면 다시 이 간격을 세어 1개씩 등장시킨다.
 //  - tickIntervalMs: 셸(commissionStore)이 시간을 전진시키는 주기(만료/스폰 감지 해상도)
-//  - minLevel: 출제 검의 절대 최소 레벨(이 미만 검은 진행도와 무관하게 의뢰에 나오지 않는다)
-//  - poolLevelBelow/Above: "진행도 근처" 범위 — 최고검 레벨 기준 [max(maxLv-below, minLevel), maxLv+above]
+//  - xpReward: 의뢰 1건 완료 시 획득하는 경험치
+//  - xpPenalty: 의뢰 1건 만료(미달성) 시 차감되는 경험치
+//  - levels: 의뢰 레벨별 정의(levels[0] = 의뢰 레벨 1). 레벨이 오를수록 등장 검 단계가 높아진다.
 export type CommissionConfig = {
   maxCommissions: number
   durationMinMs: number
   durationMaxMs: number
   incentiveMin: number
   incentiveMax: number
-  respawnDelayMs: number
+  spawnIntervalMinMs: number
+  spawnIntervalMaxMs: number
   tickIntervalMs: number
-  minLevel: number
-  poolLevelBelow: number
-  poolLevelAbove: number
+  xpReward: number
+  xpPenalty: number
+  levels: CommissionLevel[]
 }
 
 // 검의 특수 플래그(언어 중립 태그). 표시가 필요하면 i18n에서 해석한다.

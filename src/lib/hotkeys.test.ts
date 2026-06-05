@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isEnhanceHotkeyEvent } from './hotkeys'
+import { commissionHotkeySlot, isEnhanceHotkeyEvent } from './hotkeys'
 
 // KeyboardEvent 의 최소 형태만 만들어 순수 판정 함수를 검증한다(테스트 환경은 node — DOM 전역 없음).
 // 기본값은 "빈 영역(BODY) 포커스 + 수정자 없는 단발 스페이스" = 단축키로 처리돼야 하는 상태.
@@ -81,5 +81,55 @@ describe('isEnhanceHotkeyEvent — 스페이스 강화 단축키 판정', () => 
     expect(isEnhanceHotkeyEvent(makeEvent({ target: { tagName: null } }))).toBe(
       true,
     )
+  })
+})
+
+describe('commissionHotkeySlot — 1·2·3 납품 단축키 → 슬롯', () => {
+  it('Digit1/2/3 → 슬롯 0/1/2', () => {
+    expect(commissionHotkeySlot(makeEvent({ code: 'Digit1' }))).toBe(0)
+    expect(commissionHotkeySlot(makeEvent({ code: 'Digit2' }))).toBe(1)
+    expect(commissionHotkeySlot(makeEvent({ code: 'Digit3' }))).toBe(2)
+  })
+
+  it('숫자패드 Numpad1/2/3 도 같은 슬롯에 매핑', () => {
+    expect(commissionHotkeySlot(makeEvent({ code: 'Numpad1' }))).toBe(0)
+    expect(commissionHotkeySlot(makeEvent({ code: 'Numpad3' }))).toBe(2)
+  })
+
+  it('범위 밖 숫자/다른 키는 null', () => {
+    expect(commissionHotkeySlot(makeEvent({ code: 'Digit4' }))).toBeNull()
+    expect(commissionHotkeySlot(makeEvent({ code: 'Digit0' }))).toBeNull()
+    expect(commissionHotkeySlot(makeEvent({ code: 'KeyA' }))).toBeNull()
+    expect(commissionHotkeySlot(makeEvent({ code: 'Space' }))).toBeNull()
+  })
+
+  it('수정자/반복은 무시한다', () => {
+    expect(
+      commissionHotkeySlot(makeEvent({ code: 'Digit1', ctrlKey: true })),
+    ).toBeNull()
+    expect(
+      commissionHotkeySlot(makeEvent({ code: 'Digit1', metaKey: true })),
+    ).toBeNull()
+    expect(
+      commissionHotkeySlot(makeEvent({ code: 'Digit1', repeat: true })),
+    ).toBeNull()
+  })
+
+  it('편집 입력에 포커스면 가로채지 않는다(숫자 입력 보존)', () => {
+    expect(
+      commissionHotkeySlot(makeEvent({ code: 'Digit1', target: { tagName: 'INPUT' } })),
+    ).toBeNull()
+    expect(
+      commissionHotkeySlot(
+        makeEvent({ code: 'Digit2', target: { tagName: 'DIV', isContentEditable: true } }),
+      ),
+    ).toBeNull()
+  })
+
+  it('버튼·빈 영역 포커스면 슬롯으로 처리한다', () => {
+    expect(
+      commissionHotkeySlot(makeEvent({ code: 'Digit1', target: { tagName: 'BUTTON' } })),
+    ).toBe(0)
+    expect(commissionHotkeySlot(makeEvent({ code: 'Digit2', target: null }))).toBe(1)
   })
 })

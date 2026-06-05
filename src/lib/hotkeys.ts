@@ -34,6 +34,36 @@ export function isEnhanceHotkeyEvent(e: KeyboardEvent): boolean {
   return true
 }
 
+// 의뢰 납품 단축키: 숫자 1·2·3(상단 행 또는 숫자패드) → 의뢰 슬롯 0·1·2.
+// 키보드 레이아웃 무관한 물리 키(code)로 슬롯에 매핑한다.
+const COMMISSION_SLOT_BY_CODE: Record<string, number> = {
+  Digit1: 0,
+  Numpad1: 0,
+  Digit2: 1,
+  Numpad2: 1,
+  Digit3: 2,
+  Numpad3: 2,
+}
+
+// 이 keydown 이 "의뢰 납품 단축키"이면 대상 슬롯 인덱스(0~2), 아니면 null.
+// 수정자 없음 · 반복(꾹 누름) 아님 · 포커스가 편집 입력이 아닐 때만 매핑한다(스페이스 강화와 동일 정책).
+export function commissionHotkeySlot(e: KeyboardEvent): number | null {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return null
+  if (e.repeat) return null
+  const target = e.target as Partial<HTMLElement> | null
+  if (target) {
+    if (target.isContentEditable) return null
+    if (
+      typeof target.tagName === 'string' &&
+      EDITABLE_TAGS.has(target.tagName)
+    ) {
+      return null
+    }
+  }
+  const slot = COMMISSION_SLOT_BY_CODE[e.code]
+  return slot === undefined ? null : slot
+}
+
 // 데스크탑(마우스·트랙패드) 환경인지. 비브라우저(window 없음)에서는 false.
 export function isDesktopPointer(): boolean {
   if (

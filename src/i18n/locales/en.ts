@@ -43,6 +43,7 @@ export const en: Record<TranslationKey, string> = {
   'commission.reward': 'Reward',
   'commission.fulfill': 'Deliver',
   'commission.empty': 'Pending',
+  'commission.level': 'Lv.',
 
   // 강화 결과 토스트
   'toast.success': 'Enhanced',

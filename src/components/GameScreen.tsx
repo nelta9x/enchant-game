@@ -295,7 +295,7 @@ export function GameScreen() {
         <TopControls onOpenShop={openShop} />
 
         {/* 상단 의뢰 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
-        <CommissionBar onFulfill={handleFulfill} />
+        <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={!shopOpen} />
 
         {/* 모바일(<sm)은 단일 컬럼으로 스택 — 좁은 화면에서 고정폭 검 스테이지가
             좁은 트랙에 눌려 좌우 패널과 겹치는 것을 방지(반응형 폴리시는 스프린트 6). */}

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { createGameStore, playerMaxLevel } from './gameStore'
+import { createGameStore } from './gameStore'
 import { dataManager } from '../data/DataManager'
 import { Enhancer, PROTECTION_TICKET_ID } from '../game/enhancer'
 import { countOf } from '../lib/items'
@@ -542,20 +542,39 @@ describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
   })
 })
 
-describe('playerMaxLevel — 진행도 산출', () => {
-  it('장착 검과 가방 검 중 최고 레벨(가방이 더 높을 수 있음)', () => {
-    const store = createGameStore({
-      currentSwordId: 'sword_5',
-      items: [
-        { itemId: 'sword_8', count: 1 },
-        { itemId: 'iron_scrap', count: 3 }, // 검 아닌 아이템은 무시
-      ],
-    })
-    expect(playerMaxLevel(store.getState())).toBe(8)
+describe('gameStore — 의뢰 경험치(applyCommissionXp)', () => {
+  // applyCommissionXp 는 실제 commission.json 의 레벨 정의(레벨1 xpToNext=100)를 쓴다.
+  it('기본 시작값은 레벨 1, 경험치 0', () => {
+    const store = createGameStore()
+    expect(store.getState().commissionLevel).toBe(1)
+    expect(store.getState().commissionXp).toBe(0)
   })
 
-  it('보유 검이 없으면 0', () => {
-    const store = createGameStore({ currentSwordId: null, items: [] })
-    expect(playerMaxLevel(store.getState())).toBe(0)
+  it('경험치 획득(레벨 미만)은 누적', () => {
+    const store = createGameStore()
+    store.getState().applyCommissionXp(34)
+    expect(store.getState().commissionLevel).toBe(1)
+    expect(store.getState().commissionXp).toBe(34)
+  })
+
+  it('경험치가 xpToNext(100) 도달 시 레벨업', () => {
+    const store = createGameStore({ commissionLevel: 1, commissionXp: 80 })
+    store.getState().applyCommissionXp(34) // 80+34=114 → L2, xp 14
+    expect(store.getState().commissionLevel).toBe(2)
+    expect(store.getState().commissionXp).toBe(14)
+  })
+
+  it('경험치가 음수가 되면 레벨 다운', () => {
+    const store = createGameStore({ commissionLevel: 2, commissionXp: 10 })
+    store.getState().applyCommissionXp(-30) // 10-30=-20 → L1, xp 80(=100-20)
+    expect(store.getState().commissionLevel).toBe(1)
+    expect(store.getState().commissionXp).toBe(80)
+  })
+
+  it('레벨 1 바닥: 더 내려갈 곳 없으면 경험치 0 으로 클램프', () => {
+    const store = createGameStore({ commissionLevel: 1, commissionXp: 10 })
+    store.getState().applyCommissionXp(-50)
+    expect(store.getState().commissionLevel).toBe(1)
+    expect(store.getState().commissionXp).toBe(0)
   })
 })

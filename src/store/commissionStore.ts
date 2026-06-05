@@ -8,7 +8,8 @@ import {
   tick,
   type CommissionQueueState,
 } from './commissionQueue'
-import { playerMaxLevel, useGameStore } from './gameStore'
+import { swordLevelsFor } from './commissionProgress'
+import { useGameStore } from './gameStore'
 
 // 의뢰(Commission) 시스템의 얇은 셸 — 순수 전이 코어(commissionQueue)에 "시간"과 "데이터"만 입힌다.
 // 생성/만료/재생성 규칙은 전부 코어에 있고, 여기서는 setInterval 로 주기적으로 tick(Date.now()) 을 돌리고,
@@ -55,16 +56,16 @@ export function createCommissionStore(opts: CreateOpts = {}) {
   let timer: ReturnType<typeof setInterval> | null = null
 
   return create<CommissionStore>((set, get) => ({
-    // 초기 상태는 config 없이 빈 큐 — 실제 슬롯 수는 start()에서 config 로 초기화한다(모듈 평가 시 load 전이라 config 미접근).
+    // 초기 상태는 빈 큐(정지) — start()에서 emptyCommissionQueue 로 타이머를 켠다(모듈 평가 시 load 전이라 config 미접근).
     active: [],
-    pending: [],
+    nextSpawnAt: null,
     nextId: 1,
 
     start: () => {
       if (timer !== null) return
       const config = getConfig()
-      set(emptyCommissionQueue(now(), config.maxCommissions))
-      get()._tick() // 마운트 즉시 한 번 채운다(첫 tick 까지 빈 화면 방지).
+      set(emptyCommissionQueue(now()))
+      get()._tick() // 마운트 즉시 한 번 돌린다(첫 의뢰가 바로 등장).
       timer = setInterval(() => get()._tick(), config.tickIntervalMs)
     },
 
@@ -73,17 +74,25 @@ export function createCommissionStore(opts: CreateOpts = {}) {
         clearInterval(timer)
         timer = null
       }
-      set({ active: [], pending: [], nextId: 1 })
+      set({ active: [], nextSpawnAt: null, nextId: 1 })
     },
 
     _tick: () => {
       const config = getConfig()
+      // 풀은 "현재 의뢰 레벨"이 결정하는 검 단계 목록으로 거른다(진행도 근처 → 레벨 기반으로 교체).
+      const level = useGameStore.getState().commissionLevel
       const pool = commissionPool(
         dataManager.getSwords(),
-        playerMaxLevel(useGameStore.getState()),
-        config,
+        swordLevelsFor(level, config.levels),
       )
-      set((s) => tick(s, now(), rng, pool, config))
+      const { state, expired } = tick(get(), now(), rng, pool, config)
+      set(state)
+      // 만료(미달성)된 의뢰 1건당 경험치를 차감한다(완료는 complete 가 이미 제거해 expired 에 안 잡힌다).
+      if (expired.length > 0) {
+        useGameStore
+          .getState()
+          .applyCommissionXp(-config.xpPenalty * expired.length)
+      }
     },
 
     fulfill: (id) => {
@@ -92,7 +101,9 @@ export function createCommissionStore(opts: CreateOpts = {}) {
       // PlayerState 변경은 gameStore 소유 — 수락(true)일 때만 생명주기에서 제거한다.
       const ok = useGameStore.getState().fulfillCommission(c.swordId, c.reward)
       if (!ok) return false
-      set((s) => complete(s, id, now(), getConfig()))
+      set((s) => complete(s, id))
+      // 완료 보상 경험치 — 레벨업으로 이어질 수 있다(다음 tick 스폰부터 상위 검 등장).
+      useGameStore.getState().applyCommissionXp(getConfig().xpReward)
       return true
     },
   }))

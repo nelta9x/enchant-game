@@ -4,11 +4,15 @@ import type { Material, ShopItem } from '../data/types'
 import { Enhancer, type EnhanceInput } from '../game/enhancer'
 import type { EnhanceResult, ItemStack, PlayerState } from '../game/types'
 import { countOf } from '../lib/items'
+import { applyXpDelta } from './commissionProgress'
 
 // 시작 자금 / 시작 검. 시작 자금은 사용자 지정값(100만). 시작 검 획득 방식 등 나머지
 // '게임 시작 설정'은 디자인 미확정이며, 밸런스 확정 시 이 값은 조정될 수 있다.
 export const INITIAL_GOLD = 1_000_000
 export const INITIAL_SWORD_ID = 'sword_0'
+// 의뢰 진행도 시작값(1레벨, 경험치 0). 모든 의뢰 진행은 여기서 시작한다.
+export const INITIAL_COMMISSION_LEVEL = 1
+export const INITIAL_COMMISSION_XP = 0
 
 type GameActions = {
   // 강화 가능 여부(전제조건 충족). UI 버튼 게이팅용.
@@ -51,6 +55,9 @@ type GameActions = {
   // reward 는 의뢰가 생성 시 freeze 한 값을 그대로 받는다(store 에서 재계산하지 않는다 — 단일 출처).
   // 완료 성공이면 true, 미보유면 false(아무 변화 없음).
   fulfillCommission: (swordId: string, reward: number) => boolean
+  // 의뢰 경험치 증감(+완료 / -만료). DataManager 의 레벨 정의로 레벨업/레벨다운을 적용한다(commissionProgress).
+  // 셸(commissionStore)이 완료/만료 시 호출한다 — XP/레벨 변경은 PlayerState 라 gameStore 가 소유한다.
+  applyCommissionXp: (delta: number) => void
 }
 
 export type GameState = PlayerState & GameActions
@@ -61,6 +68,8 @@ type CreateOpts = {
   gold?: number
   currentSwordId?: string | null
   items?: ItemStack[]
+  commissionLevel?: number
+  commissionXp?: number
 }
 
 // 불변 차감: removals 수량만큼 빼고, 0 이하가 된 슬롯은 제거한다.
@@ -156,23 +165,6 @@ function bankOutgoing(
   return addItems(items, [{ itemId: outgoingId, count: 1 }])
 }
 
-// 플레이어가 보유한 검 중 최고 레벨(장착 검 + 가방 검). 보유 검이 없으면 0.
-// 가방이 장착 검보다 높은 검을 가질 수 있어 둘 다 본다 — 의뢰 출제 풀의 "진행도" 기준이다.
-// gameStore 밖(commissionStore)에서 PlayerState 만으로 호출하므로 순수 함수로 분리해 export 한다.
-export function playerMaxLevel(state: PlayerState): number {
-  let max = 0
-  const equipped =
-    state.currentSwordId !== null
-      ? dataManager.getSwordById(state.currentSwordId)
-      : undefined
-  if (equipped) max = equipped.level
-  for (const it of state.items) {
-    const sword = dataManager.getSwordById(it.itemId)
-    if (sword && sword.level > max) max = sword.level
-  }
-  return max
-}
-
 // 게임 진행 상태 store 팩토리. 기본 인스턴스(useGameStore)는 Math.random 엔진을 쓰고,
 // 테스트는 결정적 enhancer와 초기 상태를 주입해 독립 store를 만든다.
 export function createGameStore(opts: CreateOpts = {}) {
@@ -201,6 +193,8 @@ export function createGameStore(opts: CreateOpts = {}) {
           : INITIAL_SWORD_ID,
       items: opts.items ?? [],
       pendingDrops: [],
+      commissionLevel: opts.commissionLevel ?? INITIAL_COMMISSION_LEVEL,
+      commissionXp: opts.commissionXp ?? INITIAL_COMMISSION_XP,
 
       canEnhance: (useProtection) => {
         const input = buildInput(useProtection)
@@ -370,6 +364,20 @@ export function createGameStore(opts: CreateOpts = {}) {
           return true
         }
         return false // 미보유 — 변화 없음
+      },
+
+      applyCommissionXp: (delta) => {
+        // 레벨 정의는 DataManager 단일 출처에서 읽어 순수 reducer 에 주입한다.
+        const levels = dataManager.getCommissionConfig().levels
+        set((state) => {
+          const next = applyXpDelta(
+            state.commissionLevel,
+            state.commissionXp,
+            delta,
+            levels,
+          )
+          return { commissionLevel: next.level, commissionXp: next.xp }
+        })
       },
     }
   })
