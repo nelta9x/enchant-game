@@ -24,9 +24,9 @@ export const ko = {
   'action.store': '보관',
   'action.equip': '장착',
 
-  // 파괴보호장치 사용(armed) 토글
+  // 파괴보호장치 보호 결계(검 주변) — 토글·상태 라벨
   'protection.toggle': '파괴보호장치 사용 전환',
-  'protection.on': '사용 중',
+  'protection.unavailable': '보호 불가',
 
   // 검 스테이지 스탯
   'stat.protection': '파괴보호장치',

@@ -25,9 +25,9 @@ export const en: Record<TranslationKey, string> = {
   'action.store': 'Store',
   'action.equip': 'Equip',
 
-  // 파괴보호장치 사용(armed) 토글
+  // 파괴보호장치 보호 결계(검 주변) — 토글·상태 라벨
   'protection.toggle': 'Toggle protection',
-  'protection.on': 'Armed',
+  'protection.unavailable': 'No Protection',
 
   // 검 스테이지 스탯
   'stat.protection': 'Protection',

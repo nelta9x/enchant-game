@@ -5,16 +5,16 @@ import type { SwordData } from '../data/types'
 import { formatRate } from '../lib/format'
 import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, SHAKE_TRANSITION } from './shake'
+import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
 
-// 중앙 검 스테이지: 글로우 + 마법진 + 스프라이트 + 레벨 뱃지 + 이름 배너 + 스탯 바.
-// 파괴보호장치 스탯은 보유·단계 조건이 맞을 때(canArm) 사용(armed) 토글 버튼으로 동작한다.
+// 중앙 검 스테이지: 글로우 + 마법진(결계) + 스프라이트 + 레벨 뱃지 + 이름 배너 + 스탯 바.
+// 파괴보호장치는 검을 감싸는 "보호 결계"로 표현한다 — 발동(armed) 시 마법진이 강화색으로 점등하고
+// 실드 돔이 검을 덮으며, 결계 뱃지(ProtectionWard)가 필요/보유·상태를 검 하단에 드러낸다.
 type SwordStageProps = {
   sword: SwordData | undefined
   level: number | null
-  ownedTickets: number
-  armed: boolean
-  canArm: boolean
-  onToggleProtection: () => void
+  // 보호 결계(필요/보유·발동 상태 + 토글/상점/플레어). 순수 상태 계산은 protection.ts 가 맡는다.
+  protection: ProtectionWardProps
   // 스프라이트 자리 위에 겹쳐 그릴 오버레이 슬롯(파괴 연출 등). SwordStage 는 내용·타이밍을
   // 모른 채 자리만 내어 준다 → 연출 컴포넌트를 주입해 뷰/연출 결합을 피한다.
   spriteOverlay?: ReactNode
@@ -35,10 +35,7 @@ const HEX =
 export function SwordStage({
   sword,
   level,
-  ownedTickets,
-  armed,
-  canArm,
-  onToggleProtection,
+  protection,
   spriteOverlay,
   entranceDelay = 0,
   shakeKey = 0,
@@ -46,6 +43,8 @@ export function SwordStage({
 }: SwordStageProps) {
   const t = useT()
   const hasSword = sword !== undefined && level !== null
+  // 결계 발동(armed) 여부 — 배경 마법진 점등·실드 돔을 켜는 단일 플래그(순수 상태에서 유도).
+  const armed = protection.state.kind === 'armed'
 
   // 떨림은 remount 없이 명령형으로 제어한다 — key 를 바꿔 재마운트하면 등장 애니메이션이 다시
   // 재생돼 검이 "재생성"되는 인상을 준다. shakeKey 가 바뀔 때마다 한 번 떤다(초기 0 은 무시).
@@ -76,13 +75,42 @@ export function SwordStage({
               'radial-gradient(circle, color-mix(in srgb, var(--color-gold) 60%, transparent) 0%, transparent 62%)',
           }}
         />
-        {/* 천천히 도는 마법진 */}
+        {/* 보호 결계 돔(발동 시) — 좌상단 결계 서클에서 흘러나온 마력이 검을 은은한 흰빛으로 감싼다.
+            천천히 숨 쉬듯 맥동(은은함)해, 무기만 보고 있어도 "보호 중"임이 읽힌다(검 뒤로 깔림). */}
+        {armed && (
+          <motion.div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(circle, color-mix(in srgb, white 45%, transparent) 0%, transparent 58%)',
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.5, 0.85, 0.5] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        )}
+        {/* 천천히 도는 마법진 — 발동 시 결계로 승격돼 흰빛으로 점등하고 더 또렷이 빛난다. */}
         <motion.div
-          className="pointer-events-none absolute inset-3 rounded-full border border-frame/25"
+          className={`pointer-events-none absolute inset-3 rounded-full border ${
+            armed ? 'border-white/80' : 'border-frame/25'
+          }`}
+          style={
+            armed
+              ? {
+                  boxShadow:
+                    '0 0 18px color-mix(in srgb, white 60%, transparent)',
+                }
+              : undefined
+          }
           animate={{ rotate: 360 }}
           transition={{ duration: 48, repeat: Infinity, ease: 'linear' }}
         >
-          <div className="absolute inset-2 rounded-full border border-dashed border-frame/20" />
+          <div
+            className={`absolute inset-2 rounded-full border border-dashed ${
+              armed ? 'border-white/55' : 'border-frame/20'
+            }`}
+          />
         </motion.div>
 
         {/* 떨림 레이어(방지 시 실제 검을 흔든다) — remount 하지 않고 shakeControls 로 제어한다.
@@ -122,6 +150,9 @@ export function SwordStage({
 
         {/* 스프라이트 위 오버레이 슬롯(파괴 연출 등) — 자리만 제공, 내용은 주입받는다. */}
         {spriteOverlay}
+
+        {/* 보호 결계 전경(하단 뱃지 + 발동 플레어) — 검 위에 그려 필요/보유·상태를 또렷이 드러낸다. */}
+        <ProtectionWard {...protection} />
       </div>
 
       {/* 레벨 뱃지(다이아몬드) */}
@@ -146,18 +177,8 @@ export function SwordStage({
         </div>
       </div>
 
-      {/* 스탯 바: 파괴보호장치(토글) | 성공률 */}
+      {/* 스탯 바: 성공률(파괴보호장치는 검을 감싸는 보호 결계로 이동했다 — ProtectionWard). */}
       <div className="flex items-stretch overflow-hidden rounded-lg border border-parchment-line bg-parchment/85">
-        <ProtectionStat
-          count={ownedTickets}
-          armed={armed}
-          canArm={canArm}
-          onToggle={onToggleProtection}
-          label={t('stat.protection')}
-          armedLabel={t('protection.on')}
-          toggleLabel={t('protection.toggle')}
-        />
-        <div className="w-px self-stretch bg-parchment-line" />
         <Stat
           icon={<TargetIcon />}
           label={t('stat.successRate')}
@@ -165,58 +186,6 @@ export function SwordStage({
         />
       </div>
     </div>
-  )
-}
-
-function ProtectionStat({
-  count,
-  armed,
-  canArm,
-  onToggle,
-  label,
-  armedLabel,
-  toggleLabel,
-}: {
-  count: number
-  armed: boolean
-  canArm: boolean
-  onToggle: () => void
-  label: string
-  armedLabel: string
-  toggleLabel: string
-}) {
-  const body = (
-    <>
-      <ShieldIcon active={armed} />
-      <div className="flex flex-col items-start leading-tight">
-        <span className="text-[11px] font-medium text-ink-soft">{label}</span>
-        <span className="text-base font-bold tabular-nums text-ink">
-          {count}
-        </span>
-      </div>
-      {armed && (
-        <span className="ml-1 rounded bg-enhance/15 px-1.5 py-0.5 text-[10px] font-semibold text-enhance">
-          {armedLabel}
-        </span>
-      )}
-    </>
-  )
-
-  if (!canArm) {
-    return <div className="flex items-center gap-2 px-4 py-2.5">{body}</div>
-  }
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={armed}
-      aria-label={toggleLabel}
-      className={`flex items-center gap-2 px-4 py-2.5 transition-colors ${
-        armed ? 'bg-enhance/10' : 'hover:bg-parchment-line/40'
-      }`}
-    >
-      {body}
-    </button>
   )
 }
 
@@ -239,19 +208,6 @@ function Stat({
         </span>
       </div>
     </div>
-  )
-}
-
-function ShieldIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={`h-6 w-6 ${active ? 'text-enhance' : 'text-ink-soft'}`}
-      fill="currentColor"
-      aria-hidden
-    >
-      <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" />
-    </svg>
   )
 }
 

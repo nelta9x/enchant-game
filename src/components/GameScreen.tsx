@@ -26,6 +26,7 @@ import { GoldDisplay } from './GoldDisplay'
 import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import { InventoryPanel } from './InventoryPanel'
 import { particleCount } from './particles'
+import { protectionState, isProtectionActive } from './protection'
 import { SellButton } from './SellButton'
 import { StoreButton } from './StoreButton'
 import { SHAKE_SEC } from './shake'
@@ -78,14 +79,15 @@ export function GameScreen() {
       ? dataManager.getSwordById(currentSwordId)
       : undefined
 
-  // 파괴보호장치 사용(armed) 가능 조건: 단계가 파괴보호장치를 허용(number>0)하고, 요구 수량 이상 보유.
+  // 보호 결계 상태(보호불가/부족/대기/발동) — 흩어진 조건 대신 순수 코어 한 곳에서 계산한다.
+  // 검이 없으면 'disabled'(이 단계 보호 불가)로 본다. 실제 강화 적용 여부는 armed 일 때만.
   const ownedTickets = countOf(items, PROTECTION_TICKET_ID)
-  const canArm =
-    sword !== undefined &&
-    typeof sword.protectionTickets === 'number' &&
-    sword.protectionTickets > 0 &&
-    ownedTickets >= sword.protectionTickets
-  const effectiveProtection = protectionArmed && canArm
+  const protection = protectionState(
+    sword ? sword.protectionTickets : 'disabled',
+    ownedTickets,
+    protectionArmed,
+  )
+  const effectiveProtection = isProtectionActive(protection)
   const canEnhance = canEnhanceFn(effectiveProtection)
   const canSell = canSellFn()
   const canStore = canStoreFn()
@@ -340,10 +342,14 @@ export function GameScreen() {
             <SwordStage
               sword={sword}
               level={sword?.level ?? null}
-              ownedTickets={ownedTickets}
-              armed={effectiveProtection}
-              canArm={canArm}
-              onToggleProtection={toggleProtection}
+              // 보호 결계: 순수 상태 + 토글(발동)·상점(부족 보충)·플레어(방지 발동) 트리거.
+              // blockKey 는 protectedShake 와 같은 트리거(shakeKey)를 공유 — 막아낸 순간 결계가 번쩍인다.
+              protection={{
+                state: protection,
+                onToggle: toggleProtection,
+                onShop: openShop,
+                blockKey: shakeKey,
+              }}
               spriteOverlay={
                 <>
                   <DestructionEffect event={destructionEvent} />
