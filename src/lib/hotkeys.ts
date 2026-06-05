@@ -12,6 +12,16 @@ const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
 // 터치 전용 기기(물리 스페이스 키가 없음)는 매칭되지 않아 단축키가 비활성화된다.
 const DESKTOP_POINTER_QUERY = '(hover: hover) and (pointer: fine)'
 
+// 이벤트 대상이 편집 입력(INPUT/TEXTAREA/SELECT/contentEditable)인가 — 그러면 단축키를 가로채지 않고
+// 네이티브 입력에 맡긴다. EventTarget 을 덕타이핑으로 검사한다(node 테스트에서 DOM 전역에 의존하지 않도록
+// instanceof 대신 속성 존재로 판정). 모든 단축키 판정이 공유하는 단일 정의.
+export function isEditableTarget(target: EventTarget | null): boolean {
+  const el = target as Partial<HTMLElement> | null
+  if (!el) return false
+  if (el.isContentEditable) return true
+  return typeof el.tagName === 'string' && EDITABLE_TAGS.has(el.tagName)
+}
+
 // 이 keydown 을 "스페이스 강화 단축키"로 처리해야 하는가.
 // 스페이스 키 · 수정자(ctrl/meta/alt/shift) 없음 · 키 반복(꾹 누름) 아님 ·
 // 포커스가 편집 입력(INPUT/TEXTAREA/SELECT/contentEditable)이 아닐 때만 true.
@@ -19,19 +29,7 @@ export function isEnhanceHotkeyEvent(e: KeyboardEvent): boolean {
   if (e.code !== ENHANCE_HOTKEY_CODE) return false
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return false
   if (e.repeat) return false
-  // EventTarget 을 덕타이핑으로 검사한다 — node 테스트에서 DOM 전역(HTMLElement)에 의존하지 않도록
-  // instanceof 대신 속성 존재로 판정한다.
-  const target = e.target as Partial<HTMLElement> | null
-  if (target) {
-    if (target.isContentEditable) return false
-    if (
-      typeof target.tagName === 'string' &&
-      EDITABLE_TAGS.has(target.tagName)
-    ) {
-      return false
-    }
-  }
-  return true
+  return !isEditableTarget(e.target)
 }
 
 // 의뢰 납품 단축키: 숫자 1·2·3(상단 행 또는 숫자패드) → 의뢰 슬롯 0·1·2.
@@ -50,18 +48,38 @@ const COMMISSION_SLOT_BY_CODE: Record<string, number> = {
 export function commissionHotkeySlot(e: KeyboardEvent): number | null {
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return null
   if (e.repeat) return null
-  const target = e.target as Partial<HTMLElement> | null
-  if (target) {
-    if (target.isContentEditable) return null
-    if (
-      typeof target.tagName === 'string' &&
-      EDITABLE_TAGS.has(target.tagName)
-    ) {
-      return null
-    }
-  }
+  if (isEditableTarget(e.target)) return null
   const slot = COMMISSION_SLOT_BY_CODE[e.code]
   return slot === undefined ? null : slot
+}
+
+// S = 상점 열기 단축키로 쓰는 KeyboardEvent.code — 키보드 레이아웃과 무관한 물리 키 식별자.
+export const SHOP_HOTKEY_CODE = 'KeyS'
+
+// 이 keydown 을 "S = 상점 열기" 단축키로 처리해야 하는가.
+// S 키 · 수정자 없음 · 반복(꾹 누름) 아님 · 편집 입력 포커스 아님일 때만 true(스페이스 강화와 동일 정책).
+// 상점 열기는 비파괴·가역(닫으면 됨)이라 단순 keydown 으로 처리한다(판매·보관의 keyup-탭과 대비).
+export function isShopHotkeyEvent(e: KeyboardEvent): boolean {
+  if (e.code !== SHOP_HOTKEY_CODE) return false
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return false
+  if (e.repeat) return false
+  return !isEditableTarget(e.target)
+}
+
+// 단독-수정자 '탭'(눌렀다 뗌) 액션: Ctrl = 판매, Alt = 보관(요청: "Ctrl 누르면 판매, Alt 누르면 보관").
+// 판매·보관은 비가역(검 소모)이라 keydown 으로 발동하면 모든 조합키(Ctrl+R, Alt+Tab …)의 수정자
+// keydown 에서 오발한다 — 그래서 "중간에 다른 키가 끼지 않은 단독 탭"을 keyup 에서 판정한다(useActionHotkeys).
+// KeyboardEvent.key 는 좌/우 수정자 모두 'Control'·'Alt' 로 같아 레이아웃·좌우 무관하게 매핑된다.
+export type ModifierAction = 'sell' | 'store'
+
+const MODIFIER_ACTION_BY_KEY: Record<string, ModifierAction> = {
+  Control: 'sell',
+  Alt: 'store',
+}
+
+// 이 key 가 단독-수정자 액션 키(Control/Alt)이면 해당 액션, 아니면 null.
+export function modifierActionForKey(key: string): ModifierAction | null {
+  return MODIFIER_ACTION_BY_KEY[key] ?? null
 }
 
 // 데스크탑(마우스·트랙패드) 환경인지. 비브라우저(window 없음)에서는 false.

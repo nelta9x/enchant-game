@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { dataManager } from '../data/DataManager'
+import { useActionHotkeys } from '../hooks/useActionHotkeys'
 import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useT, type TranslationKey } from '../i18n'
 import { countOf, PROTECTION_TICKET_ID } from '../lib/items'
@@ -240,6 +241,15 @@ export function GameScreen() {
     enabled: !shopOpen,
     disabled: enhanceDisabled,
     onEnhance: handleEnhance,
+  })
+
+  // 데스크탑 액션 단축키: Ctrl 탭 = 판매, Alt 탭 = 보관(단독 탭만 — 조합키 오발 방지), S = 상점 열기.
+  // 상점이 닫혀 있을 때만 부착한다(모달 내부 입력 보존). 판매·보관 가능 여부는 핸들러가 self-gate.
+  useActionHotkeys({
+    enabled: !shopOpen,
+    onSell: handleSell,
+    onStore: store,
+    onOpenShop: openShop,
   })
 
   // 연출 트리거는 effectStore 의 running 에서 "가장 최근"으로 뽑는다(latestRunning — 겹친 새 효과 유실 방지).

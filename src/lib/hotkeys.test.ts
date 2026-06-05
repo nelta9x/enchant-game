@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { commissionHotkeySlot, isEnhanceHotkeyEvent } from './hotkeys'
+import {
+  commissionHotkeySlot,
+  isEnhanceHotkeyEvent,
+  isShopHotkeyEvent,
+  modifierActionForKey,
+} from './hotkeys'
 
 // KeyboardEvent 의 최소 형태만 만들어 순수 판정 함수를 검증한다(테스트 환경은 node — DOM 전역 없음).
 // 기본값은 "빈 영역(BODY) 포커스 + 수정자 없는 단발 스페이스" = 단축키로 처리돼야 하는 상태.
@@ -131,5 +136,52 @@ describe('commissionHotkeySlot — 1·2·3 납품 단축키 → 슬롯', () => {
       commissionHotkeySlot(makeEvent({ code: 'Digit1', target: { tagName: 'BUTTON' } })),
     ).toBe(0)
     expect(commissionHotkeySlot(makeEvent({ code: 'Digit2', target: null }))).toBe(1)
+  })
+})
+
+describe('isShopHotkeyEvent — S = 상점 열기 단축키 판정', () => {
+  it('수정자 없는 단발 S(빈 영역 포커스)는 단축키로 처리한다', () => {
+    expect(isShopHotkeyEvent(makeEvent({ code: 'KeyS' }))).toBe(true)
+  })
+
+  it('S 가 아닌 키는 무시한다', () => {
+    expect(isShopHotkeyEvent(makeEvent({ code: 'Space' }))).toBe(false)
+    expect(isShopHotkeyEvent(makeEvent({ code: 'KeyA' }))).toBe(false)
+  })
+
+  it('수정자(ctrl/meta/alt/shift)가 눌리면 무시한다(Ctrl+S 브라우저 저장 등 보존)', () => {
+    expect(isShopHotkeyEvent(makeEvent({ code: 'KeyS', ctrlKey: true }))).toBe(false)
+    expect(isShopHotkeyEvent(makeEvent({ code: 'KeyS', metaKey: true }))).toBe(false)
+    expect(isShopHotkeyEvent(makeEvent({ code: 'KeyS', altKey: true }))).toBe(false)
+    expect(isShopHotkeyEvent(makeEvent({ code: 'KeyS', shiftKey: true }))).toBe(false)
+  })
+
+  it('키 반복(꾹 누름)은 무시한다', () => {
+    expect(isShopHotkeyEvent(makeEvent({ code: 'KeyS', repeat: true }))).toBe(false)
+  })
+
+  it('편집 입력에 포커스면 가로채지 않는다(S 입력 보존)', () => {
+    expect(
+      isShopHotkeyEvent(makeEvent({ code: 'KeyS', target: { tagName: 'INPUT' } })),
+    ).toBe(false)
+    expect(
+      isShopHotkeyEvent(
+        makeEvent({ code: 'KeyS', target: { tagName: 'DIV', isContentEditable: true } }),
+      ),
+    ).toBe(false)
+  })
+})
+
+describe('modifierActionForKey — Ctrl=판매 / Alt=보관 단독-수정자 매핑', () => {
+  it('Control → sell, Alt → store', () => {
+    expect(modifierActionForKey('Control')).toBe('sell')
+    expect(modifierActionForKey('Alt')).toBe('store')
+  })
+
+  it('다른 키(Shift/Meta/일반 키)는 null', () => {
+    expect(modifierActionForKey('Shift')).toBeNull()
+    expect(modifierActionForKey('Meta')).toBeNull()
+    expect(modifierActionForKey('s')).toBeNull()
+    expect(modifierActionForKey(' ')).toBeNull()
   })
 })
