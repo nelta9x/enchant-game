@@ -4,6 +4,7 @@ import { useActionHotkeys } from '../hooks/useActionHotkeys'
 import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useT, type TranslationKey } from '../i18n'
 import { countOf, PROTECTION_TICKET_ID } from '../lib/items'
+import { sound } from '../lib/sound'
 import { swordSpriteUrl } from '../lib/sprites'
 import { useEffectStore } from '../store/effectStore'
 import { latestRunning } from '../store/effectQueue'
@@ -166,6 +167,9 @@ export function GameScreen() {
   const handleEnhance = () => {
     const result = enhance(effectiveProtection)
     if (!result) return
+
+    // 강화 '캉!' 타격음 — 결과(성공·파괴·방지)와 무관하게 내려치는 순간 한 번 재생(버튼·스페이스 공통 경로).
+    sound.playSfx('enhance')
 
     // 강화 버튼 잠금(0.4s)은 성공·파괴 공통 — 연출과 별개의 병렬 효과(lockCount). SHAKE_SEC 가 단일 출처.
     const lockEnhance = () =>
