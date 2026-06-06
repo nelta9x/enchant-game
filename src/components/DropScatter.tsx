@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { sound } from '../lib/sound'
 import { ItemIcon } from './ItemIcon'
 import {
   DROP_APPEAR_DELAY_SEC,
@@ -211,7 +212,11 @@ function DropToken({
             }
       }
       onAnimationComplete={() => {
-        if (collecting) onCollected()
+        if (collecting) {
+          // 인벤토리창에 빨려 들어가 도달하는 순간(토큰마다 1회) — 코인 흡수음과 동일한 'coin_pickup'.
+          sound.playSfx('coin_pickup')
+          onCollected()
+        }
       }}
     >
       <ItemIcon itemId={spec.itemId} className="h-full w-full" />
