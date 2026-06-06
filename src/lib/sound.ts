@@ -17,6 +17,7 @@ const SFX_FILES = {
   enhance: 'enhance_kang.wav', // 강화 '캉!' 타격음
   coin_pickup: 'coin_pickup.wav', // 코인 1개가 골드창에 흡수될 때(코인마다 1회)
   enchant_destroyed: 'enchant_destroyed.wav', // 강화 실패로 검이 파괴(폭발)되는 순간
+  item_sold: 'item_sold.wav', // 검을 판매한 순간(차칭) — 코인 착지음(coin_pickup)과는 별개
 } as const
 
 const BGM_FILES = {

@@ -140,6 +140,8 @@ export function GameScreen() {
   const handleFulfill = (commission: Commission, originEl: HTMLElement | null) => {
     // 생명주기·검 소모는 store 가 소유 — 수락(true)일 때만 연출을 띄운다.
     if (!useCommissionStore.getState().fulfill(commission.id)) return
+    // 보상 획득 '짤랑' 효과음 — 판매와 동일(둘 다 검을 내주고 골드를 받는 순간).
+    sound.playSfx('item_sold')
     // 출발점을 못 받았으면 코인 비행만 생략한다(골드 펄스·획득 텍스트는 그대로). rect 는 언마운트 전(동기)에 읽어 유효.
     if (originEl) {
       commissionCoinKey.current += 1
@@ -156,6 +158,8 @@ export function GameScreen() {
   const handleSell = () => {
     const price = sell()
     if (price === null || price <= 0) return
+    // 판매 성사 '차칭' 효과음 — 판매한 순간 1회(코인 착지음 coin_pickup 은 연출 중 코인마다 별도로 울린다).
+    sound.playSfx('item_sold')
     // 판매 = 검에서 코인이 뿜어져 골드창으로 빨려 들어가는 연출(잠금 없음·병렬). 코인 수는 판매가에 비례.
     enqueueEffect({
       kind: 'coinFlight',
