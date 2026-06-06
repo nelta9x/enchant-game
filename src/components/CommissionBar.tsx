@@ -14,10 +14,11 @@ import { ItemIcon } from './ItemIcon'
 // 각 의뢰서: 아이템 아이콘 + 이름 + 보상가(판매가에 인센티브가 붙은 금액). 요구 검을 보유했을 때만
 // 클릭(납품) 가능하다. 빈 슬롯은 재생성 대기('준비 중') placeholder 로 채워 바 높이를 안정시킨다.
 //
-// 완료(검 소모+보상)는 부모(GameScreen)가 onFulfill 콜백으로 처리한다 — 코인 연출의 출발점을 위해
-// 클릭한 카드 엘리먼트를 함께 넘긴다. 생명주기(active 에서 제거)는 commissionStore.fulfill 이 소유.
+// 완료(검 소모+보상)는 부모(GameScreen)가 onFulfill 콜백으로 처리한다. 두 번째 인자는 코인 연출의
+// 출발점(클릭한/슬롯의 카드 엘리먼트)이며 연출 전용·선택이다 — null 이어도 납품은 진행된다(키보드 경로 대비).
+// 생명주기(active 에서 제거)는 commissionStore.fulfill 이 소유.
 type CommissionBarProps = {
-  onFulfill: (commission: Commission, cardEl: HTMLElement) => void
+  onFulfill: (commission: Commission, originEl: HTMLElement | null) => void
   // 숫자 1·2·3 납품 단축키 활성 여부(상점 열림 등에서 끈다).
   hotkeysEnabled: boolean
 }
@@ -47,14 +48,20 @@ export function CommissionBar({ onFulfill, hotkeysEnabled }: CommissionBarProps)
     (_, i) => active[i] ?? null,
   )
 
-  // 키보드(1·2·3) 납품의 코인 연출 출발점을 위해 카드 DOM 을 슬롯별로 잡아 둔다(클릭은 currentTarget 사용).
-  const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
+  // 키보드(1·2·3) 납품 시 코인 연출의 출발점이 될 카드 DOM 을 슬롯 인덱스로 찾기 위한 컨테이너(클릭 경로는 currentTarget 사용).
+  const slotsRef = useRef<HTMLDivElement>(null)
   const onSlot = useCallback(
     (slot: number) => {
       const c = active[slot]
-      const el = cardRefs.current[slot]
       // 슬롯에 의뢰가 있고 납품 가능할 때만 — 빈 슬롯/미보유 키 입력은 무시.
-      if (c && el && canFulfill(c.swordId)) onFulfill(c, el)
+      if (!c || !canFulfill(c.swordId)) return
+      // 코인 연출의 출발점이 될 카드 DOM 을 슬롯 인덱스로 찾아 넘긴다(연출 전용·선택). 못 찾아도 onFulfill 이
+      // 출발점을 옵션으로 받아 납품은 그대로 진행한다 — 마우스(currentTarget)와 동일하게 동작.
+      const originEl =
+        slotsRef.current?.querySelector<HTMLElement>(
+          `[data-commission-slot="${slot}"]`,
+        ) ?? null
+      onFulfill(c, originEl)
     },
     [active, canFulfill, onFulfill],
   )
@@ -72,7 +79,7 @@ export function CommissionBar({ onFulfill, hotkeysEnabled }: CommissionBarProps)
         xp={commissionXp}
         xpToNext={xpToNext}
       />
-      <div className="flex gap-2">
+      <div ref={slotsRef} className="flex gap-2">
         {slots.map((c, i) =>
           c ? (
             <CommissionCard
@@ -81,9 +88,6 @@ export function CommissionBar({ onFulfill, hotkeysEnabled }: CommissionBarProps)
               commission={c}
               fulfillable={canFulfill(c.swordId)}
               onFulfill={onFulfill}
-              cardRef={(el) => {
-                cardRefs.current[i] = el
-              }}
             />
           ) : (
             <EmptySlot key={`empty-${i}`} slotIndex={i} label={t('commission.empty')} />
@@ -134,13 +138,11 @@ function CommissionCard({
   commission,
   fulfillable,
   onFulfill,
-  cardRef,
 }: {
   slotIndex: number
   commission: Commission
   fulfillable: boolean
   onFulfill: (commission: Commission, cardEl: HTMLElement) => void
-  cardRef: (el: HTMLButtonElement | null) => void
 }) {
   const t = useT()
   const name = itemDisplayName(commission.swordId, t)
@@ -148,8 +150,8 @@ function CommissionCard({
 
   return (
     <motion.button
-      ref={cardRef}
       type="button"
+      data-commission-slot={slotIndex}
       initial={{ opacity: 0, scale: 0.85, y: -8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.25 }}

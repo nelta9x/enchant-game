@@ -135,16 +135,20 @@ export function GameScreen() {
     setGoldGain({ id: goldGainKey.current, amount })
   }, [])
 
-  const handleFulfill = (commission: Commission, cardEl: HTMLElement) => {
-    const rect = cardEl.getBoundingClientRect()
-    // 생명주기·검 소모는 store 가 소유 — 수락(true)일 때만 코인 연출을 띄운다.
+  // originEl 은 코인 비행의 "출발점"(연출 전용·선택)이다 — 납품(검 소모·보상·생명주기)은 store 가 소유하며
+  // 엘리먼트 유무와 무관하게 진행된다. 연출 엘리먼트에 게임 액션을 묶지 않는다(키보드 납품이 막히던 버그의 근본 차단).
+  const handleFulfill = (commission: Commission, originEl: HTMLElement | null) => {
+    // 생명주기·검 소모는 store 가 소유 — 수락(true)일 때만 연출을 띄운다.
     if (!useCommissionStore.getState().fulfill(commission.id)) return
-    commissionCoinKey.current += 1
-    setCommissionCoin({
-      id: commissionCoinKey.current,
-      rect,
-      coinCount: coinCount(commission.reward),
-    })
+    // 출발점을 못 받았으면 코인 비행만 생략한다(골드 펄스·획득 텍스트는 그대로). rect 는 언마운트 전(동기)에 읽어 유효.
+    if (originEl) {
+      commissionCoinKey.current += 1
+      setCommissionCoin({
+        id: commissionCoinKey.current,
+        rect: originEl.getBoundingClientRect(),
+        coinCount: coinCount(commission.reward),
+      })
+    }
     setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(commission.reward) }))
     showGoldGain(commission.reward)
   }
