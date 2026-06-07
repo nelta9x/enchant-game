@@ -155,7 +155,7 @@
     "successRate": 0.65,
     "sellPrice": 3000000,
     "protectionTickets": 3,
-    "dropOnFail": { "itemId": "iron_scrap", "count": 10 },
+    "dropOnFail": { "itemId": "dark_matter", "count": 1 },
     "sprite": "apophis_the_demon_sword.png"
   },
   {

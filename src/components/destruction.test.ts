@@ -24,7 +24,7 @@ describe('destructionTargetOf — 연출 대상 판정(순수 로직)', () => {
       fromId: 'sword_14',
       toId: null,
       consumed,
-      drops: [{ itemId: 'iron_scrap', count: 10 }],
+      drops: [{ itemId: 'dark_matter', count: 1 }],
     }
     expect(destructionTargetOf(result)?.id).toBe('sword_14')
   })

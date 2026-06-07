@@ -99,7 +99,7 @@ describe('gameStore — 강화 적용 (seam)', () => {
   })
 
   it('방지: 단계 유지 + 파괴보호장치 차감 + 드랍 없음', () => {
-    // level 14: 골드 100000, 파괴보호장치 소모 3, dropOnFail = iron_scrap ×10.
+    // level 14: 골드 100000, 파괴보호장치 소모 3, dropOnFail = dark_matter ×1.
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 200000,
@@ -112,18 +112,30 @@ describe('gameStore — 강화 적용 (seam)', () => {
     expect(store.getState().gold).toBe(100000)
     expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(2)
     // 방지 시 드랍 없음(items·pendingDrops 모두).
-    expect(countOf(store.getState().items, 'iron_scrap')).toBe(0)
+    expect(countOf(store.getState().items, 'dark_matter')).toBe(0)
     expect(store.getState().pendingDrops).toEqual([])
   })
 })
 
 describe('gameStore — 드랍 수집(collectDrop / flushDrops)', () => {
-  // sword_14: 골드 100000, dropOnFail = iron_scrap ×10. ALWAYS_FAIL 로 파괴해 대기분 10을 만든다.
-  const destroyedWithPending = () => {
+  it('마검 아포피스 파괴 시 암흑 물질이 대기 드랍으로 쌓인다', () => {
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 1_000_000,
       currentSwordId: 'sword_14',
+      items: [],
+    })
+    store.getState().enhance(false)
+    expect(countOf(store.getState().pendingDrops, 'dark_matter')).toBe(1)
+    expect(countOf(store.getState().items, 'dark_matter')).toBe(0)
+  })
+
+  // sword_15: 골드 180000, dropOnFail = iron_scrap ×15. ALWAYS_FAIL 로 파괴해 대기분 15를 만든다.
+  const destroyedWithPending = () => {
+    const store = createGameStore({
+      enhancer: ALWAYS_FAIL(),
+      gold: 1_000_000,
+      currentSwordId: 'sword_15',
       items: [],
     })
     store.getState().enhance(false)
@@ -132,27 +144,27 @@ describe('gameStore — 드랍 수집(collectDrop / flushDrops)', () => {
 
   it('collectDrop 은 대기분 한도 내에서 items 로 옮긴다(부분 수집)', () => {
     const store = destroyedWithPending()
-    expect(countOf(store.getState().pendingDrops, 'iron_scrap')).toBe(10)
+    expect(countOf(store.getState().pendingDrops, 'iron_scrap')).toBe(15)
     store.getState().collectDrop('iron_scrap', 3)
     expect(countOf(store.getState().items, 'iron_scrap')).toBe(3)
-    expect(countOf(store.getState().pendingDrops, 'iron_scrap')).toBe(7)
+    expect(countOf(store.getState().pendingDrops, 'iron_scrap')).toBe(12)
   })
 
   it('collectDrop 은 대기분을 초과해 추가하지 않는다(과다·중복 합산 방지)', () => {
     const store = destroyedWithPending()
-    store.getState().collectDrop('iron_scrap', 100) // 대기분(10)까지만
-    expect(countOf(store.getState().items, 'iron_scrap')).toBe(10)
+    store.getState().collectDrop('iron_scrap', 100) // 대기분(15)까지만
+    expect(countOf(store.getState().items, 'iron_scrap')).toBe(15)
     expect(countOf(store.getState().pendingDrops, 'iron_scrap')).toBe(0)
     // 대기분 소진 후 다시 호출해도 무변화(연출 완료 콜백이 늦게 와도 중복 합산 안 됨).
     store.getState().collectDrop('iron_scrap', 5)
-    expect(countOf(store.getState().items, 'iron_scrap')).toBe(10)
+    expect(countOf(store.getState().items, 'iron_scrap')).toBe(15)
   })
 
   it('flushDrops 는 남은 대기분을 모두 items 로 합산하고 비운다', () => {
     const store = destroyedWithPending()
     store.getState().collectDrop('iron_scrap', 4) // 일부 수집
-    store.getState().flushDrops() // 나머지 6 회수
-    expect(countOf(store.getState().items, 'iron_scrap')).toBe(10)
+    store.getState().flushDrops() // 나머지 11 회수
+    expect(countOf(store.getState().items, 'iron_scrap')).toBe(15)
     expect(store.getState().pendingDrops).toEqual([])
   })
 

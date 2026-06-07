@@ -16,6 +16,7 @@ const ITEM_NAME_KEYS: Record<string, TranslationKey> = {
   iron_scrap: 'item.iron_scrap',
   faded_fluorescent: 'item.faded_fluorescent',
   flame_sword_handle: 'item.flame_sword_handle',
+  dark_matter: 'item.dark_matter',
 }
 
 // 검이 아닌 아이템(파괴보호장치·잡템) → 전용 스프라이트 파일명(public/sprites/items/) 매핑.
@@ -26,6 +27,7 @@ const ITEM_SPRITES: Record<string, string> = {
   iron_scrap: 'iron_scrap.png',
   faded_fluorescent: 'faded_fluorescent.png',
   flame_sword_handle: 'flame_sword_handle.png',
+  dark_matter: 'dark_matter.png',
 }
 
 // itemId → 전용 스프라이트 파일명(없으면 undefined). URL 조립은 호출 측(ItemIcon)이 itemSpriteUrl 로 한다.
