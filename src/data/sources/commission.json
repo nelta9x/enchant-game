@@ -144,6 +144,30 @@
           "rewardKind": "item",
           "rewardItemId": "sword_16",
           "rewardItemCount": 1
+        },
+        {
+          "itemId": "dark_matter",
+          "requiredCount": 2,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_14",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "dark_matter",
+          "requiredCount": 10,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_19",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "dark_matter",
+          "requiredCount": 50,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_23",
+          "rewardItemCount": 1
         }
       ],
       "durationMinMs": 30000,
@@ -196,6 +220,30 @@
           "incentiveMax": 2,
           "additiveMin": 0,
           "additiveMax": 0
+        },
+        {
+          "itemId": "dark_matter",
+          "requiredCount": 2,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_14",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "dark_matter",
+          "requiredCount": 10,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_19",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "dark_matter",
+          "requiredCount": 30,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_23",
+          "rewardItemCount": 1
         }
       ],
       "durationMinMs": 30000,

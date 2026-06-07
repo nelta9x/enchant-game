@@ -13,5 +13,10 @@
     "id": "flame_sword_handle",
     "basePrice": 600000,
     "sprite": "flame_sword_handle.png"
+  },
+  {
+    "id": "dark_matter",
+    "basePrice": 1500000,
+    "sprite": "dark_matter.png"
   }
 ]

@@ -13,13 +13,11 @@ export { PROTECTION_TICKET_ID }
 // 동적 문자열로 t()를 호출하면 TranslationKey 타입을 벗어나므로 알려진 itemId만 리터럴 키로 매핑한다.
 const ITEM_NAME_KEYS: Record<string, TranslationKey> = {
   [PROTECTION_TICKET_ID]: 'item.protection_ticket',
-  dark_matter: 'item.dark_matter',
 }
 
 // 파괴보호장치 전용 스프라이트 — carve-out(위와 동일 사유). 재료 스프라이트는 items.json(ItemData.sprite)에 있다.
 const ITEM_SPRITES: Record<string, string> = {
   [PROTECTION_TICKET_ID]: 'protection_ticket.png',
-  dark_matter: 'dark_matter.png',
 }
 
 // itemId → 전용 스프라이트 파일명(없으면 undefined). URL 조립은 호출 측(ItemIcon)이 itemSpriteUrl 로 한다.
