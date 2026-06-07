@@ -24,8 +24,10 @@ describe('DataManager', () => {
     dm.load()
     expect(dm.getSwordById('sword_0')?.id).toBe('sword_0')
     expect(dm.getSwordById('sword_0')?.level).toBe(0)
-    expect(dm.getSwordById('sword_29')?.level).toBe(29)
-    expect(dm.getSwordById('sword_29')?.nextId).toBeNull()
+    // 최종 단계는 이제 sword_30(신성한 레이피어) — sword_29 는 +30 으로 강화된다.
+    expect(dm.getSwordById('sword_30')?.level).toBe(30)
+    expect(dm.getSwordById('sword_30')?.nextId).toBeNull()
+    expect(dm.getSwordById('sword_29')?.nextId).toBe('sword_30')
     expect(dm.getSwordById('sword_999')).toBeUndefined()
     expect(dm.getSwordById('protection_ticket')).toBeUndefined()
   })
@@ -46,6 +48,31 @@ describe('DataManager', () => {
     // itemId는 항목 id가 아니므로 조회되지 않는다.
     expect(dm.getShopItem('protection_ticket')).toBeUndefined()
     expect(dm.getShopItem('nonexistent')).toBeUndefined()
+  })
+
+  it('load() 후 아이템 카탈로그를 조회할 수 있다(검은 카탈로그가 아님)', () => {
+    const dm = new DataManager()
+    dm.load()
+    expect(dm.getItems().length).toBeGreaterThan(0)
+    expect(dm.getItemById('iron_scrap')?.basePrice).toBeGreaterThanOrEqual(0)
+    expect(dm.getItemById('sword_3')).toBeUndefined() // 검은 카탈로그에 없다
+    expect(dm.getItemById('nonexistent')).toBeUndefined()
+  })
+
+  it('getItemBasePrice: 검은 sellPrice, 재료는 basePrice, 둘 다 없으면 undefined', () => {
+    const dm = new DataManager()
+    dm.load()
+    // 판매 가능 검 → sellPrice 가 기준가.
+    expect(dm.getItemBasePrice('sword_3')).toBe(
+      dm.getSwordById('sword_3')?.sellPrice,
+    )
+    // 재료 → 카탈로그 basePrice.
+    expect(dm.getItemBasePrice('iron_scrap')).toBe(
+      dm.getItemById('iron_scrap')?.basePrice,
+    )
+    // 판매 불가 검(sword_0, sellPrice=null)·미지의 id → undefined.
+    expect(dm.getItemBasePrice('sword_0')).toBeUndefined()
+    expect(dm.getItemBasePrice('nonexistent')).toBeUndefined()
   })
 })
 
@@ -94,6 +121,13 @@ describe('아이템 아이콘 ↔ 스프라이트 무결성', () => {
       ids.add(item.itemId)
       if (item.price.kind === 'item') ids.add(item.price.itemId)
     }
+    // 거래에 등장하는 모든 아이템(아이템 비용의 납품 아이템 + 아이템 보상의 지급 아이템)도 아이콘으로 표시되므로 함께 검증한다.
+    for (const bucket of dataManager.getCommissionConfig().buckets) {
+      for (const e of bucket.items) {
+        if (e.costKind !== 'gold') ids.add(e.itemId)
+        if (e.rewardKind === 'item') ids.add(e.rewardItemId)
+      }
+    }
     const nonSword = [...ids].filter(
       (id) => dataManager.getSwordById(id) === undefined,
     )
@@ -105,6 +139,35 @@ describe('아이템 아이콘 ↔ 스프라이트 무결성', () => {
         existsSync(resolve('public/sprites/items', file as string)),
         `'${id}' 스프라이트 파일이 없다: ${file}`,
       ).toBe(true)
+    }
+  })
+})
+
+// 아이템 카탈로그(items.json)의 모든 nameKey 가 번역 리소스에 존재해야 한다(검 규약과 동일).
+describe('아이템 카탈로그 ↔ i18n 무결성', () => {
+  it('모든 ItemData nameKey 가 번역 리소스에 존재한다', () => {
+    dataManager.load()
+    const keys = Object.keys(ko)
+    for (const item of dataManager.getItems()) {
+      expect(keys).toContain(item.nameKey)
+    }
+  })
+})
+
+// 의뢰 버킷에 출제되는 모든 itemId 는 표시명으로 해석 가능해야 한다(검 또는 카탈로그 아이템).
+describe('의뢰 데이터 ↔ 표시명 무결성', () => {
+  it('모든 버킷의 모든 출제 itemId 가 표시 가능하다', () => {
+    dataManager.load()
+    for (const bucket of dataManager.getCommissionConfig().buckets) {
+      for (const e of bucket.items) {
+        if (e.costKind !== 'gold')
+          expect(isDisplayableItemId(e.itemId), `'${e.itemId}'`).toBe(true)
+        if (e.rewardKind === 'item')
+          expect(
+            isDisplayableItemId(e.rewardItemId),
+            `'${e.rewardItemId}'`,
+          ).toBe(true)
+      }
     }
   })
 })

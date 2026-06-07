@@ -1,37 +1,207 @@
 {
-  "maxCommissions": 3,
-  "durationMinMs": 60000,
-  "durationMaxMs": 120000,
-  "incentiveMin": 0.1,
-  "incentiveMax": 2.0,
-  "spawnIntervalMinMs": 30000,
-  "spawnIntervalMaxMs": 60000,
-  "tickIntervalMs": 250,
-  "xpReward": 34,
-  "xpPenalty": 20,
-  "levels": [
-    { "swordLevels": [3, 4, 5], "xpToNext": 100 },
-    { "swordLevels": [4, 5, 6], "xpToNext": 110 },
-    { "swordLevels": [5, 6, 7], "xpToNext": 120 },
-    { "swordLevels": [6, 7, 8], "xpToNext": 130 },
-    { "swordLevels": [7, 8, 9], "xpToNext": 140 },
-    { "swordLevels": [8, 9, 10], "xpToNext": 150 },
-    { "swordLevels": [9, 10, 11], "xpToNext": 160 },
-    { "swordLevels": [10, 11, 12], "xpToNext": 170 },
-    { "swordLevels": [11, 12, 13], "xpToNext": 180 },
-    { "swordLevels": [12, 13, 14], "xpToNext": 190 },
-    { "swordLevels": [13, 14, 15], "xpToNext": 200 },
-    { "swordLevels": [14, 15, 16], "xpToNext": 210 },
-    { "swordLevels": [15, 16, 17], "xpToNext": 220 },
-    { "swordLevels": [16, 17, 18], "xpToNext": 230 },
-    { "swordLevels": [17, 18, 19], "xpToNext": 240 },
-    { "swordLevels": [18, 19, 20], "xpToNext": 250 },
-    { "swordLevels": [19, 20, 21], "xpToNext": 260 },
-    { "swordLevels": [20, 21, 22], "xpToNext": 270 },
-    { "swordLevels": [21, 22, 23], "xpToNext": 280 },
-    { "swordLevels": [22, 23, 24], "xpToNext": 290 },
-    { "swordLevels": [23, 24, 25], "xpToNext": 300 },
-    { "swordLevels": [24, 25, 26], "xpToNext": 310 },
-    { "swordLevels": [25, 26, 27], "xpToNext": 320 }
+  "maxCommissions": 1,
+  "initialSpawnCount": 1,
+  "tickIntervalMs": 1000,
+  "buckets": [
+    {
+      "minGold": 0,
+      "maxGold": 1000000,
+      "items": [
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 1,
+          "weight": 3,
+          "rewardKind": "gold",
+          "incentiveMin": 0.8,
+          "incentiveMax": 2,
+          "additiveMin": 0,
+          "additiveMax": 100
+        },
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 10,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "protection_ticket",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 5,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_10",
+          "rewardItemCount": 1
+        }
+      ],
+      "durationMinMs": 30000,
+      "durationMaxMs": 30000,
+      "spawnIntervalMinMs": 5000,
+      "spawnIntervalMaxMs": 5000
+    },
+    {
+      "minGold": 1000000,
+      "maxGold": 5000000,
+      "items": [
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 10,
+          "weight": 2,
+          "rewardKind": "item",
+          "rewardItemId": "protection_ticket",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 20,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "protection_ticket",
+          "rewardItemCount": 2
+        },
+        {
+          "itemId": "faded_fluorescent",
+          "requiredCount": 1,
+          "weight": 1,
+          "rewardKind": "gold",
+          "incentiveMin": 1,
+          "incentiveMax": 2,
+          "additiveMin": 0,
+          "additiveMax": 0
+        },
+        {
+          "itemId": "faded_fluorescent",
+          "requiredCount": 1,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_12",
+          "rewardItemCount": 1
+        }
+      ],
+      "durationMinMs": 10000,
+      "durationMaxMs": 60000,
+      "spawnIntervalMinMs": 5000,
+      "spawnIntervalMaxMs": 5000
+    },
+    {
+      "minGold": 5000000,
+      "maxGold": 20000000,
+      "items": [
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 20,
+          "weight": 2,
+          "rewardKind": "item",
+          "rewardItemId": "protection_ticket",
+          "rewardItemCount": 3
+        },
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 30,
+          "weight": 2,
+          "rewardKind": "item",
+          "rewardItemId": "protection_ticket",
+          "rewardItemCount": 5
+        },
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 50,
+          "weight": 2,
+          "rewardKind": "item",
+          "rewardItemId": "protection_ticket",
+          "rewardItemCount": 10
+        },
+        {
+          "itemId": "faded_fluorescent",
+          "requiredCount": 2,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_12",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "flame_sword_handle",
+          "requiredCount": 1,
+          "weight": 1,
+          "rewardKind": "gold",
+          "incentiveMin": 1,
+          "incentiveMax": 3,
+          "additiveMin": 0,
+          "additiveMax": 0
+        },
+        {
+          "itemId": "flame_sword_handle",
+          "requiredCount": 1,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_15",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "flame_sword_handle",
+          "requiredCount": 2,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_16",
+          "rewardItemCount": 1
+        }
+      ],
+      "durationMinMs": 30000,
+      "durationMaxMs": 60000,
+      "spawnIntervalMinMs": 5000,
+      "spawnIntervalMaxMs": 5000
+    },
+    {
+      "minGold": 20000000,
+      "maxGold": null,
+      "items": [
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 50,
+          "weight": 2,
+          "rewardKind": "item",
+          "rewardItemId": "protection_ticket",
+          "rewardItemCount": 5
+        },
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 100,
+          "weight": 2,
+          "rewardKind": "item",
+          "rewardItemId": "protection_ticket",
+          "rewardItemCount": 10
+        },
+        {
+          "itemId": "faded_fluorescent",
+          "requiredCount": 2,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_12",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "flame_sword_handle",
+          "requiredCount": 2,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "sword_16",
+          "rewardItemCount": 1
+        },
+        {
+          "itemId": "flame_sword_handle",
+          "requiredCount": 1,
+          "weight": 1,
+          "rewardKind": "gold",
+          "incentiveMin": 0.8,
+          "incentiveMax": 2,
+          "additiveMin": 0,
+          "additiveMax": 0
+        }
+      ],
+      "durationMinMs": 30000,
+      "durationMaxMs": 60000,
+      "spawnIntervalMinMs": 5000,
+      "spawnIntervalMaxMs": 5000
+    }
   ]
 }

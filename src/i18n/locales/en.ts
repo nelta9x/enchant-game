@@ -38,17 +38,22 @@ export const en: Record<TranslationKey, string> = {
   // 인벤토리
   'inventory.title': 'Inventory',
 
-  // 의뢰(Commission)
-  'commission.title': 'Commissions',
+  // 거래 제안(Commission — 내부 코드명은 commission 유지, 표시명만 "거래 제안")
+  'commission.title': 'Trade Offers',
   'commission.reward': 'Reward',
-  'commission.fulfill': 'Deliver',
-  'commission.empty': 'Pending',
-  'commission.level': 'Lv.',
+  'commission.fulfill': 'Accept',
+  'commission.empty': 'Awaiting offer',
+  'commission.arrived': 'New trade offer!',
 
   // 강화 결과 토스트
   'toast.success': 'Enhanced',
   'toast.protected': 'Protected',
   'toast.destroyed': 'Destroyed',
+
+  // 게임 클리어(최종 검 완성)
+  'gameClear.title': 'Game Cleared!',
+  'gameClear.body': 'You forged the Divine Rapier. Congratulations!',
+  'gameClear.close': 'Close',
 
   // 아이템 표시명
   'item.protection_ticket': 'Protection Ticket',
@@ -87,4 +92,5 @@ export const en: Record<TranslationKey, string> = {
   'sword.27.name': 'Odyssey Sword',
   'sword.28.name': 'Mosaikal',
   'sword.29.name': 'Flame-Tempered Sword',
+  'sword.30.name': 'Divine Rapier',
 }

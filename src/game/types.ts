@@ -34,12 +34,6 @@ export type PlayerState = {
   // 마우스로 스치거나(개별) 일정 시간 후(자동) 수집될 때 collectDrop 으로 items 로 옮긴다.
   // 연출이 끝날 때 미수집분은 flushDrops 로 일괄 items 에 합산해 유실을 막는다(손실 0 보장).
   pendingDrops: ItemStack[]
-  // 의뢰 진행도(검 강화와 별개의 progression). 의뢰를 완료하면 경험치가 차 레벨이 오르고,
-  // 만료(미달성)하면 깎여 레벨이 내려갈 수 있다(최소 1). 의뢰 레벨이 등장 검 단계를 결정한다.
-  //  - commissionLevel: 현재 의뢰 레벨(1부터). 정의는 DataManager 의 CommissionConfig.levels.
-  //  - commissionXp: 현재 레벨 내 누적 경험치(0 .. 그 레벨의 xpToNext).
-  commissionLevel: number
-  commissionXp: number
 }
 
 // 강화 1회 시도에 소모되는 재료(호출자가 인벤토리에서 차감하는 데 사용).

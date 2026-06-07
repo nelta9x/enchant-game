@@ -1,23 +1,38 @@
 import { create } from 'zustand'
 import { dataManager } from '../data/DataManager'
-import type { CommissionConfig } from '../data/types'
+import type { CommissionConfig, GoldBucket } from '../data/types'
 import {
+  bootstrapCommissionQueue,
   commissionPool,
   complete,
-  emptyCommissionQueue,
   tick,
   type CommissionQueueState,
+  type BucketSettings,
+  type PoolEntry,
 } from './commissionQueue'
-import { swordLevelsFor } from './commissionProgress'
 import { useGameStore } from './gameStore'
+
+// 골드 버킷 정의에서 생성에 필요한 설정 묶음만 뽑는다(코어 BucketSettings 형태로).
+// (보상 배수/가산은 아이템별이라 여기 없고 buildPool 이 PoolEntry 로 실어 나른다.)
+function settingsOf(bucket: GoldBucket): BucketSettings {
+  return {
+    durationMinMs: bucket.durationMinMs,
+    durationMaxMs: bucket.durationMaxMs,
+    spawnIntervalMinMs: bucket.spawnIntervalMinMs,
+    spawnIntervalMaxMs: bucket.spawnIntervalMaxMs,
+  }
+}
 
 // 의뢰(Commission) 시스템의 얇은 셸 — 순수 전이 코어(commissionQueue)에 "시간"과 "데이터"만 입힌다.
 // 생성/만료/재생성 규칙은 전부 코어에 있고, 여기서는 setInterval 로 주기적으로 tick(Date.now()) 을 돌리고,
-// 출제 풀(DataManager)·진행도(gameStore)·튜닝 설정(DataManager)을 읽어 주입한다. effectStore 와 같은 셸 패턴.
+// 출제 풀(DataManager)·보유 골드(gameStore)·튜닝 설정(DataManager)을 읽어 주입한다. effectStore 와 같은 셸 패턴.
 //
 // 설정(config)은 DataManager.getCommissionConfig() 에서 읽는다. 단 이 호출은 반드시 load 이후여야 하므로
 // (DataManager.ensureLoaded), 모듈 평가 시점에 즉시 도는 zustand 초기화에서는 읽지 않는다 — 초기 상태는
-// config 없는 빈 큐로 두고, start()(App useEffect → load 이후)에서 emptyCommissionQueue 로 재초기화한다.
+// config 없는 빈 큐로 두고, start()(App useEffect → load 이후)에서 bootstrapCommissionQueue 로 재초기화한다.
+//
+// 출제 풀은 "보유 골드"가 고른다: 매 tick 현재 골드로 담당 버킷(currentBucket)을 골라 그 items[]·타이머로
+// 의뢰를 생성한다. 골드가 바뀌어 버킷이 달라지면 다음 스폰부터 반영된다(이미 발급된 의뢰는 freeze 유지).
 //
 // 완료는 두 store 에 걸친 트랜잭션이다: PlayerState 변경(검 소모+골드)은 gameStore 가 소유하고,
 // 의뢰 생명주기(active 에서 제거 + 재생성 예약)는 여기가 소유한다 — gameStore 가 완료를 수락(true)할
@@ -28,7 +43,7 @@ type CommissionActions = {
   start: () => void
   // tick 정지 + 큐 비우기(App 언마운트 시).
   stop: () => void
-  // 내부: 시간 전진 1회 — 설정·풀·진행도를 읽어 tick 에 주입.
+  // 내부: 시간 전진 1회 — 설정·풀·보유 골드를 읽어 tick 에 주입.
   _tick: () => void
   // 의뢰 완료 시도: gameStore 가 검 소모+보상을 수락하면 complete 적용 후 true. 미보유면 false(무변화).
   fulfill: (id: number) => boolean
@@ -55,8 +70,23 @@ export function createCommissionStore(opts: CreateOpts = {}) {
   // setInterval 핸들은 store 상태가 아니라 클로저에 둔다(직렬화/구독 대상 아님).
   let timer: ReturnType<typeof setInterval> | null = null
 
+  // 현재 보유 골드가 담당하는 버킷을 읽는다. 매 tick 새로 읽어 골드 변동이 다음 스폰부터 반영된다.
+  // 로더가 보장(정렬·연속·첫 minGold=0·마지막 maxGold=null)하므로 "maxGold 가 null 이거나 gold < maxGold 인
+  // 첫 버킷"이 담당이다(minGold 는 스폰 시 읽지 않는다). find 가 못 찾는 경우(방어)는 마지막 버킷으로 폴백.
+  const currentBucket = (config: CommissionConfig): GoldBucket => {
+    const gold = useGameStore.getState().gold
+    return (
+      config.buckets.find((b) => b.maxGold === null || gold < b.maxGold) ??
+      config.buckets[config.buckets.length - 1]
+    )
+  }
+
+  // 출제 풀 조립: 현재 버킷의 items[] 에 basePrice 를 붙여 PoolEntry[] 로. start(부트스트랩)·_tick 이 공유.
+  const buildPool = (bucket: GoldBucket): PoolEntry[] =>
+    commissionPool(bucket.items, (id) => dataManager.getItemBasePrice(id))
+
   return create<CommissionStore>((set, get) => ({
-    // 초기 상태는 빈 큐(정지) — start()에서 emptyCommissionQueue 로 타이머를 켠다(모듈 평가 시 load 전이라 config 미접근).
+    // 초기 상태는 빈 큐(정지) — start()에서 bootstrapCommissionQueue 로 채우고 타이머를 켠다(모듈 평가 시 load 전이라 config 미접근).
     active: [],
     nextSpawnAt: null,
     nextId: 1,
@@ -64,8 +94,20 @@ export function createCommissionStore(opts: CreateOpts = {}) {
     start: () => {
       if (timer !== null) return
       const config = getConfig()
-      set(emptyCommissionQueue(now()))
-      get()._tick() // 마운트 즉시 한 번 돌린다(첫 의뢰가 바로 등장).
+      const bucket = currentBucket(config)
+      // 부트스트랩으로 initialSpawnCount 개를 즉시 채운다. 이어지는 _tick 은 자리가 차 있으면 무발화
+      //  (initialSpawnCount>0 → nextSpawnAt 이 간격 뒤라 추가 스폰 없음), 0 이면 첫 1개를 즉시 등장시킨다.
+      set(
+        bootstrapCommissionQueue(
+          now(),
+          rng,
+          buildPool(bucket),
+          settingsOf(bucket),
+          config.maxCommissions,
+          config.initialSpawnCount,
+        ),
+      )
+      get()._tick()
       timer = setInterval(() => get()._tick(), config.tickIntervalMs)
     },
 
@@ -79,31 +121,26 @@ export function createCommissionStore(opts: CreateOpts = {}) {
 
     _tick: () => {
       const config = getConfig()
-      // 풀은 "현재 의뢰 레벨"이 결정하는 검 단계 목록으로 거른다(진행도 근처 → 레벨 기반으로 교체).
-      const level = useGameStore.getState().commissionLevel
-      const pool = commissionPool(
-        dataManager.getSwords(),
-        swordLevelsFor(level, config.levels),
+      const bucket = currentBucket(config)
+      const { state } = tick(
+        get(),
+        now(),
+        rng,
+        buildPool(bucket),
+        settingsOf(bucket),
+        config.maxCommissions,
       )
-      const { state, expired } = tick(get(), now(), rng, pool, config)
       set(state)
-      // 만료(미달성)된 의뢰 1건당 경험치를 차감한다(완료는 complete 가 이미 제거해 expired 에 안 잡힌다).
-      if (expired.length > 0) {
-        useGameStore
-          .getState()
-          .applyCommissionXp(-config.xpPenalty * expired.length)
-      }
+      // 만료된 의뢰(expired)는 단순히 active 에서 제거된다 — 별도 패널티 없음.
     },
 
     fulfill: (id) => {
       const c = get().active.find((x) => x.id === id)
       if (!c) return false
-      // PlayerState 변경은 gameStore 소유 — 수락(true)일 때만 생명주기에서 제거한다.
-      const ok = useGameStore.getState().fulfillCommission(c.swordId, c.reward)
+      // PlayerState 변경(검 소모+골드)은 gameStore 소유 — 수락(true)일 때만 생명주기에서 제거한다.
+      const ok = useGameStore.getState().fulfillCommission(c.cost, c.reward)
       if (!ok) return false
       set((s) => complete(s, id))
-      // 완료 보상 경험치 — 레벨업으로 이어질 수 있다(다음 tick 스폰부터 상위 검 등장).
-      useGameStore.getState().applyCommissionXp(getConfig().xpReward)
       return true
     },
   }))

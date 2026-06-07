@@ -79,18 +79,14 @@ describe('parseShop — 구조 검증', () => {
 })
 
 describe('loadShop — 실제 번들 데이터(shop.json)', () => {
-  it('파괴보호장치를 골드(100만)와 철조각(10개) 두 방식으로 판매한다', () => {
+  it('파괴보호장치를 골드(100만)로만 판매한다(철조각 교환 경로 제거됨)', () => {
     const items = loadShop()
     const gold = items.find((i) => i.id === 'protection_ticket_gold')
-    const scrap = items.find((i) => i.id === 'protection_ticket_scrap')
     expect(gold?.itemId).toBe('protection_ticket')
     expect(gold?.price).toEqual({ kind: 'gold', amount: 1_000_000 })
-    expect(scrap?.itemId).toBe('protection_ticket')
-    expect(scrap?.price).toEqual({
-      kind: 'item',
-      itemId: 'iron_scrap',
-      count: 10,
-    })
+    // 철조각(iron_scrap)으로 파괴방지권을 사는 항목은 더 이상 없다.
+    expect(items.find((i) => i.id === 'protection_ticket_scrap')).toBeUndefined()
+    expect(items.some((i) => i.price.kind === 'item')).toBe(false)
   })
 
   it('항목 id가 중복되지 않는다', () => {
