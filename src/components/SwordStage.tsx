@@ -155,25 +155,20 @@ export function SwordStage({
         <ProtectionWard {...protection} />
       </div>
 
-      {/* 레벨 뱃지(다이아몬드) */}
-      {hasSword && (
-        <div className="relative flex h-9 w-14 items-center justify-center">
-          <span className="absolute inset-x-3 inset-y-0 rotate-45 rounded-[5px] border border-frame/60 bg-panel" />
-          <span className="relative text-sm font-bold tabular-nums text-on-dark">
-            +{level}
-          </span>
-        </div>
-      )}
-
       {/* 이름 배너 */}
       <div className="bg-frame/70 p-[1.5px]" style={{ clipPath: HEX }}>
         <div
-          className="flex min-w-56 items-center justify-center bg-panel px-10 py-2.5"
+          className="flex w-80 items-center justify-center bg-panel px-10 py-3"
           style={{ clipPath: HEX }}
         >
-          <span className="text-center text-2xl font-extrabold tracking-tight text-on-dark">
+          <span className="whitespace-nowrap text-center text-2xl font-extrabold tracking-tight text-on-dark">
             {hasSword ? t(sword.nameKey) : t('sword.none')}
           </span>
+          {hasSword && (
+            <span className="ml-2 text-xl font-bold tabular-nums text-gold">
+              +{level}
+            </span>
+          )}
         </div>
       </div>
 

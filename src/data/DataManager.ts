@@ -1,6 +1,7 @@
-import type { CommissionConfig, ShopItem, SwordData } from './types'
+import type { CommissionConfig, ItemData, ShopItem, SwordData } from './types'
 import { loadSwords } from './loadSwords'
 import { loadShop } from './loadShop'
+import { loadItems } from './loadItems'
 import { loadCommission } from './loadCommission'
 
 // 중앙 데이터 관리자.
@@ -9,17 +10,30 @@ import { loadCommission } from './loadCommission'
 export class DataManager {
   private swords: readonly SwordData[] = []
   private shop: readonly ShopItem[] = []
+  private items: readonly ItemData[] = []
   private commission: CommissionConfig | null = null
   private loaded = false
 
   // 데이터 파일(sources/*.json)을 검증·적재한다(동기).
-  // 데이터 소스는 코드 상수가 아니라 별도 데이터 파일이며, loadSwords()/loadShop()이
+  // 데이터 소스는 코드 상수가 아니라 별도 데이터 파일이며, loadSwords()/loadShop()/loadItems()이
   // 파일을 읽어 런타임 검증을 거친 도메인 타입으로 만든다.
   // 원격/비동기 로드가 필요해지면 이 메서드만 async로 전환하면 된다.
+  //
+  // 로드 순서: 검·아이템 카탈로그를 먼저, 의뢰를 나중에 — loadCommission 검증이
+  // "의뢰 itemId 가 판매 가능한 검이거나 아이템 카탈로그에 존재하는가"를 강제하므로
+  // 알려진 itemId 집합(knownItemIds)을 먼저 만들어 주입한다(sword_0 등 비판매 검 출제 차단).
   load(): void {
     this.swords = loadSwords()
     this.shop = loadShop()
-    this.commission = loadCommission()
+    this.items = loadItems()
+    const knownItemIds = new Set<string>()
+    for (const s of this.swords)
+      if (s.sellPrice !== null) knownItemIds.add(s.id)
+    for (const it of this.items) knownItemIds.add(it.id)
+    // 상점이 지급하는 itemId(파괴방지권 등)도 정당히 소유 가능한 아이템이므로 출제 집합에 포함한다 —
+    // 카탈로그(재료)에는 없지만 거래 제안 보상으로 지급할 수 있어야 한다(기준가는 없어도 됨, 고정 지급).
+    for (const sku of this.shop) knownItemIds.add(sku.itemId)
+    this.commission = loadCommission(knownItemIds)
     this.loaded = true
   }
 
@@ -52,6 +66,27 @@ export class DataManager {
   getShopItem(id: string): ShopItem | undefined {
     this.ensureLoaded()
     return this.shop.find((s) => s.id === id)
+  }
+
+  // 아이템 카탈로그(검이 아닌 재료 등). 표시명/스프라이트 해석(lib/items)이 검 다음으로 조회한다.
+  getItems(): readonly ItemData[] {
+    this.ensureLoaded()
+    return this.items
+  }
+
+  // itemId 로 카탈로그 아이템 조회(검·미지의 id 는 undefined).
+  getItemById(id: string): ItemData | undefined {
+    this.ensureLoaded()
+    return this.items.find((i) => i.id === id)
+  }
+
+  // 의뢰 보상 산정 기준가. 검은 sellPrice(판매 가능 검만 non-null), 그 외는 카탈로그 basePrice.
+  // 둘 다 없으면 undefined(의뢰 풀 구성 시 방어적으로 제외된다).
+  getItemBasePrice(itemId: string): number | undefined {
+    this.ensureLoaded()
+    const sword = this.getSwordById(itemId)
+    if (sword && sword.sellPrice !== null) return sword.sellPrice
+    return this.getItemById(itemId)?.basePrice
   }
 
   // 의뢰 시스템 튜닝 설정. commissionStore 셸이 읽어 순수 reducer 에 주입한다(load 이후 호출 보장).

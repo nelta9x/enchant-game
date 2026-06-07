@@ -37,17 +37,22 @@ export const ko = {
   // 인벤토리
   'inventory.title': '인벤토리',
 
-  // 의뢰(Commission)
-  'commission.title': '의뢰',
+  // 거래 제안(Commission — 내부 코드명은 commission 유지, 표시명만 "거래 제안")
+  'commission.title': '거래 제안',
   'commission.reward': '보상',
-  'commission.fulfill': '납품',
-  'commission.empty': '준비 중',
-  'commission.level': '의뢰 Lv.',
+  'commission.fulfill': '거래 수락',
+  'commission.empty': '제안 대기 중',
+  'commission.arrived': '새 거래 제안!',
 
   // 강화 결과 토스트
   'toast.success': '강화 성공',
   'toast.protected': '파괴보호장치로 보호',
   'toast.destroyed': '검 파괴',
+
+  // 게임 클리어(최종 검 완성)
+  'gameClear.title': '게임 클리어!',
+  'gameClear.body': '신성한 레이피어를 완성했습니다. 축하합니다!',
+  'gameClear.close': '닫기',
 
   // 아이템 표시명 (파괴보호장치 · 잡템 — 인벤토리/드랍 표시에 사용)
   // 재료로 쓰이는 검(sword_<level>)은 검 이름 키(sword.N.name)로 해석한다.
@@ -89,6 +94,7 @@ export const ko = {
   'sword.27.name': '오딧세이 소드',
   'sword.28.name': '모자이칼',
   'sword.29.name': '화염에 달군 검',
+  'sword.30.name': '신성한 레이피어',
 } as const
 
 // 모든 번역 키의 합집합 타입. 데이터·UI 양쪽에서 이 타입을 키로 사용한다.

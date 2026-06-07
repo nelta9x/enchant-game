@@ -26,37 +26,84 @@ export type ShopItem = {
   price: Material
 }
 
-// 의뢰 레벨 1단계 정의(언어 중립). 의뢰 레벨이 오를수록 더 높은 단계의 검을 요구한다.
-//  - swordLevels: 이 의뢰 레벨에서 출제될 수 있는 검 단계(level) 목록(판매가 있는 단계만 둔다)
-//  - xpToNext: 이 레벨에서 다음 레벨로 오르기까지 필요한 경험치
-export type CommissionLevel = {
-  swordLevels: number[]
-  xpToNext: number
+// 아이템 카탈로그 1건(언어 중립). 검이 아닌 아이템(철조각 등 재료)의 메타데이터를 데이터 파일(items.json)에 둔다.
+// 표시명은 데이터에 박지 않고 id → i18n 키(item.<id>)로 파생한다(검의 nameKey 파생 패턴 미러).
+//  - id: 인벤토리 itemId(= 카탈로그 키)
+//  - basePrice: 의뢰 보상 산정 기준가(>= 0). 검은 sellPrice 를 기준가로 쓰므로 여기 등록하지 않는다.
+//  - nameKey: 표시명 i18n 키(id 에서 파생)
+//  - sprite: 전용 스프라이트 파일명(없으면 null → ItemIcon 토큰 폴백)
+export type ItemData = {
+  id: string
+  basePrice: number
+  nameKey: TranslationKey
+  sprite: string | null
+}
+
+// 의뢰 버킷에서 출제될 거래 1종(언어 중립). 등장 확률(weight) + "지불(cost)" + "보상(reward)"을 아이템별로 둔다.
+// 거래는 비용·보상이 각각 골드 또는 아이템이라 4조합이 가능하다(단 골드 비용은 아이템 보상만 — 아래 제약).
+//
+// 지불(cost):
+//  - costKind 'item'(기본, 누락 시): itemId 아이템을 requiredCount 개 납품(검·재료). 로더가 requiredCount 누락 시 1로 정규화.
+//  - costKind 'gold': 골드 costAmount 를 지불(골드로 아이템 구매). itemId/requiredCount 없음.
+// 보상(reward):
+//  - rewardKind 'gold': basePrice·incentive·additive 로 골드를 동적 산정(reward = round((basePrice + additive) * incentive)).
+//    basePrice 는 "납품 아이템"의 기준가라 골드 보상은 아이템 비용(costKind 'item')에만 허용된다(로더 강제).
+//  - rewardKind 'item': 납품/지불하면 rewardItemId 를 rewardItemCount 개 지급(골드 산정 없음).
+// (costKind/rewardKind 누락 시 로더가 각각 'item'/'gold' 로 정규화 — 기존 골드 의뢰는 itemId+incentive/additive 만 두면 된다.)
+export type CommissionItemEntry = {
+  weight: number
+  // 선택: 이 항목 전용 시간 제한(둘 다 있거나 둘 다 없음). 없으면 버킷 기본 duration 을 쓴다.
+  // 물물교환처럼 특정 의뢰만 슬롯 점유를 짧게 두고 싶을 때 사용(버킷 전체 duration 은 그대로).
+  durationMinMs?: number
+  durationMaxMs?: number
+} & (
+  | { costKind?: 'item'; itemId: string; requiredCount: number }
+  | { costKind: 'gold'; costAmount: number }
+) &
+  (
+    | {
+        rewardKind: 'gold'
+        incentiveMin: number
+        incentiveMax: number
+        additiveMin: number
+        additiveMax: number
+      }
+    | {
+        rewardKind: 'item'
+        rewardItemId: string
+        rewardItemCount: number
+      }
+  )
+
+// 의뢰 골드 버킷 1구간(언어 중립). 플레이어의 보유 골드 구간마다 출제 아이템·시간을 독립 설정한다.
+// 버킷들은 [0, ∞) 를 빈틈·겹침 없이 덮어야 한다(로더가 강제): 첫 버킷 minGold=0, 연속, 마지막 maxGold=null.
+//  - minGold: 담당 골드 구간 하한(포함). 검증 전용 — 셀렉터는 maxGold 만 본다.
+//  - maxGold: 상한(미포함). null = ∞(마지막 버킷).
+//  - items: 이 버킷에서 출제될 아이템 목록(itemId + weight + 아이템별 incentive/additive). 비어있지 않음
+//  - durationMin/MaxMs: 의뢰 시간 제한 범위(생성 시 이 구간에서 무작위)
+//  - spawnIntervalMin/MaxMs: 의뢰 1개가 등장하는 간격 범위(이 구간에서 무작위)
+export type GoldBucket = {
+  minGold: number
+  maxGold: number | null
+  items: CommissionItemEntry[]
+  durationMinMs: number
+  durationMaxMs: number
+  spawnIntervalMinMs: number
+  spawnIntervalMaxMs: number
 }
 
 // 의뢰(Commission) 시스템 튜닝 설정(언어 중립). 코드 상수가 아니라 데이터 파일(commission.json)에 두고
-// DataManager 가 로드 시 검증한다. 순수 reducer(commissionQueue/commissionProgress)는 이 값을 인자로 주입받아 쓴다.
+// DataManager 가 로드 시 검증한다. 순수 reducer(commissionQueue)는 이 값을 인자로 주입받아 쓴다.
+// 시스템 파라미터(아래 3개)는 버킷과 무관한 글로벌이고, 나머지 튜닝값은 전부 buckets[] 안에 골드 구간별로 둔다.
 //  - maxCommissions: 동시 유지 의뢰 수(꽉 차면 스폰 타이머가 멈춘다)
-//  - durationMin/MaxMs: 의뢰 시간 제한 범위(생성 시 이 구간에서 무작위)
-//  - incentiveMin/Max: 판매가 대비 보상 인센티브 범위(예: 0.1~2.0 = +10%~+200%)
-//  - spawnIntervalMin/MaxMs: 의뢰 1개가 등장하는 간격 범위(이 구간에서 무작위). 슬롯이 꽉 차면
-//    타이머가 멈췄다가, 한 자리가 비면 다시 이 간격을 세어 1개씩 등장시킨다.
+//  - initialSpawnCount: 시작 시 즉시 등장시킬 의뢰 수(0~maxCommissions). 나머지는 spawnInterval 간격으로 채운다.
 //  - tickIntervalMs: 셸(commissionStore)이 시간을 전진시키는 주기(만료/스폰 감지 해상도)
-//  - xpReward: 의뢰 1건 완료 시 획득하는 경험치
-//  - xpPenalty: 의뢰 1건 만료(미달성) 시 차감되는 경험치
-//  - levels: 의뢰 레벨별 정의(levels[0] = 의뢰 레벨 1). 레벨이 오를수록 등장 검 단계가 높아진다.
+//  - buckets: 보유 골드 구간별 정의([0,∞) 를 덮는 연속 버킷 — buckets[0] 이 골드 0 구간).
 export type CommissionConfig = {
   maxCommissions: number
-  durationMinMs: number
-  durationMaxMs: number
-  incentiveMin: number
-  incentiveMax: number
-  spawnIntervalMinMs: number
-  spawnIntervalMaxMs: number
+  initialSpawnCount: number
   tickIntervalMs: number
-  xpReward: number
-  xpPenalty: number
-  levels: CommissionLevel[]
+  buckets: GoldBucket[]
 }
 
 // 검의 특수 플래그(언어 중립 태그). 표시가 필요하면 i18n에서 해석한다.

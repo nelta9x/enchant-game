@@ -214,9 +214,9 @@ describe('gameStore — canEnhance 게이팅', () => {
     expect(store.getState().enhance(false)).toBeNull()
   })
 
-  it('최종 단계(+29)는 강화 불가', () => {
+  it('최종 단계(+30 신성한 레이피어)는 강화 불가', () => {
     const store = createGameStore({
-      currentSwordId: 'sword_29',
+      currentSwordId: 'sword_30',
       gold: 999_999_999,
     })
     expect(store.getState().canEnhance(false)).toBe(false)
@@ -425,47 +425,13 @@ describe('gameStore — 보관 / 장착', () => {
 })
 
 describe('gameStore — 상점 구매', () => {
-  // shop.json: protection_ticket_gold(골드 100만), protection_ticket_scrap(철조각 10개)
+  // shop.json: protection_ticket_gold(골드 100만) — 파괴방지권은 이제 골드로만 판다(철조각 교환 경로 제거됨).
   it('골드 구매: 골드 차감 + 파괴보호장치 적재', () => {
     const store = createGameStore({ gold: 2_500_000 })
     expect(store.getState().canBuy('protection_ticket_gold')).toBe(true)
     expect(store.getState().buy('protection_ticket_gold')).not.toBeNull()
     expect(store.getState().gold).toBe(1_500_000)
     expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(1)
-  })
-
-  it('아이템 구매: 철조각 10개 차감 + 파괴보호장치 적재(골드 불변)', () => {
-    const store = createGameStore({
-      gold: 0,
-      items: [{ itemId: 'iron_scrap', count: 25 }],
-    })
-    expect(store.getState().canBuy('protection_ticket_scrap')).toBe(true)
-    expect(store.getState().buy('protection_ticket_scrap')).not.toBeNull()
-    expect(countOf(store.getState().items, 'iron_scrap')).toBe(15)
-    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(1)
-    expect(store.getState().gold).toBe(0)
-  })
-
-  it('아이템 구매: 철조각이 정확히 가격과 같으면 구매 가능(경계) → 0', () => {
-    const store = createGameStore({
-      gold: 0,
-      items: [{ itemId: 'iron_scrap', count: 10 }],
-    })
-    expect(store.getState().canBuy('protection_ticket_scrap')).toBe(true)
-    store.getState().buy('protection_ticket_scrap')
-    expect(countOf(store.getState().items, 'iron_scrap')).toBe(0)
-    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(1)
-  })
-
-  it('아이템 부족이면 구매 불가 + buy는 null(상태 불변)', () => {
-    const store = createGameStore({
-      gold: 0,
-      items: [{ itemId: 'iron_scrap', count: 9 }],
-    })
-    expect(store.getState().canBuy('protection_ticket_scrap')).toBe(false)
-    expect(store.getState().buy('protection_ticket_scrap')).toBeNull()
-    expect(countOf(store.getState().items, 'iron_scrap')).toBe(9)
-    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(0)
   })
 
   it('수량 구매: 골드 가격 × qty 차감 + qty개 지급', () => {
@@ -506,8 +472,8 @@ describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
       currentSwordId: 'sword_5',
       items: [{ itemId: 'sword_3', count: 2 }],
     })
-    expect(store.getState().canFulfill('sword_3')).toBe(true)
-    expect(store.getState().fulfillCommission('sword_3', 5000)).toBe(true)
+    expect(store.getState().canFulfill({ kind: 'item', itemId: 'sword_3', count: 1 })).toBe(true)
+    expect(store.getState().fulfillCommission({ kind: 'item', itemId: 'sword_3', count: 1 }, { kind: 'gold', amount: 5000 })).toBe(true)
     expect(store.getState().gold).toBe(6000)
     expect(countOf(store.getState().items, 'sword_3')).toBe(1)
     expect(store.getState().currentSwordId).toBe('sword_5') // 장착 불변
@@ -519,7 +485,7 @@ describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
       currentSwordId: 'sword_5',
       items: [],
     })
-    expect(store.getState().fulfillCommission('sword_5', 5000)).toBe(true)
+    expect(store.getState().fulfillCommission({ kind: 'item', itemId: 'sword_5', count: 1 }, { kind: 'gold', amount: 5000 })).toBe(true)
     expect(store.getState().gold).toBe(6000)
     expect(store.getState().currentSwordId).toBe('sword_0') // 빈 슬롯 리필
   })
@@ -530,7 +496,7 @@ describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
       currentSwordId: 'sword_5',
       items: [{ itemId: 'sword_2', count: 1 }],
     })
-    expect(store.getState().fulfillCommission('sword_5', 5000)).toBe(true)
+    expect(store.getState().fulfillCommission({ kind: 'item', itemId: 'sword_5', count: 1 }, { kind: 'gold', amount: 5000 })).toBe(true)
     expect(store.getState().gold).toBe(6000)
     // 보관 검(sword_2)을 자동 장착하지 않는다 — 의도치 않은 강화 방지.
     expect(store.getState().currentSwordId).toBe('sword_0')
@@ -543,8 +509,8 @@ describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
       currentSwordId: 'sword_5',
       items: [{ itemId: 'sword_3', count: 1 }],
     })
-    expect(store.getState().canFulfill('sword_9')).toBe(false)
-    expect(store.getState().fulfillCommission('sword_9', 5000)).toBe(false)
+    expect(store.getState().canFulfill({ kind: 'item', itemId: 'sword_9', count: 1 })).toBe(false)
+    expect(store.getState().fulfillCommission({ kind: 'item', itemId: 'sword_9', count: 1 }, { kind: 'gold', amount: 5000 })).toBe(false)
     expect(store.getState().gold).toBe(1000)
     expect(store.getState().currentSwordId).toBe('sword_5')
     expect(countOf(store.getState().items, 'sword_3')).toBe(1)
@@ -556,46 +522,84 @@ describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
       currentSwordId: 'sword_5',
       items: [{ itemId: 'sword_5', count: 1 }],
     })
-    expect(store.getState().fulfillCommission('sword_5', 5000)).toBe(true)
+    expect(store.getState().fulfillCommission({ kind: 'item', itemId: 'sword_5', count: 1 }, { kind: 'gold', amount: 5000 })).toBe(true)
     expect(store.getState().gold).toBe(6000)
     expect(store.getState().currentSwordId).toBe('sword_5') // 장착분 유지
     expect(countOf(store.getState().items, 'sword_5')).toBe(0) // 가방분 소모
   })
+
+  it('물물교환: 재료 requiredCount 개 소모 + 아이템 보상 지급(골드·장착검 불변)', () => {
+    const store = createGameStore({
+      gold: 100,
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'faded_fluorescent', count: 3 }],
+    })
+    expect(store.getState().canFulfill({ kind: 'item', itemId: 'faded_fluorescent', count: 2 })).toBe(true)
+    expect(
+      store.getState().fulfillCommission({ kind: 'item', itemId: 'faded_fluorescent', count: 2 }, {
+        kind: 'item',
+        itemId: 'sword_12',
+        count: 1,
+      }),
+    ).toBe(true)
+    expect(countOf(store.getState().items, 'faded_fluorescent')).toBe(1) // 2 소모
+    expect(countOf(store.getState().items, 'sword_12')).toBe(1) // 검 지급
+    expect(store.getState().gold).toBe(100) // 골드 불변(아이템 보상)
+    expect(store.getState().currentSwordId).toBe('sword_5') // 장착검 불변
+  })
+
+  it('수량 부족: requiredCount 미만이면 canFulfill false + fulfill 무변화', () => {
+    const store = createGameStore({
+      gold: 0,
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'faded_fluorescent', count: 1 }], // 2개 필요한데 1개뿐
+    })
+    expect(store.getState().canFulfill({ kind: 'item', itemId: 'faded_fluorescent', count: 2 })).toBe(false)
+    expect(
+      store.getState().fulfillCommission({ kind: 'item', itemId: 'faded_fluorescent', count: 2 }, {
+        kind: 'item',
+        itemId: 'sword_12',
+        count: 1,
+      }),
+    ).toBe(false)
+    expect(countOf(store.getState().items, 'faded_fluorescent')).toBe(1) // 무변화
+    expect(countOf(store.getState().items, 'sword_12')).toBe(0) // 미지급
+  })
+
+  it('골드 비용 거래: 골드로 아이템을 산다 — 골드 차감 + 아이템 보상(가방/장착검 불변)', () => {
+    const store = createGameStore({
+      gold: 50_000,
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'sword_3', count: 1 }],
+    })
+    const cost = { kind: 'gold' as const, amount: 30_000 }
+    const reward = { kind: 'item' as const, itemId: 'sword_12', count: 1 }
+    expect(store.getState().canFulfill(cost)).toBe(true)
+    expect(store.getState().fulfillCommission(cost, reward)).toBe(true)
+    expect(store.getState().gold).toBe(20_000) // 30,000 차감
+    expect(countOf(store.getState().items, 'sword_12')).toBe(1) // 보상 지급
+    expect(store.getState().currentSwordId).toBe('sword_5') // 장착검 불변
+    expect(countOf(store.getState().items, 'sword_3')).toBe(1) // 가방 불변
+  })
+
+  it('골드 비용 거래: 골드 부족이면 canFulfill false + fulfill 무변화', () => {
+    const store = createGameStore({ gold: 29_999, items: [] })
+    const cost = { kind: 'gold' as const, amount: 30_000 }
+    const reward = { kind: 'item' as const, itemId: 'sword_12', count: 1 }
+    expect(store.getState().canFulfill(cost)).toBe(false)
+    expect(store.getState().fulfillCommission(cost, reward)).toBe(false)
+    expect(store.getState().gold).toBe(29_999) // 무변화
+    expect(countOf(store.getState().items, 'sword_12')).toBe(0) // 미지급
+  })
+
+  it('골드 비용 거래: 정확히 보유 골드와 같으면 구매 가능(경계) → 0', () => {
+    const store = createGameStore({ gold: 30_000, items: [] })
+    const cost = { kind: 'gold' as const, amount: 30_000 }
+    const reward = { kind: 'item' as const, itemId: 'sword_12', count: 1 }
+    expect(store.getState().canFulfill(cost)).toBe(true)
+    expect(store.getState().fulfillCommission(cost, reward)).toBe(true)
+    expect(store.getState().gold).toBe(0)
+    expect(countOf(store.getState().items, 'sword_12')).toBe(1)
+  })
 })
 
-describe('gameStore — 의뢰 경험치(applyCommissionXp)', () => {
-  // applyCommissionXp 는 실제 commission.json 의 레벨 정의(레벨1 xpToNext=100)를 쓴다.
-  it('기본 시작값은 레벨 1, 경험치 0', () => {
-    const store = createGameStore()
-    expect(store.getState().commissionLevel).toBe(1)
-    expect(store.getState().commissionXp).toBe(0)
-  })
-
-  it('경험치 획득(레벨 미만)은 누적', () => {
-    const store = createGameStore()
-    store.getState().applyCommissionXp(34)
-    expect(store.getState().commissionLevel).toBe(1)
-    expect(store.getState().commissionXp).toBe(34)
-  })
-
-  it('경험치가 xpToNext(100) 도달 시 레벨업', () => {
-    const store = createGameStore({ commissionLevel: 1, commissionXp: 80 })
-    store.getState().applyCommissionXp(34) // 80+34=114 → L2, xp 14
-    expect(store.getState().commissionLevel).toBe(2)
-    expect(store.getState().commissionXp).toBe(14)
-  })
-
-  it('경험치가 음수가 되면 레벨 다운', () => {
-    const store = createGameStore({ commissionLevel: 2, commissionXp: 10 })
-    store.getState().applyCommissionXp(-30) // 10-30=-20 → L1, xp 80(=100-20)
-    expect(store.getState().commissionLevel).toBe(1)
-    expect(store.getState().commissionXp).toBe(80)
-  })
-
-  it('레벨 1 바닥: 더 내려갈 곳 없으면 경험치 0 으로 클램프', () => {
-    const store = createGameStore({ commissionLevel: 1, commissionXp: 10 })
-    store.getState().applyCommissionXp(-50)
-    expect(store.getState().commissionLevel).toBe(1)
-    expect(store.getState().commissionXp).toBe(0)
-  })
-})

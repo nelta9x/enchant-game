@@ -32,6 +32,7 @@ import { SellButton } from './SellButton'
 import { StoreButton } from './StoreButton'
 import { SHAKE_SEC } from './shake'
 import { ShopModal } from './ShopModal'
+import { GameClearModal } from './GameClearModal'
 import {
   SuccessEffect,
   SUCCESS_DURATION_MS,
@@ -101,6 +102,9 @@ export function GameScreen() {
   const openShop = useCallback(() => setShopOpen(true), [])
   const closeShop = useCallback(() => setShopOpen(false), [])
 
+  // 게임 클리어(승리) — 최종 검(다음 단계 없음)에 도달하면 축하 모달을 띄운다.
+  const [cleared, setCleared] = useState(false)
+
   // 판매 코인 연출의 출발점(검 박스)·도착점(골드창) 측정용 ref.
   const swordBoxRef = useRef<HTMLDivElement>(null)
   const goldRef = useRef<HTMLDivElement>(null)
@@ -140,19 +144,24 @@ export function GameScreen() {
   const handleFulfill = (commission: Commission, originEl: HTMLElement | null) => {
     // 생명주기·검 소모는 store 가 소유 — 수락(true)일 때만 연출을 띄운다.
     if (!useCommissionStore.getState().fulfill(commission.id)) return
-    // 보상 획득 '짤랑' 효과음 — 판매와 동일(둘 다 검을 내주고 골드를 받는 순간).
+    // 보상 획득 '짤랑' 효과음 — 판매와 동일(검·재료를 내주고 보상을 받는 순간).
     sound.playSfx('item_sold')
-    // 출발점을 못 받았으면 코인 비행만 생략한다(골드 펄스·획득 텍스트는 그대로). rect 는 언마운트 전(동기)에 읽어 유효.
-    if (originEl) {
-      commissionCoinKey.current += 1
-      setCommissionCoin({
-        id: commissionCoinKey.current,
-        rect: originEl.getBoundingClientRect(),
-        coinCount: coinCount(commission.reward),
-      })
+    // 골드 보상일 때만 코인 비행·골드 펄스·획득 텍스트 연출. 아이템 보상(물물교환)은 인벤토리로
+    // 들어가므로 골드 연출을 띄우지 않는다(reward.kind 로 분기 — reward 는 Material).
+    if (commission.reward.kind === 'gold') {
+      const amount = commission.reward.amount
+      // 출발점을 못 받았으면 코인 비행만 생략한다(골드 펄스·획득 텍스트는 그대로). rect 는 언마운트 전(동기)에 읽어 유효.
+      if (originEl) {
+        commissionCoinKey.current += 1
+        setCommissionCoin({
+          id: commissionCoinKey.current,
+          rect: originEl.getBoundingClientRect(),
+          coinCount: coinCount(amount),
+        })
+      }
+      setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(amount) }))
+      showGoldGain(amount)
     }
-    setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(commission.reward) }))
-    showGoldGain(commission.reward)
   }
 
   const handleSell = () => {
@@ -214,6 +223,9 @@ export function GameScreen() {
         })
       }
       lockEnhance()
+      // 최종 검(다음 단계 없음)에 도달하면 게임 클리어. id 하드코딩 대신 nextId === null 로 판별해
+      // 최고 단계가 바뀌어도 자동 동작한다. 성공 분출 연출과 함께 축하 모달을 띄운다.
+      if (next && next.nextId === null) setCleared(true)
     } else if (result.outcome === 'destroyed') {
       // 파괴 폭발 효과음 — 떨림(0.4s)이 끝나 폭발이 터지는 순간에 맞춰 울린다('캉!' 직후가 아닌 분출 시점).
       sound.playSfx('enchant_destroyed', { delayMs: SHAKE_SEC * 1000 })
@@ -334,7 +346,7 @@ export function GameScreen() {
       <div className="relative w-full max-w-5xl rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5">
         <TopControls onOpenShop={openShop} />
 
-        {/* 상단 의뢰 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
+        {/* 상단 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
         <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={!shopOpen} />
 
         {/* 모바일(<sm)은 단일 컬럼으로 스택 — 좁은 화면에서 고정폭 검 스테이지가
@@ -468,6 +480,7 @@ export function GameScreen() {
 
       {/* 상점 팝업 (전체 화면 오버레이 — 열렸을 때만 렌더) */}
       <ShopModal open={shopOpen} onClose={closeShop} />
+      <GameClearModal open={cleared} onClose={() => setCleared(false)} />
     </div>
   )
 }

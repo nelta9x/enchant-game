@@ -3,8 +3,11 @@
     "id": "sword_0",
     "level": 0,
     "nextId": "sword_1",
-    "enhanceCost": { "kind": "gold", "amount": 300 },
-    "successRate": 1.0,
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 300
+    },
+    "successRate": 1,
     "sellPrice": null,
     "protectionTickets": 0,
     "sprite": "rusty_dagger.png"
@@ -13,9 +16,12 @@
     "id": "sword_1",
     "level": 1,
     "nextId": "sword_2",
-    "enhanceCost": { "kind": "gold", "amount": 300 },
-    "successRate": 1.0,
-    "sellPrice": 150,
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 300
+    },
+    "successRate": 0.99,
+    "sellPrice": 200,
     "protectionTickets": 0,
     "sprite": "decent_dagger.png"
   },
@@ -23,9 +29,12 @@
     "id": "sword_2",
     "level": 2,
     "nextId": "sword_3",
-    "enhanceCost": { "kind": "gold", "amount": 500 },
-    "successRate": 1.0,
-    "sellPrice": 400,
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 500
+    },
+    "successRate": 0.97,
+    "sellPrice": 500,
     "protectionTickets": 0,
     "sprite": "sturdy_dagger.png"
   },
@@ -33,9 +42,12 @@
     "id": "sword_3",
     "level": 3,
     "nextId": "sword_4",
-    "enhanceCost": { "kind": "gold", "amount": 500 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 500
+    },
     "successRate": 0.95,
-    "sellPrice": 600,
+    "sellPrice": 1000,
     "protectionTickets": 0,
     "sprite": "viking_sword.png"
   },
@@ -43,7 +55,10 @@
     "id": "sword_4",
     "level": 4,
     "nextId": "sword_5",
-    "enhanceCost": { "kind": "gold", "amount": 1000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 1000
+    },
     "successRate": 0.95,
     "sellPrice": 800,
     "protectionTickets": 0,
@@ -53,7 +68,10 @@
     "id": "sword_5",
     "level": 5,
     "nextId": "sword_6",
-    "enhanceCost": { "kind": "gold", "amount": 1500 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 1500
+    },
     "successRate": 0.9,
     "sellPrice": 1600,
     "protectionTickets": 0,
@@ -63,128 +81,197 @@
     "id": "sword_6",
     "level": 6,
     "nextId": "sword_7",
-    "enhanceCost": { "kind": "gold", "amount": 2000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 2000
+    },
     "successRate": 0.9,
     "sellPrice": 3500,
     "protectionTickets": 1,
-    "dropOnFail": { "itemId": "iron_scrap", "count": 1 },
+    "dropOnFail": {
+      "itemId": "iron_scrap",
+      "count": 1
+    },
     "sprite": "double_edged_sword.png"
   },
   {
     "id": "sword_7",
     "level": 7,
     "nextId": "sword_8",
-    "enhanceCost": { "kind": "gold", "amount": 2000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 2000
+    },
     "successRate": 0.9,
     "sellPrice": 6100,
     "protectionTickets": 1,
-    "dropOnFail": { "itemId": "iron_scrap", "count": 1 },
+    "dropOnFail": {
+      "itemId": "iron_scrap",
+      "count": 1
+    },
     "sprite": "judicators_greatsword.png"
   },
   {
     "id": "sword_8",
     "level": 8,
     "nextId": "sword_9",
-    "enhanceCost": { "kind": "gold", "amount": 3000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 3000
+    },
     "successRate": 0.85,
     "sellPrice": 10000,
     "protectionTickets": 1,
-    "dropOnFail": { "itemId": "iron_scrap", "count": 1 },
+    "dropOnFail": {
+      "itemId": "iron_scrap",
+      "count": 1
+    },
     "sprite": "arcane_sword.png"
   },
   {
     "id": "sword_9",
     "level": 9,
     "nextId": "sword_10",
-    "enhanceCost": { "kind": "gold", "amount": 5000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 5000
+    },
     "successRate": 0.8,
     "sellPrice": 20000,
     "protectionTickets": 1,
-    "dropOnFail": { "itemId": "iron_scrap", "count": 2 },
+    "dropOnFail": {
+      "itemId": "iron_scrap",
+      "count": 2
+    },
     "sprite": "tau_sword.png"
   },
   {
     "id": "sword_10",
     "level": 10,
     "nextId": "sword_11",
-    "enhanceCost": { "kind": "gold", "amount": 10900 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 10900
+    },
     "successRate": 0.8,
     "sellPrice": 35100,
     "protectionTickets": 1,
-    "dropOnFail": { "itemId": "faded_fluorescent", "count": 1 },
+    "dropOnFail": {
+      "itemId": "faded_fluorescent",
+      "count": 1
+    },
     "sprite": "fluorescent_sword.png"
   },
   {
     "id": "sword_11",
     "level": 11,
     "nextId": "sword_12",
-    "enhanceCost": { "kind": "gold", "amount": 20000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 20000
+    },
     "successRate": 0.75,
     "sellPrice": 160000,
     "protectionTickets": 1,
-    "dropOnFail": { "itemId": "iron_scrap", "count": 5 },
+    "dropOnFail": {
+      "itemId": "iron_scrap",
+      "count": 5
+    },
     "sprite": "bloodstained_sword.png"
   },
   {
     "id": "sword_12",
     "level": 12,
     "nextId": "sword_13",
-    "enhanceCost": { "kind": "gold", "amount": 35000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 35000
+    },
     "successRate": 0.7,
     "sellPrice": 350000,
     "protectionTickets": 1,
-    "dropOnFail": { "itemId": "iron_scrap", "count": 5 },
+    "dropOnFail": {
+      "itemId": "iron_scrap",
+      "count": 5
+    },
     "sprite": "flame_twin_swords.png"
   },
   {
     "id": "sword_13",
     "level": 13,
     "nextId": "sword_14",
-    "enhanceCost": { "kind": "gold", "amount": 55000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 55000
+    },
     "successRate": 0.7,
     "sellPrice": 1000000,
     "protectionTickets": 2,
-    "dropOnFail": { "itemId": "flame_sword_handle", "count": 1 },
+    "dropOnFail": {
+      "itemId": "flame_sword_handle",
+      "count": 1
+    },
     "sprite": "blazing_demon_blade.png"
   },
   {
     "id": "sword_14",
     "level": 14,
     "nextId": "sword_15",
-    "enhanceCost": { "kind": "gold", "amount": 100000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 100000
+    },
     "successRate": 0.65,
     "sellPrice": 3000000,
     "protectionTickets": 3,
-    "dropOnFail": { "itemId": "dark_matter", "count": 1 },
+    "dropOnFail": {
+      "itemId": "dark_matter",
+      "count": 1
+    },
     "sprite": "apophis_the_demon_sword.png"
   },
   {
     "id": "sword_15",
     "level": 15,
     "nextId": "sword_16",
-    "enhanceCost": { "kind": "gold", "amount": 180000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 180000
+    },
     "successRate": 0.6,
     "sellPrice": 7500000,
     "protectionTickets": 4,
-    "dropOnFail": { "itemId": "iron_scrap", "count": 15 },
+    "dropOnFail": {
+      "itemId": "iron_scrap",
+      "count": 15
+    },
     "sprite": "demon_battle_axe.png"
   },
   {
     "id": "sword_16",
     "level": 16,
     "nextId": "sword_17",
-    "enhanceCost": { "kind": "gold", "amount": 300000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 300000
+    },
     "successRate": 0.6,
     "sellPrice": 14200000,
     "protectionTickets": 7,
-    "dropOnFail": { "itemId": "iron_scrap", "count": 20 },
+    "dropOnFail": {
+      "itemId": "iron_scrap",
+      "count": 20
+    },
     "sprite": "invisible_sword.png"
   },
   {
     "id": "sword_17",
     "level": 17,
     "nextId": "sword_18",
-    "enhanceCost": { "kind": "gold", "amount": 300000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 300000
+    },
     "successRate": 0.55,
     "sellPrice": 20000000,
     "protectionTickets": 9,
@@ -194,7 +281,10 @@
     "id": "sword_18",
     "level": 18,
     "nextId": "sword_19",
-    "enhanceCost": { "kind": "gold", "amount": 500000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 500000
+    },
     "successRate": 0.5,
     "sellPrice": 30000000,
     "protectionTickets": 10,
@@ -204,7 +294,10 @@
     "id": "sword_19",
     "level": 19,
     "nextId": "sword_20",
-    "enhanceCost": { "kind": "gold", "amount": 800000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 800000
+    },
     "successRate": 0.5,
     "sellPrice": 47500000,
     "protectionTickets": 12,
@@ -215,7 +308,10 @@
     "id": "sword_20",
     "level": 20,
     "nextId": "sword_21",
-    "enhanceCost": { "kind": "gold", "amount": 1500000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 1500000
+    },
     "successRate": 0.45,
     "sellPrice": 68300000,
     "protectionTickets": 15,
@@ -255,7 +351,11 @@
     "id": "sword_23",
     "level": 23,
     "nextId": "sword_24",
-    "enhanceCost": { "kind": "item", "itemId": "iron_scrap", "count": 80 },
+    "enhanceCost": {
+      "kind": "item",
+      "itemId": "iron_scrap",
+      "count": 80
+    },
     "successRate": 0.4,
     "sellPrice": 230000000,
     "protectionTickets": 22,
@@ -279,7 +379,11 @@
     "id": "sword_25",
     "level": 25,
     "nextId": "sword_26",
-    "enhanceCost": { "kind": "item", "itemId": "iron_scrap", "count": 225 },
+    "enhanceCost": {
+      "kind": "item",
+      "itemId": "iron_scrap",
+      "count": 225
+    },
     "successRate": 0.35,
     "sellPrice": 400000000,
     "protectionTickets": 23,
@@ -289,43 +393,62 @@
     "id": "sword_26",
     "level": 26,
     "nextId": "sword_27",
-    "enhanceCost": { "kind": "gold", "amount": 5000000 },
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 5000000
+    },
     "successRate": 0.5,
     "sellPrice": 1800000000,
     "protectionTickets": "disabled",
-    "notes": ["easyBug"],
     "sprite": "medusa.png"
   },
   {
     "id": "sword_27",
     "level": 27,
     "nextId": "sword_28",
-    "enhanceCost": { "kind": "item", "itemId": "iron_scrap", "count": 40 },
+    "enhanceCost": {
+      "kind": "item",
+      "itemId": "iron_scrap",
+      "count": 40
+    },
     "successRate": 0.4,
     "sellPrice": 2500000000,
     "protectionTickets": "disabled",
-    "notes": ["easyBug"],
     "sprite": "odyssey_sword.png"
   },
   {
     "id": "sword_28",
     "level": 28,
     "nextId": "sword_29",
-    "enhanceCost": { "kind": "free" },
+    "enhanceCost": {
+      "kind": "free"
+    },
     "successRate": 0.15,
     "sellPrice": null,
     "protectionTickets": "disabled",
-    "notes": ["easyBug"],
     "sprite": "mosaikal.png"
   },
   {
     "id": "sword_29",
     "level": 29,
+    "nextId": "sword_30",
+    "enhanceCost": {
+      "kind": "gold",
+      "amount": 10000000
+    },
+    "successRate": 0.5,
+    "sellPrice": null,
+    "protectionTickets": "disabled",
+    "sprite": "flame_tempered_sword.png"
+  },
+  {
+    "id": "sword_30",
+    "level": 30,
     "nextId": null,
     "enhanceCost": null,
     "successRate": null,
     "sellPrice": null,
     "protectionTickets": 0,
-    "sprite": "flame_tempered_sword.png"
+    "sprite": "divine_rapier.png"
   }
 ]

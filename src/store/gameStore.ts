@@ -4,15 +4,11 @@ import type { Material, ShopItem } from '../data/types'
 import { Enhancer, type EnhanceInput } from '../game/enhancer'
 import type { EnhanceResult, ItemStack, PlayerState } from '../game/types'
 import { countOf } from '../lib/items'
-import { applyXpDelta } from './commissionProgress'
 
-// 시작 자금 / 시작 검. 시작 자금은 사용자 지정값(100만). 시작 검 획득 방식 등 나머지
-// '게임 시작 설정'은 디자인 미확정이며, 밸런스 확정 시 이 값은 조정될 수 있다.
-export const INITIAL_GOLD = 1_000_000
+// 시작 자금 / 시작 검. 시작 자금은 사용자 지정값(10만) — 새 플레이어가 의뢰 첫 골드 버킷(보유 50만 미만)에서
+// 시작하도록 한다. 시작 검 획득 방식 등 나머지 '게임 시작 설정'은 디자인 미확정이며 조정될 수 있다.
+export const INITIAL_GOLD = 100_000
 export const INITIAL_SWORD_ID = 'sword_0'
-// 의뢰 진행도 시작값(1레벨, 경험치 0). 모든 의뢰 진행은 여기서 시작한다.
-export const INITIAL_COMMISSION_LEVEL = 1
-export const INITIAL_COMMISSION_XP = 0
 
 type GameActions = {
   // 강화 가능 여부(전제조건 충족). UI 버튼 게이팅용.
@@ -49,15 +45,12 @@ type GameActions = {
   // 남은 pendingDrops 전체를 items 로 합산하고 비운다(연출 종료 시 미수집분 유실 방지). 멱등 —
   // 대기분이 없으면 무변화라 종료 트리거가 여러 번 와도 안전하다.
   flushDrops: () => void
-  // 의뢰 완료 가능 여부(요구 검을 가방에 보유했거나 현재 장착 중). 의뢰 카드 게이팅용.
-  canFulfill: (swordId: string) => boolean
-  // 의뢰 완료: 요구 검 1개를 소모하고 reward 골드를 지급한다(가방 우선 → 없으면 장착 검).
-  // reward 는 의뢰가 생성 시 freeze 한 값을 그대로 받는다(store 에서 재계산하지 않는다 — 단일 출처).
-  // 완료 성공이면 true, 미보유면 false(아무 변화 없음).
-  fulfillCommission: (swordId: string, reward: number) => boolean
-  // 의뢰 경험치 증감(+완료 / -만료). DataManager 의 레벨 정의로 레벨업/레벨다운을 적용한다(commissionProgress).
-  // 셸(commissionStore)이 완료/만료 시 호출한다 — XP/레벨 변경은 PlayerState 라 gameStore 가 소유한다.
-  applyCommissionXp: (delta: number) => void
+  // 거래 성사 가능 여부(비용을 지불할 수 있는가). 비용이 골드면 보유 골드, 아이템이면 가방 수량(또는 검이면 장착 중·수량 1). 카드 게이팅용.
+  canFulfill: (cost: Material) => boolean
+  // 거래 성사: 비용(cost)을 지불하고 보상(reward)을 지급한다. 비용이 골드면 골드 차감, 아이템이면 가방 우선(→ 검이면 장착 검) 소모.
+  // cost·reward 는 거래 생성 시 freeze 한 Material — store 에서 재계산하지 않는다(단일 출처).
+  // 성사 성공이면 true, 지불 불가면 false(아무 변화 없음).
+  fulfillCommission: (cost: Material, reward: Material) => boolean
 }
 
 export type GameState = PlayerState & GameActions
@@ -68,8 +61,6 @@ type CreateOpts = {
   gold?: number
   currentSwordId?: string | null
   items?: ItemStack[]
-  commissionLevel?: number
-  commissionXp?: number
 }
 
 // 불변 차감: removals 수량만큼 빼고, 0 이하가 된 슬롯은 제거한다.
@@ -175,8 +166,6 @@ export function createGameStore(opts: CreateOpts = {}) {
           : INITIAL_SWORD_ID,
       items: opts.items ?? [],
       pendingDrops: [],
-      commissionLevel: opts.commissionLevel ?? INITIAL_COMMISSION_LEVEL,
-      commissionXp: opts.commissionXp ?? INITIAL_COMMISSION_XP,
 
       canEnhance: (useProtection) => {
         const input = buildInput(useProtection)
@@ -322,43 +311,66 @@ export function createGameStore(opts: CreateOpts = {}) {
         )
       },
 
-      canFulfill: (swordId) =>
-        countOf(get().items, swordId) > 0 || get().currentSwordId === swordId,
-
-      fulfillCommission: (swordId, reward) => {
-        const state = get()
-        // 가방 우선: 가방에 있으면 거기서 1개 차감하고 장착 슬롯은 건드리지 않는다.
-        if (countOf(state.items, swordId) > 0) {
-          set({
-            gold: state.gold + reward,
-            items: subtractItems(state.items, [{ itemId: swordId, count: 1 }]),
-          })
-          return true
-        }
-        // 가방에 없고 현재 장착 검이 요구 검이면 그것을 소모하고 낡은 단검(+0)으로 재시작한다
-        // (판매·파괴와 동일 규칙). 가방 검은 자동 장착하지 않고 그대로 둔다 — 보관 검의 의도치 않은 강화 방지.
-        if (state.currentSwordId === swordId) {
-          set({
-            gold: state.gold + reward,
-            currentSwordId: INITIAL_SWORD_ID,
-          })
-          return true
-        }
-        return false // 미보유 — 변화 없음
+      canFulfill: (cost) => {
+        const s = get()
+        if (cost.kind === 'gold') return s.gold >= cost.amount
+        if (cost.kind === 'item')
+          return (
+            countOf(s.items, cost.itemId) >= cost.count ||
+            (cost.count === 1 && s.currentSwordId === cost.itemId)
+          )
+        return true // free(비용 없음) — 방어
       },
 
-      applyCommissionXp: (delta) => {
-        // 레벨 정의는 DataManager 단일 출처에서 읽어 순수 reducer 에 주입한다.
-        const levels = dataManager.getCommissionConfig().levels
-        set((state) => {
-          const next = applyXpDelta(
-            state.commissionLevel,
-            state.commissionXp,
-            delta,
-            levels,
-          )
-          return { commissionLevel: next.level, commissionXp: next.xp }
-        })
+      fulfillCommission: (cost, reward) => {
+        const state = get()
+        // 보상(Material) 지급을 items/gold 에 반영한 상태 조각을 만든다(비용 차감과 합성).
+        const grant = (
+          items: readonly ItemStack[],
+          gold: number,
+        ): { items: ItemStack[]; gold: number } => {
+          if (reward.kind === 'gold')
+            return { items: items.map((i) => ({ ...i })), gold: gold + reward.amount }
+          if (reward.kind === 'item')
+            return {
+              items: addItems(items, [
+                { itemId: reward.itemId, count: reward.count },
+              ]),
+              gold,
+            }
+          return { items: items.map((i) => ({ ...i })), gold } // free
+        }
+
+        // 골드 비용(골드로 구매): 보유 골드로 지불하고 보상을 지급한다(가방/검 무관).
+        if (cost.kind === 'gold') {
+          if (state.gold < cost.amount) return false
+          set(grant(state.items, state.gold - cost.amount))
+          return true
+        }
+
+        // 아이템 비용(납품): 가방 우선 → 없으면 장착 검(수량 1). 기존 경로 유지.
+        if (cost.kind === 'item') {
+          // 가방 우선: count 개 이상 보유하면 거기서 차감하고 장착 슬롯은 건드리지 않는다.
+          // 재료(철조각·형광물질 등)는 항상 이 경로로 처리된다(가방에만 존재).
+          if (countOf(state.items, cost.itemId) >= cost.count) {
+            set(
+              grant(
+                subtractItems(state.items, [
+                  { itemId: cost.itemId, count: cost.count },
+                ]),
+                state.gold,
+              ),
+            )
+            return true
+          }
+          // 가방에 없고 현재 장착 검이 요구 검이면(수량 1) 그것을 소모하고 낡은 단검(+0)으로 재시작한다
+          // (판매·파괴와 동일 규칙). 재료 itemId 는 currentSwordId 와 일치할 수 없어 이 분기를 타지 않는다.
+          if (cost.count === 1 && state.currentSwordId === cost.itemId) {
+            set({ ...grant(state.items, state.gold), currentSwordId: INITIAL_SWORD_ID })
+            return true
+          }
+        }
+        return false // 지불 불가 — 변화 없음
       },
     }
   })
