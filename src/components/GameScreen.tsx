@@ -402,7 +402,15 @@ export function GameScreen() {
           가운데 정렬하고, bg-stage 가 화면 전체를 덮어 양옆 여백도 베이지(검정 없음). 미디어쿼리(lg)는
           초기 16px 기준이라 스케일과 무관하게 1024px 에서 고정 — <lg 는 세로 단일 컬럼(16px). */}
       <div className="relative flex w-full flex-col rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5 lg:min-h-svh lg:rounded-none lg:border-0 lg:px-0">
-        <TopControls onOpenShop={openShop} />
+        {/* 상단 컨트롤은 아래 메인 그리드와 같은 폭으로 가운데 정렬한다. 그리드는 full-width 안에서
+            lg:grid-cols-[16rem_28rem_16rem] + gap-4(0.25rem×4=1rem, 갭 2개) = 62rem 만 justify-center 로
+            가운데에 쓰는데, TopControls 만 full-width 라 상단바가 좌우로 더 넓게 튀어나와 보였다(불일치).
+            여기서 같은 62rem 밴드(mx-auto)로 묶어 언어토글·게이지·상점 줄이 인벤토리/강화 패널의 좌우 끝과
+            정렬되게 한다. bg-stage(베이지)는 바깥 div 가 계속 full-width 로 깐다. 62rem 은 위 그리드 컬럼
+            합과 동기화할 것 — 컬럼/갭을 바꾸면 이 값도 함께 고친다. <lg(세로형)은 그대로 full-width. */}
+        <div className="lg:mx-auto lg:w-full lg:max-w-[62rem]">
+          <TopControls onOpenShop={openShop} />
+        </div>
 
         {/* 상단 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
         <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={!shopOpen} />
