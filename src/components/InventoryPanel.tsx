@@ -87,9 +87,9 @@ export function InventoryPanel({
 function EquippedRow({ sword, level }: { sword: SwordData; level: number }) {
   const t = useT()
   return (
-    <li className="flex h-14 shrink-0 items-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5">
+    <li className="flex h-14 shrink-0 items-center justify-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5">
       <SpriteThumb src={swordSpriteUrl(sword.sprite)} alt={t(sword.nameKey)} />
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-1.5">
         <span className="truncate text-sm font-semibold text-on-dark">
           {t(sword.nameKey)}
         </span>
@@ -117,7 +117,7 @@ function ItemRow({
   // 검·아이템 스프라이트·토큰 폴백 규약은 ItemIcon 한 곳에 둔다(잡템도 전용 스프라이트가 있으면 표시).
   const thumb = <ItemIcon itemId={item.itemId} alt={name} className="h-10 w-10" />
   const label = (
-    <div className="min-w-0 flex-1 text-left">
+    <div className="min-w-0 text-left">
       <span className="truncate text-sm font-medium text-on-dark">{name}</span>
       {lvl !== null && (
         <span className="ml-1.5 text-xs font-bold tabular-nums text-on-dark-soft">
@@ -142,7 +142,7 @@ function ItemRow({
           type="button"
           onClick={() => onEquip(item.itemId)}
           aria-label={`${t('action.equip')}: ${name}`}
-          className="flex h-14 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 hover:bg-panel-soft/60"
+          className="flex h-14 w-full cursor-pointer items-center justify-center gap-2.5 rounded-md px-2.5 hover:bg-panel-soft/60"
         >
           {thumb}
           {label}
@@ -154,7 +154,7 @@ function ItemRow({
 
   // 검이 아닌 아이템(파괴보호장치·잡템)은 정적 표시(클릭 동작 없음).
   return (
-    <li className="flex h-14 shrink-0 items-center gap-2.5 rounded-md px-2.5">
+    <li className="flex h-14 shrink-0 items-center justify-center gap-2.5 rounded-md px-2.5">
       {thumb}
       {label}
       {count}

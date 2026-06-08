@@ -359,9 +359,8 @@ export function GameScreen() {
             겹치므로, 전환 기준을 lg(1024)로 둔다(성공률을 검 오른쪽으로 옮기는 lg 기준과도 일치). */}
         <div className="mt-3 grid grid-cols-1 gap-4 lg:min-h-[34rem] lg:grid-cols-[minmax(9.5rem,13rem)_minmax(0,1fr)_minmax(11rem,13rem)]">
           {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음).
-              세로형(<lg)에선 full-width 로 너무 넓어 보이므로 max-w-md 로 좁혀 가운데 정렬(의뢰 바와 동일 폭),
-              lg+(3열)에선 컬럼을 채운다. */}
-          <div className="mx-auto flex w-full min-h-0 max-w-md flex-col lg:max-w-none">
+              세로형(<lg)에선 강화 버튼처럼 컬럼 폭을 꽉 채우고, lg+(3열)에선 컬럼을 채운다. */}
+          <div className="flex w-full min-h-0 flex-col">
             {/* ref: 파괴 드롭이 빨려 들어갈 도착점 측정용 — 패널이 콘텐츠 높이로 줄어드므로
                 컬럼 전체가 아니라 패널 자체를 감싸 드롭이 빈칸이 아닌 보이는 인벤토리로 들어가게 한다. */}
             <div ref={inventoryRef}>
