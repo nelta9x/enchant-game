@@ -358,7 +358,7 @@ export function GameScreen() {
         {/* 좁은 화면(<lg)은 단일 컬럼으로 세로 스택 — 3열은 고정폭 검 스테이지(검 박스 240·이름 배너 320)가
             들어갈 만큼 넓을 때만 쓴다. sm(640) 기준이면 640~1024 구간에서 가운데 트랙이 눌려 좌우 패널과
             겹치므로, 전환 기준을 lg(1024)로 둔다(성공률을 검 오른쪽으로 옮기는 lg 기준과도 일치). */}
-        <div className="mt-3 grid grid-cols-1 gap-4 lg:min-h-[34rem] lg:flex-1 lg:grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)_minmax(11rem,16rem)]">
+        <div className="mt-3 grid grid-cols-1 gap-4 lg:min-h-[34rem] lg:flex-1 lg:grid-cols-[minmax(11rem,16rem)_minmax(25rem,1fr)_minmax(11rem,16rem)]">
           {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음).
               세로형(<lg)에선 강화 버튼처럼 컬럼 폭을 꽉 채우고, lg+(3열)에선 컬럼을 채운다. */}
           <div className="flex w-full min-h-0 flex-col lg:justify-center">

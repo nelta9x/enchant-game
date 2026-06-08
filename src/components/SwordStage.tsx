@@ -86,7 +86,7 @@ export function SwordStage({
       {/* 검 + 글로우 + 마법진 */}
       <div
         ref={swordBoxRef}
-        className="relative flex h-52 w-52 items-center justify-center sm:h-60 sm:w-60"
+        className="relative flex h-52 w-52 items-center justify-center sm:h-60 sm:w-60 lg:h-[clamp(15rem,20vw,24rem)] lg:w-[clamp(15rem,20vw,24rem)]"
       >
         {/* 따뜻한 골드 글로우 */}
         <div
@@ -157,7 +157,7 @@ export function SwordStage({
               <img
                 src={swordSpriteUrl(sword.sprite)}
                 alt={t(sword.nameKey)}
-                className="h-36 w-36 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] sm:h-40 sm:w-40"
+                className="h-36 w-36 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] sm:h-40 sm:w-40 lg:h-[clamp(10rem,13.3vw,16rem)] lg:w-[clamp(10rem,13.3vw,16rem)]"
                 style={{ imageRendering: 'pixelated' }}
                 draggable={false}
               />
