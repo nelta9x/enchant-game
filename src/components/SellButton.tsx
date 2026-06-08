@@ -28,7 +28,7 @@ export function SellButton({ disabled, onSell, sellPrice }: SellButtonProps) {
           : 'cursor-pointer border-frame/50 bg-panel text-on-dark hover:opacity-90'
       }`}
     >
-      <span className="text-sm font-bold">{t('action.sell')}</span>
+      <span className="text-xl font-bold">{t('action.sell')}</span>
       {/* 가격 줄은 판매 불가일 때도 invisible 로 항상 자리를 차지해 버튼 높이가 변하지 않게 한다. */}
       <span
         className={`flex items-center justify-center gap-1.5 text-sm font-bold tabular-nums text-on-dark ${
