@@ -70,8 +70,9 @@ export function InventoryPanel({
           화면 크기에 따라 기본 노출 갯수만 달라진다: 세로형(<lg) 2.5행 / 데스크탑(lg 이상) 4.5행.
           마지막 행을 절반만 노출해 "뒤에 더 있다"를 시각적으로 알린다(아이템이 적으면 하단에 빈 공간).
           높이는 box-border 기준 행높이(h-14=56)·갭(gap-1=4)·상단패딩(pt-2=8)에서 유도:
-          2.5행 = 8 + 2×56 + 2×4 + 28(반행) = 156 / 4.5행 = 8 + 4×56 + 4×4 + 28(반행) = 276. */}
-      <ul className="flex h-[156px] flex-col gap-1 overflow-y-auto px-2 pb-2 pt-2 lg:h-[276px]">
+          2.5행 = 8 + 2×56 + 2×4 + 28(반행) = 156px = 9.75rem / 4.5행 = 276px = 17.25rem.
+          (rem 단위라 데스크탑 루트 font-size 스케일과 함께 커진다 — px 고정이면 다른 rem 과 어긋남.) */}
+      <ul className="flex h-[9.75rem] flex-col gap-1 overflow-y-auto px-2 pb-2 pt-2 lg:h-[17.25rem]">
         {equipped && <EquippedRow sword={sword} level={level} />}
         {items.map((it) => (
           <ItemRow key={it.itemId} item={it} t={t} onEquip={onEquip} />
