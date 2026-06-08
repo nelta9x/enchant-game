@@ -22,7 +22,7 @@ export function SellButton({ disabled, onSell, sellPrice }: SellButtonProps) {
       type="button"
       onClick={onSell}
       disabled={disabled}
-      className={`flex w-full flex-col items-center gap-0.5 rounded-lg border px-3 py-2 transition-opacity ${
+      className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-opacity ${
         disabled
           ? 'cursor-not-allowed border-panel-edge bg-panel text-on-dark-soft opacity-40'
           : 'cursor-pointer border-frame/50 bg-panel text-on-dark hover:opacity-90'

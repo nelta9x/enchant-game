@@ -42,7 +42,7 @@ export function InventoryPanel({
   const count = (equipped ? 1 : 0) + items.length
 
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-panel-edge bg-panel">
+    <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-panel-edge bg-panel lg:h-full">
       <div className="flex items-center justify-between border-b border-panel-edge px-3 py-2">
         <span className="text-sm font-bold text-on-dark">
           {t('inventory.title')}
@@ -66,14 +66,12 @@ export function InventoryPanel({
         />
       </div>
 
-      {/* 목록은 고정 높이 UI — 아이템 수와 무관하게 크기가 변하지 않아(추가해도 주변 UI가 안 밀린다),
-          화면 크기에 따라 기본 노출 갯수만 달라진다: 세로형(<lg) 2.5행 / 데스크탑 3열(lg 이상) 4.5행.
-          (레이아웃 전환 기준 lg 와 맞춰, 세로 스택일 땐 인벤토리도 컴팩트하게.)
-          마지막 행을 절반만 노출해 "뒤에 더 있다"를 시각적으로 알린다(아이템이 적으면 하단에 빈 공간).
-          높이는 box-border 기준 행높이(h-14=56) · 갭(gap-1=4) · 상단패딩(pt-2=8)에서 유도:
-          2.5행 = 8 + 2×56 + 2×4 + 28(반행) = 156 / 4.5행 = 8 + 4×56 + 4×4 + 28(반행) = 276.
-          (행높이/갭을 바꾸면 이 두 값도 같이 고쳐야 한다.) */}
-      <ul className="flex h-[156px] flex-col gap-1 overflow-y-auto px-2 pb-2 pt-2 lg:h-[276px]">
+      {/* 목록은 아이템 수와 무관하게 크기가 변하지 않는다(추가해도 주변 UI가 안 밀린다) — 높이는
+          화면이 정하고, 넘치면 스크롤된다. 세로형(<lg)은 고정 2.5행(컴팩트), 데스크탑(lg 이상)은
+          컬럼을 꽉 채워(flex-1) 화면 아래까지 늘어난다. 아이템이 적으면 하단에 빈 공간, 많으면 스크롤.
+          세로형 2.5행 높이는 box-border 기준 행높이(h-14=56)·갭(gap-1=4)·상단패딩(pt-2=8)에서 유도:
+          2.5행 = 8 + 2×56 + 2×4 + 28(반행) = 156. (행높이/갭을 바꾸면 이 값도 같이 고쳐야 한다.) */}
+      <ul className="flex h-[156px] flex-col gap-1 overflow-y-auto px-2 pb-2 pt-2 lg:h-auto lg:min-h-0 lg:flex-1">
         {equipped && <EquippedRow sword={sword} level={level} />}
         {items.map((it) => (
           <ItemRow key={it.itemId} item={it} t={t} onEquip={onEquip} />
