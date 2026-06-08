@@ -344,11 +344,11 @@ export function GameScreen() {
   // <lg(세로형)에선 베젤 프레임을 유지한다.
   return (
     <div className="flex min-h-svh items-center justify-center overflow-auto bg-bezel p-3 sm:p-6 lg:p-0">
-      {/* 카드는 창 폭을 따라 늘어난다(리플로우) — 폭 상한 없음. lg+ 3열에서 가운데(검) 트랙은 고정폭이고
-          남는 폭은 좌우 패널(인벤토리·강화/판매/보관)이 1fr 로 동등하게(1:1 비율 유지) 흡수한다 —
-          넓은 화면일수록 좌우가 같이 커져 빈 공간을 채운다(가운데는 검+성공률 플로팅이 들어갈 만큼만 고정).
-          lg+ 에선 세로로도 뷰포트를 꽉 채우고(min-h-svh) 모서리·테두리를 없애 bg-stage 가 화면 전체를 덮는다
-          (검정 빈 공간 제거). <lg 세로형에선 어차피 w-full 이라 가로 동작 동일. */}
+      {/* 카드는 창 폭을 따라 늘어난다(리플로우) — 폭 상한 없음. lg+ 3열에서 좌우 패널은 고정폭(인벤토리·
+          강화/판매/보관)이고 남는 폭은 가운데(검) 트랙이 흡수한다 — 넓은 화면일수록 가운데가 넓어져
+          검 주위에 여백이 생긴다(좌우 그룹은 양옆에 붙고, 가운데는 여유 공간). 좌우 그룹은 컬럼 높이에서
+          세로 중앙 정렬(꽉 채우지 않음). lg+ 에선 세로로도 뷰포트를 꽉 채우고(min-h-svh) 모서리·테두리를
+          없애 bg-stage 가 화면 전체를 덮는다. <lg 세로형에선 어차피 w-full 이라 가로 동작 동일. */}
       <div className="relative flex w-full flex-col rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5 lg:min-h-svh lg:rounded-none lg:border-0 lg:px-16">
         <TopControls onOpenShop={openShop} />
 
@@ -358,13 +358,13 @@ export function GameScreen() {
         {/* 좁은 화면(<lg)은 단일 컬럼으로 세로 스택 — 3열은 고정폭 검 스테이지(검 박스 240·이름 배너 320)가
             들어갈 만큼 넓을 때만 쓴다. sm(640) 기준이면 640~1024 구간에서 가운데 트랙이 눌려 좌우 패널과
             겹치므로, 전환 기준을 lg(1024)로 둔다(성공률을 검 오른쪽으로 옮기는 lg 기준과도 일치). */}
-        <div className="mt-3 grid grid-cols-1 gap-4 lg:min-h-[34rem] lg:flex-1 lg:grid-cols-[minmax(9.5rem,1fr)_25rem_minmax(11rem,1fr)]">
+        <div className="mt-3 grid grid-cols-1 gap-4 lg:min-h-[34rem] lg:flex-1 lg:grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)_minmax(11rem,16rem)]">
           {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음).
               세로형(<lg)에선 강화 버튼처럼 컬럼 폭을 꽉 채우고, lg+(3열)에선 컬럼을 채운다. */}
-          <div className="flex w-full min-h-0 flex-col">
+          <div className="flex w-full min-h-0 flex-col lg:justify-center">
             {/* ref: 파괴 드롭이 빨려 들어갈 도착점 측정용 — 패널을 감싸 드롭이 보이는 인벤토리로 들어가게 한다.
-                lg+(데스크탑)에선 컬럼 높이를 꽉 채워(flex-1) 인벤토리가 화면 아래까지 늘어난다. */}
-            <div ref={inventoryRef} className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+                lg+(데스크탑)에선 컬럼 높이에서 세로 중앙 정렬(고정 높이 박스, 꽉 채우지 않음). */}
+            <div ref={inventoryRef}>
               <InventoryPanel
                 sword={sword}
                 level={sword?.level ?? null}
@@ -378,8 +378,9 @@ export function GameScreen() {
             </div>
           </div>
 
-          {/* 중앙: 검 스테이지 + 결과 연출(오버레이) */}
-          <div className="relative flex items-center justify-center">
+          {/* 중앙: 검 스테이지 + 결과 연출(오버레이). lg+ 에선 검 주위에 여백(패딩)을 둬 좌우 그룹과
+              떨어진 여유 공간을 만든다(넓은 가운데 트랙 + 패딩). */}
+          <div className="relative flex items-center justify-center lg:px-10 lg:py-8">
             <SwordStage
               sword={sword}
               level={sword?.level ?? null}
@@ -424,11 +425,10 @@ export function GameScreen() {
           {/* 우: 강화 카드(비용 포함) + 판매 버튼(판매가 포함) + 보관 버튼(세로 중앙).
               보유 골드는 좌측 인벤토리 패널의 별도 섹션으로 옮겼다(화폐 분리). */}
           <div className="flex flex-col items-center justify-center">
-            {/* lg+(데스크탑): 강화 2 : 판매 1 : 보관 1 비율의 행 그리드로 컬럼을 아래까지 채운다 —
-                판매·보관은 강화의 절반 높이(행 사이 갭은 트랙 밖이라 정확히 1/2). items-stretch 로 각
-                버튼이 행 높이만큼 늘어난다(items-center 면 콘텐츠 높이로 줄어 안 채워짐).
-                세로형(<lg)은 일반 flex 스택(콘텐츠 높이). */}
-            <div className="flex w-full flex-col items-center gap-3 lg:grid lg:h-full lg:grid-rows-[2fr_1fr_1fr] lg:items-stretch">
+            {/* 강화/판매/보관을 한 그룹으로 모은다(콘텐츠 높이의 컴팩트 스택, 컬럼을 꽉 채우지 않음).
+                바깥 컬럼이 세로 중앙 정렬하므로 그룹이 컬럼 높이의 가운데에 놓인다. 강화는 비용 칩+큰
+                라벨로 자연히 크고, 판매·보관(작은 패딩)은 그 절반 정도로 작다. */}
+            <div className="flex w-full flex-col items-center gap-3">
               <EnhanceButton
                 disabled={enhanceDisabled}
                 onEnhance={handleEnhance}
