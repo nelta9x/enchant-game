@@ -25,6 +25,17 @@ npm run format     # Prettier 포맷 적용
 npm test           # vitest 테스트
 ```
 
+## 배포 (서버 없이 실행)
+
+`npm run build` 산출물(`dist/`)은 **백엔드·HTTP 서버 없이** 동작한다.
+
+- **로컬 더블클릭** — `dist/index.html` 을 브라우저로 곧바로 열면(`file://`) 실행된다.
+  자산을 상대 경로(`base: './'`)로 참조하고, JS/CSS 를 `index.html` 에 인라인(`vite-plugin-singlefile`)해
+  `file://` 에서 외부 ES 모듈이 CORS 로 막히는 문제를 피한다. 이미지·오디오는 `dist/sprites/`, `dist/audio/`
+  에 상대 경로로 함께 둔다(같은 폴더 구조 유지 필요).
+- **GitHub Pages** — `main` 에 push 하면 `.github/workflows/deploy.yml` 이 빌드 후 자동 배포한다.
+  최초 1회만 리포지토리 **Settings → Pages → Source** 를 **"GitHub Actions"** 로 설정한다.
+
 ## 아키텍처 원칙
 
 - **상수 하드코딩 금지 + 다국어** — UI 문자열·게임 텍스트는 i18n 키로 관리 (`src/i18n`)

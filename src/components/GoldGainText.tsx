@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, type Transition } from 'motion/react'
 import { formatGoldGain } from '../lib/format'
 import { GOLD_GAIN_MS, goldTextSize, hasGoldGlow } from './goldGain'
 import { relativeCenter, type Point } from './coins'
@@ -73,10 +73,10 @@ function GoldGainBurst({
   const glow = hasGoldGlow(amount) // 100만+ 큰 획득은 텍스트 뒤 금색 광채를 함께 띄운다
 
   // 떠오름·페이드 타이밍 — 무리(글로우+텍스트)가 한 몸으로 움직이도록 공유한다.
-  const RISE = {
+  const RISE: Transition = {
     duration: GOLD_GAIN_MS / 1000,
     times: [0, 0.16, 0.72, 1], // ~0.21s~0.94s 동안 또렷이 머문 뒤 페이드(쾌감·인지)
-    ease: ['backOut', 'easeOut', 'easeIn'] as const,
+    ease: ['backOut', 'easeOut', 'easeIn'],
   }
 
   return (

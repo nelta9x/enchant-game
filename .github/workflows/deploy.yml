@@ -1,0 +1,44 @@
+# main 에 push 될 때마다 빌드 후 GitHub Pages 에 배포한다.
+# 산출물(dist)은 base: './' + JS 인라인이라 Pages 하위 경로와 file:// 양쪽에서 동작한다.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # 수동 실행도 허용
+
+# Pages 배포에 필요한 권한(OIDC 토큰 포함).
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 동시에 한 배포만 진행. 진행 중인 실행은 취소하지 않고 큐잉한다(배포 중단 방지).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
