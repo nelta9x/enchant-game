@@ -30,7 +30,7 @@ export const ko = {
 
   // 검 스테이지 스탯
   'stat.protection': '파괴보호장치',
-  'stat.successRate': '성공률',
+  'stat.successRate': '강화 성공률',
   'sword.none': '검 없음',
   'sword.maxLevel': '최종 단계',
 
@@ -41,7 +41,6 @@ export const ko = {
   'commission.title': '거래 제안',
   'commission.reward': '보상',
   'commission.fulfill': '거래 수락',
-  'commission.empty': '제안 대기 중',
   'commission.arrived': '새 거래 제안!',
 
   // 강화 결과 토스트

@@ -60,6 +60,27 @@ export function SwordStage({
       ? formatRate(sword.successRate)
       : t('sword.maxLevel')
 
+  // 강화 성공률 값 색 — 신호등(80%+ 초록 / 55~80% 노랑 / 그 미만 빨강). 표시되는 %(반올림)와
+  // 일치하도록 raw rate 가 아닌 반올림 퍼센트로 분기한다. 최종 단계(null)·검 없음은 기본색.
+  const rateColorClass = (() => {
+    if (!sword || sword.successRate === null) return 'text-ink'
+    const pct = Math.round(sword.successRate * 100)
+    if (pct >= 80) return 'text-rate-high'
+    if (pct >= 55) return 'text-rate-mid'
+    return 'text-rate-low'
+  })()
+
+  // 성공률 스탯 — 외곽(테두리·배경) 없이 텍스트만 둔다. 같은 내용을 두 위치에 쓴다(반응형):
+  // 좁은 화면·모바일은 이름 아래 흐름에, lg+ 에선 검 오른쪽 빈 공간으로. 동시에 보이지 않으므로
+  // (한쪽은 invisible/hidden) 접근성 트리에도 한 번만 노출된다.
+  const successStat = (
+    <Stat
+      label={t('stat.successRate')}
+      value={hasSword ? successText : '—'}
+      valueClassName={rateColorClass}
+    />
+  )
+
   return (
     <div className="flex flex-col items-center gap-5">
       {/* 검 + 글로우 + 마법진 */}
@@ -153,6 +174,13 @@ export function SwordStage({
 
         {/* 보호 결계 전경(하단 뱃지 + 발동 플레어) — 검 위에 그려 필요/보유·상태를 또렷이 드러낸다. */}
         <ProtectionWard {...protection} />
+
+        {/* lg+ 전용: 성공률(외곽 없는 텍스트)을 검 오른쪽 하단의 빈 공간으로 옮긴다. 검 박스를 기준으로
+            배치해 검과 함께 움직이고, 좁은 폭(~lg 미만)에선 갭이 없어 강화 버튼과 겹치므로 숨긴다
+            (그 구간은 아래 흐름상 스탯을 쓴다). */}
+        <div className="absolute bottom-0 left-full hidden lg:block">
+          {successStat}
+        </div>
       </div>
 
       {/* 이름 배너 */}
@@ -172,53 +200,33 @@ export function SwordStage({
         </div>
       </div>
 
-      {/* 스탯 바: 성공률(파괴보호장치는 검을 감싸는 보호 결계로 이동했다 — ProtectionWard). */}
-      <div className="flex items-stretch overflow-hidden rounded-lg border border-parchment-line bg-parchment/85">
-        <Stat
-          icon={<TargetIcon />}
-          label={t('stat.successRate')}
-          value={hasSword ? successText : '—'}
-        />
-      </div>
+      {/* 성공률(외곽 없는 텍스트). lg+ 에선 검 오른쪽으로 옮기되, 여기서는 invisible 로 공간만
+          유지해 컬럼 높이가 그대로라 세로 중앙정렬된 검 위치가 흔들리지 않는다(흐름에서 빼면 검이 재중앙됨). */}
+      <div className="lg:invisible">{successStat}</div>
     </div>
   )
 }
 
+// 성공률 텍스트(외곽 없음) — 라벨 + 값만. 값 색은 신호등 분기를 valueClassName 으로 주입받는다.
+// py 패딩은 흐름상(invisible) 인스턴스의 높이를 유지해 lg 에서 검 위치가 흔들리지 않게 하는
+// 용도로 남긴다(외곽만 사라지고 차지하는 공간은 동일).
 function Stat({
-  icon,
   label,
   value,
+  valueClassName = 'text-ink',
 }: {
-  icon: ReactNode
   label: string
   value: string
+  valueClassName?: string
 }) {
   return (
-    <div className="flex items-center gap-2 px-4 py-2.5">
-      {icon}
-      <div className="flex flex-col items-start leading-tight">
-        <span className="text-[11px] font-medium text-ink-soft">{label}</span>
-        <span className="text-base font-bold tabular-nums text-ink">
-          {value}
-        </span>
-      </div>
+    <div className="flex flex-col items-center px-4 py-2.5 leading-tight">
+      <span className="whitespace-nowrap text-[11px] font-medium text-ink-soft">
+        {label}
+      </span>
+      <span className={`text-base font-bold tabular-nums ${valueClassName}`}>
+        {value}
+      </span>
     </div>
-  )
-}
-
-function TargetIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-6 w-6 text-ink-soft"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="4.5" />
-      <circle cx="12" cy="12" r="0.6" fill="currentColor" />
-    </svg>
   )
 }

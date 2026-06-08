@@ -31,7 +31,7 @@ export const en: Record<TranslationKey, string> = {
 
   // 검 스테이지 스탯
   'stat.protection': 'Protection',
-  'stat.successRate': 'Success Rate',
+  'stat.successRate': 'Enhance Success Rate',
   'sword.none': 'No Sword',
   'sword.maxLevel': 'Max Level',
 
@@ -42,7 +42,6 @@ export const en: Record<TranslationKey, string> = {
   'commission.title': 'Trade Offers',
   'commission.reward': 'Reward',
   'commission.fulfill': 'Accept',
-  'commission.empty': 'Awaiting offer',
   'commission.arrived': 'New trade offer!',
 
   // 강화 결과 토스트

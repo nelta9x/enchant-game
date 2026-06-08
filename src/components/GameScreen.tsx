@@ -23,7 +23,6 @@ import { coinCount } from './coins'
 import { CoinFlight, COIN_FLIGHT_MS, type CoinFlightEvent } from './CoinFlight'
 import { DropScatter, DROP_LIFETIME_MS, type DropEvent } from './DropScatter'
 import { EnhanceButton } from './EnhanceButton'
-import { GoldDisplay } from './GoldDisplay'
 import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import { InventoryPanel } from './InventoryPanel'
 import { particleCount } from './particles'
@@ -341,26 +340,40 @@ export function GameScreen() {
   }
   const announcement = announceFx ? t(ANNOUNCE_KEY[announceFx.kind]) : ''
 
+  // lg+(데스크탑)에선 바깥 패딩을 없애 카드가 브라우저를 꽉 채우게 한다 — 베젤(검정) 여백 제거.
+  // <lg(세로형)에선 베젤 프레임을 유지한다.
   return (
-    <div className="flex min-h-svh items-center justify-center overflow-auto bg-bezel p-3 sm:p-6">
-      <div className="relative w-full max-w-5xl rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5">
+    <div className="flex min-h-svh items-center justify-center overflow-auto bg-bezel p-3 sm:p-6 lg:p-0">
+      {/* 카드는 창 폭을 따라 늘어난다(리플로우) — 폭 상한 없음. lg+ 3열에서 좌우 패널은 고정폭(≈13rem)이라
+          남는 폭은 가운데(검) 트랙이 흡수한다(매우 넓은 화면에선 가운데가 다소 비어 보일 수 있음).
+          lg+ 에선 세로로도 뷰포트를 꽉 채우고(min-h-svh) 모서리·테두리를 없애 bg-stage 가 화면 전체를 덮는다
+          (검정 빈 공간 제거). <lg 세로형에선 어차피 w-full 이라 가로 동작 동일. */}
+      <div className="relative w-full rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5 lg:min-h-svh lg:rounded-none lg:border-0">
         <TopControls onOpenShop={openShop} />
 
         {/* 상단 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
         <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={!shopOpen} />
 
-        {/* 모바일(<sm)은 단일 컬럼으로 스택 — 좁은 화면에서 고정폭 검 스테이지가
-            좁은 트랙에 눌려 좌우 패널과 겹치는 것을 방지(반응형 폴리시는 스프린트 6). */}
-        <div className="mt-3 grid grid-cols-1 gap-4 sm:min-h-[34rem] sm:grid-cols-[minmax(9.5rem,13rem)_minmax(0,1fr)_minmax(11rem,13rem)]">
-          {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음) */}
-          {/* ref: 파괴 드롭이 빨려 들어갈 도착점 측정용. */}
-          <div ref={inventoryRef} className="flex min-h-0 flex-col">
-            <div className="min-h-0 flex-1">
+        {/* 좁은 화면(<lg)은 단일 컬럼으로 세로 스택 — 3열은 고정폭 검 스테이지(검 박스 240·이름 배너 320)가
+            들어갈 만큼 넓을 때만 쓴다. sm(640) 기준이면 640~1024 구간에서 가운데 트랙이 눌려 좌우 패널과
+            겹치므로, 전환 기준을 lg(1024)로 둔다(성공률을 검 오른쪽으로 옮기는 lg 기준과도 일치). */}
+        <div className="mt-3 grid grid-cols-1 gap-4 lg:min-h-[34rem] lg:grid-cols-[minmax(9.5rem,13rem)_minmax(0,1fr)_minmax(11rem,13rem)]">
+          {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음).
+              세로형(<lg)에선 full-width 로 너무 넓어 보이므로 max-w-md 로 좁혀 가운데 정렬(의뢰 바와 동일 폭),
+              lg+(3열)에선 컬럼을 채운다. */}
+          <div className="mx-auto flex w-full min-h-0 max-w-md flex-col lg:max-w-none">
+            {/* ref: 파괴 드롭이 빨려 들어갈 도착점 측정용 — 패널이 콘텐츠 높이로 줄어드므로
+                컬럼 전체가 아니라 패널 자체를 감싸 드롭이 빈칸이 아닌 보이는 인벤토리로 들어가게 한다. */}
+            <div ref={inventoryRef}>
               <InventoryPanel
                 sword={sword}
                 level={sword?.level ?? null}
                 items={items}
                 onEquip={equip}
+                gold={gold}
+                goldPulseKey={goldPulse.key}
+                goldCoinCount={goldPulse.count}
+                goldRef={goldRef}
               />
             </div>
           </div>
@@ -408,29 +421,21 @@ export function GameScreen() {
             </div>
           </div>
 
-          {/* 우: 강화 카드(비용 포함) + 판매 버튼(판매가 포함) + 보관 버튼(세로 중앙) + 골드(하단) */}
-          <div className="flex flex-col items-center justify-between gap-4">
-            <div className="grid w-full flex-1 place-items-center">
-              <div className="flex w-full flex-col items-center gap-3">
-                <EnhanceButton
-                  disabled={enhanceDisabled}
-                  onEnhance={handleEnhance}
-                  enhanceCost={sword?.enhanceCost ?? null}
-                />
-                <SellButton
-                  disabled={!canSell}
-                  onSell={handleSell}
-                  sellPrice={sword?.sellPrice ?? null}
-                />
-                <StoreButton disabled={!canStore} onStore={store} />
-              </div>
-            </div>
-            <div ref={goldRef} className="w-full">
-              <GoldDisplay
-                gold={gold}
-                pulseKey={goldPulse.key}
-                coinCount={goldPulse.count}
+          {/* 우: 강화 카드(비용 포함) + 판매 버튼(판매가 포함) + 보관 버튼(세로 중앙).
+              보유 골드는 좌측 인벤토리 패널의 별도 섹션으로 옮겼다(화폐 분리). */}
+          <div className="flex flex-col items-center justify-center">
+            <div className="flex w-full flex-col items-center gap-3">
+              <EnhanceButton
+                disabled={enhanceDisabled}
+                onEnhance={handleEnhance}
+                enhanceCost={sword?.enhanceCost ?? null}
               />
+              <SellButton
+                disabled={!canSell}
+                onSell={handleSell}
+                sellPrice={sword?.sellPrice ?? null}
+              />
+              <StoreButton disabled={!canStore} onStore={store} />
             </div>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { itemDisplayName } from '../lib/items'
 import { Coin } from './Coin'
 import { ItemIcon } from './ItemIcon'
 
-// 강화 버튼 — 둥근 카드형(청색 글로우). 카드 안에 "강화" 라벨 + 강화 조건(비용/재료)을 아이콘+수량으로 보여 준다.
+// 강화 버튼 — 둥근 카드형(황금빛 글로우). 카드 안에 "강화" 라벨 + 강화 조건(비용/재료)을 아이콘+수량으로 보여 준다.
 //  - 골드 비용: 금화 아이콘 + 금액 / 아이템(재료검·잡템) 비용: 아이템 아이콘 + ×수량 / 무료·최종 단계: 칩 없이 라벨만.
 //  - 비용 칩은 시각적으로 아이콘+수량만 보여 주되, aria-label 로 스크린리더에 비용을 설명한다(접근성 보존).
 // 비활성(disabled) 시 글로우·펄스를 끄고 흐리게 표시. aria-keyshortcuts="Space"로 데스크탑 단축키를 알린다
@@ -68,20 +68,22 @@ export function EnhanceButton({
       className={`relative flex w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border bg-gradient-to-b from-panel-soft to-panel px-3 py-5 transition-opacity ${
         disabled
           ? 'cursor-not-allowed border-panel-edge opacity-40 saturate-50'
-          : 'cursor-pointer border-enhance/60 shadow-[0_0_28px_-4px_var(--color-enhance-glow)]'
+          : 'cursor-pointer border-gold/60 shadow-[0_0_28px_-4px_var(--color-gold)]'
       }`}
     >
       {/* 활성 시 천천히 번지는 펄스 링(카드 외곽) */}
       {!disabled && (
         <motion.span
-          className="pointer-events-none absolute inset-0 rounded-2xl border border-enhance-glow"
+          className="pointer-events-none absolute inset-0 rounded-2xl border border-gold-glow"
           animate={{ scale: [1, 1.04], opacity: [0.5, 0] }}
           transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
         />
       )}
+      {/* "강화" 라벨은 강화 수치(검 +레벨 등)에 쓰는 UI 금색(text-gold)으로 통일해 일관된 느낌을 준다.
+          비활성 시에는 흐린 색으로 둔다. */}
       <span
         className={`relative text-2xl font-extrabold tracking-wide ${
-          disabled ? 'text-on-dark-soft' : 'text-enhance-glow'
+          disabled ? 'text-on-dark-soft' : 'text-gold'
         }`}
       >
         {t('action.enhance')}

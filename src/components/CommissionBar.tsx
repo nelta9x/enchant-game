@@ -108,11 +108,7 @@ export function CommissionBar({
               onFulfill={onFulfill}
             />
           ) : (
-            <EmptySlot
-              key={`empty-${i}`}
-              slotIndex={i}
-              label={t('commission.empty')}
-            />
+            <EmptySlot key={`empty-${i}`} />
           ),
         )}
         </div>
@@ -170,7 +166,7 @@ function CommissionCard({
       aria-label={`${t('commission.fulfill')}: ${costLabel} → ${rewardLabel}`}
       aria-keyshortcuts={`${key}`}
       // 지불 가능하면 초록색으로 강조(테두리 + 글로우), 불가하면 흐리게.
-      className={`relative flex flex-1 items-center gap-3 overflow-hidden rounded-lg border px-3 py-4 text-left transition-opacity ${
+      className={`relative flex flex-1 items-center justify-center gap-3 overflow-hidden rounded-lg border px-3 py-4 text-left transition-opacity ${
         fulfillable
           ? 'cursor-pointer border-success bg-panel ring-1 ring-success/60 shadow-[0_0_12px_-2px_var(--color-success)] hover:opacity-90'
           : 'cursor-not-allowed border-frame/40 bg-panel-soft opacity-60'
@@ -288,17 +284,14 @@ function TimerBar({
   )
 }
 
-function EmptySlot({ slotIndex, label }: { slotIndex: number; label: string }) {
+// 의뢰가 없는 슬롯은 그냥 빈 공간으로 둔다 — 배경·텍스트·키 힌트 없이 비워, "제안 대기 중" 같은
+// placeholder 가 허전하게 보이지 않게 한다. 단, 의뢰가 오갈 때 게임 레이아웃이 흔들리지 않도록
+// 카드와 동일한 박스 크기는 유지한다: 보이지 않는 스페이서(h-12 = 카드 아이콘 높이) + 같은 px-3/py-4,
+// 그리고 box-border 높이에 카드 테두리(border 1px)가 더하는 만큼을 투명 테두리로 똑같이 채운다.
+function EmptySlot() {
   return (
-    <div
-      className="relative flex flex-1 items-center justify-center rounded-lg border border-dashed border-frame/30 bg-panel-soft/40 px-3 py-4 text-xs text-on-dark-soft"
-      aria-hidden
-    >
-      {/* 의뢰 카드의 아이콘(h-12 = 콘텐츠 높이)과 동일한 높이를 강제하는 보이지 않는 스페이서 —
-          슬롯이 비어도 바 높이가 카드와 같아 화면이 흔들리지 않는다. */}
+    <div className="flex flex-1 border border-transparent px-3 py-4" aria-hidden>
       <span className="h-12 w-0 shrink-0" aria-hidden />
-      <KeyHint slot={slotIndex + 1} active={false} />
-      {label}
     </div>
   )
 }
