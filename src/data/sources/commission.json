@@ -13,14 +13,14 @@
           "weight": 3,
           "rewardKind": "gold",
           "incentiveMin": 0.8,
-          "incentiveMax": 2,
+          "incentiveMax": 3,
           "additiveMin": 0,
           "additiveMax": 100
         },
         {
           "itemId": "iron_scrap",
           "requiredCount": 10,
-          "weight": 1,
+          "weight": 2,
           "rewardKind": "item",
           "rewardItemId": "protection_ticket",
           "rewardItemCount": 1
@@ -37,7 +37,7 @@
       "durationMinMs": 30000,
       "durationMaxMs": 30000,
       "spawnIntervalMinMs": 5000,
-      "spawnIntervalMaxMs": 5000
+      "spawnIntervalMaxMs": 30000
     },
     {
       "minGold": 1000000,
@@ -58,6 +58,14 @@
           "rewardKind": "item",
           "rewardItemId": "protection_ticket",
           "rewardItemCount": 2
+        },
+        {
+          "itemId": "iron_scrap",
+          "requiredCount": 40,
+          "weight": 1,
+          "rewardKind": "item",
+          "rewardItemId": "protection_ticket",
+          "rewardItemCount": 5
         },
         {
           "itemId": "faded_fluorescent",
@@ -81,7 +89,7 @@
       "durationMinMs": 10000,
       "durationMaxMs": 60000,
       "spawnIntervalMinMs": 5000,
-      "spawnIntervalMaxMs": 5000
+      "spawnIntervalMaxMs": 30000
     },
     {
       "minGold": 5000000,
