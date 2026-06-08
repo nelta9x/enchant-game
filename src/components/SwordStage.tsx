@@ -221,7 +221,7 @@ function Stat({
 }) {
   return (
     <div className="flex flex-col items-center px-4 py-2.5 leading-tight">
-      <span className="whitespace-nowrap text-[11px] font-medium text-ink-soft">
+      <span className="whitespace-nowrap text-[0.6875rem] font-medium text-ink-soft">
         {label}
       </span>
       <span className={`text-base font-bold tabular-nums ${valueClassName}`}>
