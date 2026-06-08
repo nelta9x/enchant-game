@@ -14,6 +14,7 @@ export type EffectPayload = {
   particleCount?: number // 분출할 파티클 수(파괴·성공 — 단계에 비례)
   coinCount?: number // 분출할 코인 수(판매 — 판매가에 비례)
   drops?: { itemId: string; count: number }[] // 파괴 드롭 스택(검 아래 흩뿌림 연출)
+  itemId?: string // 인벤토리로 빨려드는 아이템(보관·장착 비행)
 }
 
 // 효과 명세(호출 측이 enqueue 에 넘기는 것 — id 는 시스템이 부여).

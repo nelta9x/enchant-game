@@ -22,6 +22,7 @@ import { destructionTargetOf } from './destruction'
 import { coinCount } from './coins'
 import { CoinFlight, COIN_FLIGHT_MS, type CoinFlightEvent } from './CoinFlight'
 import { DropScatter, DROP_LIFETIME_MS, type DropEvent } from './DropScatter'
+import { ItemFlight, ITEM_FLIGHT_MS, type ItemFlightEvent } from './ItemFlight'
 import { EnhanceButton } from './EnhanceButton'
 import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import { InventoryPanel } from './InventoryPanel'
@@ -121,6 +122,17 @@ export function GameScreen() {
   const commissionAnchorRef = useRef<HTMLDivElement>(null)
   const commissionCoinKey = useRef(0)
 
+  // 의뢰 아이템 보상 연출 — 골드(코인 비행)와 달리 보상이 아이템(물물교환)이면 클릭한 카드에서
+  // 보상 아이템이 인벤토리로 빨려 들어간다. 코인 연출과 동형(카드 rect 를 고정 anchor 로 캡처해
+  // 카드가 사라진 뒤에도 출발 좌표 유지). 출발=카드 anchor, 도착=인벤토리(아래 inventoryRef).
+  const [commissionItem, setCommissionItem] = useState<{
+    id: number
+    rect: DOMRect
+    itemId: string
+  } | null>(null)
+  const commissionItemAnchorRef = useRef<HTMLDivElement>(null)
+  const commissionItemKey = useRef(0)
+
   // 골드창 상승 연출(통통통 + 숫자 카운트업)은 GoldDisplay 의 pulseKey 변화로만 구동된다.
   // 판매와 의뢰 완료가 공유하는 단일 펄스 — 둘 다 골드를 늘리므로 같은 카운터를 올린다.
   // (코인 비행 자체는 출발점이 달라 각자 다른 CoinFlight 인스턴스로 그리지만, 골드 상승은 한 경로로 모은다.)
@@ -160,6 +172,15 @@ export function GameScreen() {
       }
       setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(amount) }))
       showGoldGain(amount)
+    } else if (commission.reward.kind === 'item' && originEl) {
+      // 아이템 보상 — 클릭한 카드에서 보상 아이템이 인벤토리로 빨려 들어가는 연출(코인과 동형 anchor).
+      // 실제 지급은 fulfill 이 이미 끝냈다(연출은 순수 부가). rect 는 언마운트 전(동기)에 읽어 유효.
+      commissionItemKey.current += 1
+      setCommissionItem({
+        id: commissionItemKey.current,
+        rect: originEl.getBoundingClientRect(),
+        itemId: commission.reward.itemId,
+      })
     }
   }
 
@@ -178,6 +199,33 @@ export function GameScreen() {
     })
     setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(price) }))
     showGoldGain(price)
+  }
+
+  // 검이 검 박스에서 인벤토리로 빨려 들어가는 연출(보관·장착 공용·병렬·비잠금). 코인 비행과 동일하게
+  // Effect 시스템으로 구동한다 — 어떤 검이 나는지는 itemId(= 나가는 검의 sword id)로 전한다.
+  const enqueueItemFlight = (itemId: string) =>
+    enqueueEffect({
+      kind: 'itemFlight',
+      exclusive: false,
+      locksEnhance: false,
+      durationMs: ITEM_FLIGHT_MS,
+      payload: { itemId },
+    })
+
+  // 보관 — 현재 검을 가방으로. 나가는 검(변이 전 currentSwordId)을 캡처해 비행 연출을 띄운다.
+  const handleStore = () => {
+    if (!canStore) return // store() 와 동일 게이트(시작 검·검 없음이면 보관할 게 없음)
+    const outgoing = currentSwordId
+    store()
+    if (outgoing) enqueueItemFlight(outgoing)
+  }
+
+  // 장착 — 가방의 검을 끼우면 현재 검이 가방으로 옮겨진다(equip → bankOutgoing). 그 나가는 검도
+  // 인벤토리로 빨려 드는 연출을 띄운다. 단, 시작 검(sword_0)은 가방에 들어가지 않고 버려지므로 제외.
+  const handleEquip = (itemId: string) => {
+    const outgoing = canStore ? currentSwordId : null
+    equip(itemId)
+    if (outgoing) enqueueItemFlight(outgoing)
   }
 
   const handleEnhance = () => {
@@ -289,7 +337,7 @@ export function GameScreen() {
   useActionHotkeys({
     enabled: !shopOpen,
     onSell: handleSell,
-    onStore: store,
+    onStore: handleStore,
     onOpenShop: openShop,
   })
 
@@ -318,6 +366,10 @@ export function GameScreen() {
   const coinFlightEvent = useMemo<CoinFlightEvent | null>(() => {
     const fx = latestRunning(running, 'coinFlight')
     return fx ? { id: fx.id, coinCount: fx.payload?.coinCount ?? 0 } : null
+  }, [running])
+  const itemFlightEvent = useMemo<ItemFlightEvent | null>(() => {
+    const fx = latestRunning(running, 'itemFlight')
+    return fx?.payload?.itemId ? { id: fx.id, itemId: fx.payload.itemId } : null
   }, [running])
   const dropEvent = useMemo<DropEvent | null>(() => {
     const fx = latestRunning(running, 'drop')
@@ -369,7 +421,7 @@ export function GameScreen() {
                 sword={sword}
                 level={sword?.level ?? null}
                 items={items}
-                onEquip={equip}
+                onEquip={handleEquip}
                 gold={gold}
                 goldPulseKey={goldPulse.key}
                 goldCoinCount={goldPulse.count}
@@ -424,10 +476,11 @@ export function GameScreen() {
           {/* 우: 강화 카드(비용 포함) + 판매 버튼(판매가 포함) + 보관 버튼(세로 중앙).
               보유 골드는 좌측 인벤토리 패널의 별도 섹션으로 옮겼다(화폐 분리). */}
           <div className="flex flex-col items-center justify-center">
-            {/* 강화/판매/보관을 한 그룹으로 모은다(콘텐츠 높이의 컴팩트 스택, 컬럼을 꽉 채우지 않음).
-                바깥 컬럼이 세로 중앙 정렬하므로 그룹이 컬럼 높이의 가운데에 놓인다. 강화는 비용 칩+큰
-                라벨로 자연히 크고, 판매·보관(작은 패딩)은 그 절반 정도로 작다. */}
-            <div className="flex w-full flex-col items-center gap-3">
+            {/* 액션 패널 = 인벤토리 패널과 동일 크기. 폭은 컬럼(16rem)으로 이미 같고, 높이는 인벤토리
+                패널 높이(헤더+골드+목록 17.25rem+패딩 = 23.375rem)에 맞춘다. lg+ 에선 그 높이의 3행
+                그리드(강화 2 : 판매 1 : 보관 1)로 버튼이 행을 채운다(items-stretch). 세로형(<lg)은
+                콘텐츠 높이의 일반 flex 스택. (인벤토리 목록 높이를 바꾸면 이 23.375rem 도 같이 고칠 것.) */}
+            <div className="flex w-full flex-col items-center gap-3 lg:grid lg:h-[23.375rem] lg:grid-rows-[2fr_1fr_1fr] lg:items-stretch">
               <EnhanceButton
                 disabled={enhanceDisabled}
                 onEnhance={handleEnhance}
@@ -438,7 +491,7 @@ export function GameScreen() {
                 onSell={handleSell}
                 sellPrice={sword?.sellPrice ?? null}
               />
-              <StoreButton disabled={!canStore} onStore={store} />
+              <StoreButton disabled={!canStore} onStore={handleStore} />
             </div>
           </div>
         </div>
@@ -449,6 +502,13 @@ export function GameScreen() {
           event={coinFlightEvent}
           sourceRef={swordBoxRef}
           targetRef={goldRef}
+        />
+
+        {/* 보관·장착 연출 — 검 박스에서 검 아이콘이 인벤토리로 빨려 들어간다(스테이지 검 크기로 이륙). */}
+        <ItemFlight
+          event={itemFlightEvent}
+          sourceRef={swordBoxRef}
+          targetRef={inventoryRef}
         />
 
         {/* 의뢰 완료 코인 연출 — 출발점은 클릭한 의뢰 카드(아래 fixed anchor 로 좌표 고정), 도착점은 골드창.
@@ -474,6 +534,32 @@ export function GameScreen() {
           }
           sourceRef={commissionAnchorRef}
           targetRef={goldRef}
+        />
+
+        {/* 의뢰 아이템 보상 연출 — 출발점은 클릭한 의뢰 카드(fixed anchor 로 고정), 도착점은 인벤토리.
+            보상 아이템 아이콘이 카드에서 가방으로 빨려 든다(코인 비행과 동형, 작은 크기로 이륙). */}
+        {commissionItem && (
+          <div
+            ref={commissionItemAnchorRef}
+            aria-hidden
+            className="pointer-events-none fixed"
+            style={{
+              left: commissionItem.rect.left + commissionItem.rect.width / 2,
+              top: commissionItem.rect.top + commissionItem.rect.height / 2,
+              width: 0,
+              height: 0,
+            }}
+          />
+        )}
+        <ItemFlight
+          event={
+            commissionItem
+              ? { id: commissionItem.id, itemId: commissionItem.itemId }
+              : null
+          }
+          sourceRef={commissionItemAnchorRef}
+          targetRef={inventoryRef}
+          startSizeClass="h-12 w-12"
         />
 
         {/* 파괴 드롭 수집 연출 — 카드 전체를 덮는 오버레이(검 아래 → 인벤토리창). 재료가 검 아래로
