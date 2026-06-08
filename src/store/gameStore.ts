@@ -143,7 +143,31 @@ function bankOutgoing(
 export function createGameStore(opts: CreateOpts = {}) {
   const enhancer = opts.enhancer ?? new Enhancer()
 
-  return create<GameState>((set, get) => {
+  return create<GameState>((rawSet, get) => {
+    // 검 id → 레벨(검 없음/미상은 0). maxLevelReached 초기화·갱신이 공유한다.
+    const levelOf = (id: string | null): number =>
+      id ? (dataManager.getSwordById(id)?.level ?? 0) : 0
+
+    // ── 단조 최고 도달 레벨(maxLevelReached)의 단일 출처 ──
+    // currentSwordId 가 "더 높은 레벨" 검으로 바뀌는 모든 갱신을 가로채 maxLevelReached 를 끌어올린다.
+    // 강화 성공·장착(보관검·의뢰 보상검)·향후 검 상점 등 경로에 무관하게 자동 반영되고(어느 액션에서
+    // currentSwordId 를 올리든 한 곳에서 잡는다), 파괴·판매로 +0 이 돼도 내려가지 않는다(high-water-mark).
+    // next 를 그대로 펼치고 maxLevelReached 만 더하므로 다른 상태(골드·아이템 등)는 손대지 않는다(안전).
+    // 모든 액션은 set 을 단일 인자(부분 상태 또는 갱신 함수)로만 호출한다 — zustand 의 replace 인자는 쓰지 않는다.
+    const set = (
+      partial: Partial<GameState> | ((state: GameState) => Partial<GameState>),
+    ): void => {
+      rawSet((state) => {
+        const next = typeof partial === 'function' ? partial(state) : partial
+        if ('currentSwordId' in next) {
+          const level = levelOf(next.currentSwordId ?? null)
+          if (level > state.maxLevelReached)
+            return { ...next, maxLevelReached: level }
+        }
+        return next
+      })
+    }
+
     // 현재 검(id) → 검 정의 + 공급(골드·아이템)으로 EnhanceInput 구성.
     // 검이 없거나(파산) 정의를 못 찾으면 null. 이것이 id↔items seam이다.
     const buildInput = (useProtection: boolean): EnhanceInput | null => {
@@ -166,6 +190,11 @@ export function createGameStore(opts: CreateOpts = {}) {
           : INITIAL_SWORD_ID,
       items: opts.items ?? [],
       pendingDrops: [],
+      // 역대 최고 도달 강화 레벨(단조). 기본 시작 검(sword_0 = 레벨 0)은 0으로 둔다 — 전역 store 생성은
+      // dataManager.load() 이전(모듈 평가 시점)이라 여기서 검을 조회하면 안 된다(미적재 → throw). null 은
+      // levelOf 가 dataManager 없이 0 으로 단락한다. 테스트처럼 currentSwordId 를 지정하면(load 이후 생성)
+      // 그 검 레벨에서 시작한다. 이후 상승은 위 set 래퍼가 단일 지점에서 반영한다.
+      maxLevelReached: levelOf(opts.currentSwordId ?? null),
 
       canEnhance: (useProtection) => {
         const input = buildInput(useProtection)

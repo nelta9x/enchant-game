@@ -37,6 +37,9 @@ export const ko = {
   // 인벤토리
   'inventory.title': '인벤토리',
 
+  // 최고 도달 강화 게이지(상단바) — "최고 기록 [검 아이콘] +N" 라벨. 목표(+N/최고)는 hover/탭 카드에만 둔다.
+  'record.best': '최고 기록',
+
   // 거래 제안(Commission — 내부 코드명은 commission 유지, 표시명만 "거래 제안")
   'commission.title': '거래 제안',
   'commission.reward': '보상',

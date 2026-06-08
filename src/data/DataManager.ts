@@ -56,6 +56,21 @@ export class DataManager {
     return this.swords.find((s) => s.id === id)
   }
 
+  // 도달 가능한 최고 강화 레벨(검 데이터의 최대 level). 진행도 바의 "칸 수"이자 목표치 — 상수(30) 대신
+  // 데이터에서 도출한다(검 단계를 늘리면 칸 수도 자동으로 따라간다).
+  getMaxSwordLevel(): number {
+    this.ensureLoaded()
+    return this.swords.reduce((max, s) => Math.max(max, s.level), 0)
+  }
+
+  // 레벨로 검을 조회한다(레벨↔검은 1:1 — loadSwords 가 중복 레벨을 막는다). "최고 도달치"(레벨)만으로
+  // 그 기록을 세운 검을 되찾는 데 쓴다 — 별도 상태를 저장할 필요 없이 maxLevelReached 에서 파생한다.
+  // id 에서 레벨을 파싱하지 않는 정식 경로(getSwordById 의 짝). 범위 밖 레벨은 undefined.
+  getSwordByLevel(level: number): SwordData | undefined {
+    this.ensureLoaded()
+    return this.swords.find((s) => s.level === level)
+  }
+
   // 상점 판매 목록(데이터 순서 유지). 상점 UI가 그대로 순회해 렌더한다.
   getShopItems(): readonly ShopItem[] {
     this.ensureLoaded()

@@ -74,6 +74,26 @@ describe('DataManager', () => {
     expect(dm.getItemBasePrice('sword_0')).toBeUndefined()
     expect(dm.getItemBasePrice('nonexistent')).toBeUndefined()
   })
+
+  it('getMaxSwordLevel: 검 데이터의 최대 level 을 반환한다(진행도 바 칸 수·목표치)', () => {
+    const dm = new DataManager()
+    dm.load()
+    const expected = dm
+      .getSwords()
+      .reduce((max, s) => Math.max(max, s.level), 0)
+    expect(dm.getMaxSwordLevel()).toBe(expected)
+    expect(dm.getMaxSwordLevel()).toBe(30) // 현재 데이터: sword_30(신성한 레이피어)
+  })
+
+  it('getSwordByLevel: 레벨로 검을 조회한다(레벨↔검 1:1) — 범위 밖은 undefined', () => {
+    const dm = new DataManager()
+    dm.load()
+    expect(dm.getSwordByLevel(0)?.id).toBe('sword_0')
+    expect(dm.getSwordByLevel(23)?.level).toBe(23)
+    expect(dm.getSwordByLevel(30)?.id).toBe('sword_30')
+    expect(dm.getSwordByLevel(31)).toBeUndefined()
+    expect(dm.getSwordByLevel(-1)).toBeUndefined()
+  })
 })
 
 // seam 테스트: 데이터(언어 중립)와 i18n(표시)의 연결을 강제한다.

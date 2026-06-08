@@ -34,6 +34,10 @@ export type PlayerState = {
   // 마우스로 스치거나(개별) 일정 시간 후(자동) 수집될 때 collectDrop 으로 items 로 옮긴다.
   // 연출이 끝날 때 미수집분은 flushDrops 로 일괄 items 에 합산해 유실을 막는다(손실 0 보장).
   pendingDrops: ItemStack[]
+  // 한 번이라도 도달한 최고 강화 레벨(단조 — 내려가지 않는 high-water-mark). 파괴·판매로 +0 이 돼도
+  // 유지되어 "최대 몇강까지 갔는지 / 목표(최고 검 레벨)까지 얼마나 남았는지"를 보여주는 데 쓴다.
+  // currentSwordId(현재 장착 검)와 별개의 누적 기록이며, gameStore 가 currentSwordId 상승을 단일 지점에서 반영한다.
+  maxLevelReached: number
 }
 
 // 강화 1회 시도에 소모되는 재료(호출자가 인벤토리에서 차감하는 데 사용).

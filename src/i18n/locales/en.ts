@@ -38,6 +38,9 @@ export const en: Record<TranslationKey, string> = {
   // 인벤토리
   'inventory.title': 'Inventory',
 
+  // 최고 도달 강화 게이지(상단바)
+  'record.best': 'Best Record',
+
   // 거래 제안(Commission — 내부 코드명은 commission 유지, 표시명만 "거래 제안")
   'commission.title': 'Trade Offers',
   'commission.reward': 'Reward',

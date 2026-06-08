@@ -603,3 +603,76 @@ describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
   })
 })
 
+describe('gameStore — 최고 도달 강화(maxLevelReached)', () => {
+  it('초기값은 시작 검의 레벨이다(시작 검 +0 → 0, 지정 검 → 그 레벨, 검 없음 → 0)', () => {
+    expect(createGameStore().getState().maxLevelReached).toBe(0)
+    expect(
+      createGameStore({ currentSwordId: 'sword_0' }).getState().maxLevelReached,
+    ).toBe(0)
+    expect(
+      createGameStore({ currentSwordId: 'sword_10' }).getState().maxLevelReached,
+    ).toBe(10)
+    expect(
+      createGameStore({ currentSwordId: null }).getState().maxLevelReached,
+    ).toBe(0)
+  })
+
+  it('강화 성공 시 최고 도달치가 새 레벨로 오른다(단조 상승)', () => {
+    const store = createGameStore({
+      enhancer: ALWAYS_SUCCESS(),
+      gold: 1_000_000_000,
+      currentSwordId: 'sword_0',
+    })
+    expect(store.getState().maxLevelReached).toBe(0)
+    store.getState().enhance(false) // sword_0 → sword_1
+    expect(store.getState().currentSwordId).toBe('sword_1')
+    expect(store.getState().maxLevelReached).toBe(1)
+    store.getState().enhance(false) // sword_1 → sword_2
+    expect(store.getState().currentSwordId).toBe('sword_2')
+    expect(store.getState().maxLevelReached).toBe(2)
+  })
+
+  it('파괴로 +0 이 돼도 최고 도달치는 유지된다(내려가지 않음)', () => {
+    const store = createGameStore({
+      enhancer: ALWAYS_FAIL(),
+      gold: 1_000_000,
+      currentSwordId: 'sword_6',
+    })
+    expect(store.getState().maxLevelReached).toBe(6) // 시작 검 레벨에서 출발
+    store.getState().enhance(false) // 파괴 → 낡은 단검(+0)
+    expect(store.getState().currentSwordId).toBe('sword_0')
+    expect(store.getState().maxLevelReached).toBe(6) // 기록은 유지
+  })
+
+  it('판매로 +0 이 돼도 최고 도달치는 유지된다', () => {
+    const store = createGameStore({ gold: 0, currentSwordId: 'sword_5' })
+    expect(store.getState().maxLevelReached).toBe(5)
+    store.getState().sell()
+    expect(store.getState().currentSwordId).toBe('sword_0')
+    expect(store.getState().maxLevelReached).toBe(5)
+  })
+
+  it('강화 외 경로(장착)로 더 높은 검을 들어도 최고 도달치에 반영된다', () => {
+    // 강화 성공만 갱신했다면 놓칠 경로 — set 래퍼가 모든 currentSwordId 상승을 한 곳에서 잡는지 확인.
+    const store = createGameStore({
+      currentSwordId: 'sword_3',
+      items: [{ itemId: 'sword_8', count: 1 }],
+    })
+    expect(store.getState().maxLevelReached).toBe(3)
+    store.getState().equip('sword_8')
+    expect(store.getState().currentSwordId).toBe('sword_8')
+    expect(store.getState().maxLevelReached).toBe(8)
+  })
+
+  it('더 낮은 검을 장착해도 최고 도달치는 내려가지 않는다', () => {
+    const store = createGameStore({
+      currentSwordId: 'sword_8',
+      items: [{ itemId: 'sword_3', count: 1 }],
+    })
+    expect(store.getState().maxLevelReached).toBe(8)
+    store.getState().equip('sword_3')
+    expect(store.getState().currentSwordId).toBe('sword_3')
+    expect(store.getState().maxLevelReached).toBe(8) // 유지
+  })
+})
+
