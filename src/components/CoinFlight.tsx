@@ -10,12 +10,12 @@ import { itemSpriteUrl } from '../lib/sprites'
 import { sound } from '../lib/sound'
 import {
   COIN_FLIGHT_MS,
-  COIN_FLIGHT_SEC,
   makeCoins,
   relativeCenter,
   type CoinSpec,
   type Point,
 } from './coins'
+import { FlightChip } from './FlightChip'
 import { useOneShot } from './useOneShot'
 
 // 판매 코인 연출(프레젠테이션 전용). 게임 로직과 분리되어 'coinFlight' 이벤트(재생 id + 코인 수)
@@ -135,10 +135,9 @@ function CoinBurst({
   )
 }
 
-// 코인 1개 — 검에서 위로 흩뿌려 "튀어올라"(backOut: 정점을 살짝 넘었다 되돌아오는 바운스) 코인마다
-// 다른 시간 체공하다, 골드창 반대로 살짝 당겼다(backIn: anticipation) 급가속하며 빨려 들어간다.
-// 위치·크기·투명도가 같은 곡선을 타 "통 튀어 떠 있다 → 휙 빨려듦"이 일관되게 보인다. (DOTween 의
-// DOPunchPosition (elastic) + DOMove(InBack) 표준 기법을 Motion 내장 backOut/backIn 으로 옮긴 것)
+// 코인 1개 — 공유 비행 칩(FlightChip)에 코인 PNG 를 실어 보낸다. 안무(튀어올라 체공 후 흡수,
+// 회전·페이드)는 FlightChip 가 소유하므로 아이템 비행과 한 곡선을 공유한다. 코인만의 차이는
+// 실리는 내용(같은 PNG 1장)과 칩 크기(spec.size)뿐이다.
 function CoinChip({
   spec,
   source,
@@ -148,43 +147,26 @@ function CoinChip({
   source: Point
   target: Point
 }) {
-  // 튀어오름 정점(검 위쪽). 정점에서 살짝 가라앉고 옆으로 분산되며 잠시 체공한 뒤 골드창으로 흡수.
-  const apexX = source.x + Math.cos(spec.angle) * spec.rise
-  const apexY = source.y + Math.sin(spec.angle) * spec.rise // sin<0 → 검 위쪽
-  const hoverX = apexX + spec.drift
-  const hoverY = apexY + spec.settle
-
   return (
-    <motion.img
-      src={COIN_SPRITE}
-      alt=""
-      draggable={false}
-      className="absolute left-0 top-0 select-none"
-      style={{
-        width: spec.size,
-        height: spec.size,
-        marginLeft: -spec.size / 2,
-        marginTop: -spec.size / 2,
-        imageRendering: 'pixelated',
-      }}
-      initial={{ x: source.x, y: source.y, scale: 0, opacity: 0, rotate: 0 }}
-      animate={{
-        x: [source.x, apexX, hoverX, target.x],
-        y: [source.y, apexY, hoverY, target.y],
-        scale: [0.3, 1.18, 1.05, 0.16], // 통 튀고 → 체공 → 휙 흡수되며 작아짐
-        opacity: [0, 1, 1, 0], // 빨려드는 끝에서야 사라짐(체공 동안은 또렷)
-        rotate: [0, spec.spin * 90, spec.spin * 150, spec.spin * 520], // 빨려들 때 빛 반사하듯 빠르게 돈다
-      }}
-      transition={{
-        delay: spec.stagger,
-        duration: COIN_FLIGHT_SEC,
-        // 튀어오름(0~15%, backOut 바운스) → 체공(~hold, 코인마다 다름) → 당겼다 급가속 흡수(backIn).
-        times: [0, 0.15, spec.hold, 1],
-        ease: ['backOut', 'easeInOut', 'backIn'],
-      }}
+    <FlightChip
+      spec={spec}
+      source={source}
+      target={target}
       // 흡수가 끝나는 순간(애니메이션 완료 = 골드창 도달) 코인마다 'coin_pickup'을 울린다 —
       // 코인은 stagger 로 시간차를 두고 도착하므로 동전 쏟아지듯 차르륵 연달아 난다(풀이 보이스 상한으로 묶음).
-      onAnimationComplete={() => sound.playSfx('coin_pickup')}
-    />
+      onComplete={() => sound.playSfx('coin_pickup')}
+    >
+      <img
+        src={COIN_SPRITE}
+        alt=""
+        draggable={false}
+        className="block select-none"
+        style={{
+          width: spec.size,
+          height: spec.size,
+          imageRendering: 'pixelated',
+        }}
+      />
+    </FlightChip>
   )
 }
