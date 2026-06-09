@@ -7,7 +7,9 @@ import prettier from 'eslint-config-prettier'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // dist = 빌드 산출물. .claude = Claude 도구 디렉토리(worktree 사본 등) — 둘 다 소스가 아니므로 린트 제외.
+  // (.claude/worktrees 의 저장소 사본이 보이면 tsconfig 루트가 둘로 갈려 타입 파서가 멈춘다 — 그 방지.)
+  globalIgnores(['dist', '.claude']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
