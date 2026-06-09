@@ -10,8 +10,9 @@ import { SHAKE_SEC } from '../components/shake'
 //    늦게 반영돼도 그 사이에 두 번 쏘지 않아, 한 쿨다운에 강화가 두 번 박히는 사고를 막는다(실제 박자는
 //    강화 잠금 ~600ms 가 정한다 — min-gap(400ms) < 잠금이라 잠금이 binding).
 //  - 마우스: pointerdown 즉시 1회 + 폴링 반복(누르는 동안). 떼면(window pointerup/cancel/blur) 멈춘다.
-//  - 터치/펜: pointerdown 으로 1회만(연사 없음 — 요청은 "마우스로 꾹").
-//  - 키보드(Enter)·보조기술: 합성 click(detail===0)에서 1회. (스페이스는 전역 단축키가 전담하므로 여기선 안 쏨.)
+//  - 터치/펜: 'click'(완료된 탭)에서 1회 — 접촉(pointerdown)이 아니라 떼는 순간 확정이라, 누른 채 미끄러뜨려
+//    취소하거나 스크롤로 이어지는 제스처에 오발하지 않는다(연사 없음 — 요청은 "마우스로 꾹").
+//  - 키보드(Enter)·보조기술: click(입력원이 마우스가 아닌 것)에서 1회. (스페이스는 전역 단축키가 전담.)
 //
 // disabled/onFire 는 매 렌더 최신값을 ref 로 읽어, 잠금 토글마다 핸들러를 재생성하지 않는다(hotkey 훅과 동일).
 type UseHoldRepeatOptions = {
@@ -80,15 +81,20 @@ export function useHoldRepeat<T extends HTMLElement = HTMLElement>({
 
   const onPointerDown = useCallback((e: React.PointerEvent<T>) => {
     if (e.button !== 0 || !e.isPrimary) return // 주 포인터(왼쪽 버튼/주 접촉)만
-    apiRef.current?.fireOnce() // 누르는 즉시 1회(마우스·터치·펜 공통)
-    if (e.pointerType !== 'mouse') return // 연사(hold)는 마우스만 — 터치/펜은 탭=1회
+    // 마우스만 '누름(pointerdown)'에서 발사 + 연사한다. 터치/펜은 여기서 안 쏘고 아래 onClick(완료된 탭)에서
+    // 1회 쏜다 — 접촉 즉시 발사하면 취소·스크롤 제스처에 오발하기 때문(탭은 떼는 순간 확정).
+    if (e.pointerType !== 'mouse') return
+    apiRef.current?.fireOnce() // 누르는 즉시 1회
     apiRef.current?.startMouseHold()
   }, [])
 
   const onClick = useCallback((e: React.MouseEvent<T>) => {
-    // 키보드(Enter)·보조기술의 '합성 click'만 처리(detail===0). 마우스·터치 click(detail>=1)은 위
-    // pointerdown 이 이미 쐈으므로 무시한다 — 상태 플래그 없이 이중 발사를 막는 무상태 판정.
-    if (e.detail === 0) apiRef.current?.fireOnce()
+    // 마우스 click 은 위 pointerdown 이 이미 처리했으므로 무시. 터치/펜 탭과 키보드(Enter)·보조기술의 click
+    // 만 1회 발사한다. 'click' 의 pointerType 로 입력원을 가른다(마우스='mouse', 터치='touch', 펜='pen',
+    // 키보드·프로그램 호출=''). pointerType 이 없는 구형 브라우저에선 마우스 click 이 한 번 더 들어와도
+    // min-gap 이 막아 이중 발사가 안 된다(graceful degradation).
+    if ((e.nativeEvent as PointerEvent).pointerType === 'mouse') return
+    apiRef.current?.fireOnce()
   }, [])
 
   return { onPointerDown, onClick }

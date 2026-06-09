@@ -278,9 +278,10 @@ export function GameScreen() {
   }
 
   const handleEnhance = () => {
-    // 쿨다운(강화 딜레이) 중엔 강화 자체를 막는다 — 버튼은 더 이상 disabled 가 아니라(클릭 가능) 쿨다운
-    // 오버레이만 덮으므로, 클릭이 통과해도 여기서 무시해 enhanceDelayMs 가 throttle 로 동작하게 한다.
-    // (스페이스 단축키는 enhanceDisabled 게이트로 이미 막히지만, 이 가드는 마우스 클릭 경로의 안전장치다.)
+    // 쿨다운(강화 딜레이) 중 들어온 강화는 무시한다 — 버튼이 더 이상 disabled 가 아니라(클릭/Enter 가능)
+    // 쿨다운 오버레이만 덮으므로, 이 가드로 '쿨다운 중 단발 입력'을 no-op 으로 만든다.
+    // (연타 throttle 자체는 강화 잠금 lockCount(~600ms)와 hold 연사의 min-gap(400ms)이 책임진다 — 이
+    //  가드는 그 이중 발사 방지턱이 아니라 쿨다운 중 단발 활성화 차단이다. hold 는 useHoldRepeat 가 동일 게이팅.)
     if (enhanceLocked) return
     const result = enhance(effectiveProtection)
     if (!result) return
