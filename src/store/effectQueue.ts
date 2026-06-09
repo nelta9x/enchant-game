@@ -101,6 +101,13 @@ export function latestRunning(running: Effect[], kind: string): Effect | null {
   return best
 }
 
+// 같은 kind 의 "현재 실행 중" 효과를 running 순서대로 전부 반환한다(latestRunning 의 복수형). 동시에
+// 여러 개가 떠 있을 수 있는 연출(성공·파괴 버스트 — 재강화 중 옛 버스트 유지)을 각각 독립 렌더할 때,
+// 최신 1개만(latestRunning) 그리면 겹친 효과가 잘리므로 이걸로 전부 뽑아 id 로 키잉해 그린다.
+export function runningEventsOf(running: Effect[], kind: string): Effect[] {
+  return running.filter((e) => e.kind === kind)
+}
+
 // 효과 종료: running 에서 제거 + 잠금 효과면 lockCount 감소 + next 가 있으면 큐에 다시 넣는다. 순수.
 export function finish(state: EffectQueueState, id: number): EffectQueueState {
   const effect = state.running.find((e) => e.id === id)

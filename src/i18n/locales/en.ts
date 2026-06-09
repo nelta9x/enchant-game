@@ -15,12 +15,12 @@ export const en: Record<TranslationKey, string> = {
   'shop.insufficient': 'Not enough',
 
   // 비용 카드
-  'cost.enhance': 'Enhance Cost',
+  'cost.enhance': 'Enchant Cost',
   'cost.sell': 'Sell Price',
   'cost.free': 'Free',
 
   // 강화 / 판매 / 보관 / 장착 동작
-  'action.enhance': 'Enhance',
+  'action.enhance': 'Enchant',
   'action.sell': 'Sell',
   'action.store': 'Store',
   'action.equip': 'Equip',
@@ -31,7 +31,7 @@ export const en: Record<TranslationKey, string> = {
 
   // 검 스테이지 스탯
   'stat.protection': 'Protection',
-  'stat.successRate': 'Enhance Success Rate',
+  'stat.successRate': 'Enchant Success Rate',
   'sword.none': 'No Sword',
   'sword.maxLevel': 'Max Level',
 
@@ -48,7 +48,7 @@ export const en: Record<TranslationKey, string> = {
   'commission.arrived': 'New trade offer!',
 
   // 강화 결과 토스트
-  'toast.success': 'Enhanced',
+  'toast.success': 'Enchanted',
   'toast.protected': 'Protected',
   'toast.destroyed': 'Destroyed',
 

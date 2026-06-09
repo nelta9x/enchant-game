@@ -50,6 +50,14 @@ export type FloatingTextEntry = { text: TranslationKey; weight: number }
 // 이벤트 타이밍 키(예: 'enhanceFail') → 후보 엔트리 목록. 빈 배열 = 아직 안 채운 슬롯(미표시).
 export type FloatingTextData = Record<string, FloatingTextEntry[]>
 
+// 게임플레이 튜닝 설정(코드 상수가 아니라 데이터 파일 config.json 에서 적재). 연출 길이(SHAKE_SEC 등)와
+// 무관하게 따로 조절할 전역 값을 모은다 — 항목이 늘면 여기에 필드를 추가한다.
+//  - enhanceDelayMs: 강화 1회 후 다음 강화까지의 입력 잠금 길이(ms, 정수 >= 0). 0 = 딜레이 없음.
+//    (참고: 떨림/등장 억제 창 ~400ms 보다 짧으면 새 검 등장이 깜빡일 수 있으나 강제하진 않는다.)
+export type GameConfig = {
+  enhanceDelayMs: number
+}
+
 // 의뢰 버킷에서 출제될 거래 1종(언어 중립). 등장 확률(weight) + "지불(cost)" + "보상(reward)"을 아이템별로 둔다.
 // 거래는 비용·보상이 각각 골드 또는 아이템이라 4조합이 가능하다(단 골드 비용은 아이템 보상만 — 아래 제약).
 //

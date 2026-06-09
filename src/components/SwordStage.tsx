@@ -70,9 +70,9 @@ export function SwordStage({
     return 'text-rate-low'
   })()
 
-  // 성공률 스탯 — 외곽(테두리·배경) 없이 텍스트만 둔다. 같은 내용을 두 위치에 쓴다(반응형):
-  // 좁은 화면·모바일은 이름 아래 흐름에, lg+ 에선 검 오른쪽 빈 공간으로. 동시에 보이지 않으므로
-  // (한쪽은 invisible/hidden) 접근성 트리에도 한 번만 노출된다.
+  // 성공률 스탯 — 외곽(테두리·배경) 없이 텍스트만 둔다. 모든 폭에서 이름 배너 아래 흐름에 한 번만
+  // 두어 검 아래 가운데(부모가 flex flex-col items-center)에 놓는다 — 라벨·값은 Stat 의 items-center 로
+  // 묶음 중앙정렬된다. (이전엔 lg+ 에서 검 오른쪽으로 옮겼으나, 가운데 정렬로 통일했다.)
   const successStat = (
     <Stat
       label={t('stat.successRate')}
@@ -174,14 +174,12 @@ export function SwordStage({
 
         {/* 보호 결계 전경(하단 뱃지 + 발동 플레어) — 검 위에 그려 필요/보유·상태를 또렷이 드러낸다. */}
         <ProtectionWard {...protection} />
-
-        {/* lg+ 전용: 성공률(외곽 없는 텍스트)을 검 오른쪽 하단의 빈 공간으로 옮긴다. 검 박스를 기준으로
-            배치해 검과 함께 움직이고, 좁은 폭(~lg 미만)에선 갭이 없어 강화 버튼과 겹치므로 숨긴다
-            (그 구간은 아래 흐름상 스탯을 쓴다). */}
-        <div className="absolute bottom-0 left-full hidden lg:block">
-          {successStat}
-        </div>
       </div>
+
+      {/* 성공률(외곽 없는 텍스트) — 검 바로 아래·이름 배너 위 흐름에 두어 모든 폭에서 가운데에 놓는다.
+          -mt-2 로 컬럼 간격(gap-5)을 이 한 자식만 0.5rem 좁혀 성공률을 조금 더 위로 올린다 — 간격 토큰에서
+          자동 도출되지 않는 수동 오프셋이라, gap-5 를 바꾸면 이 보정값도 함께 재조정해야 한다. */}
+      <div className="-mt-2">{successStat}</div>
 
       {/* 이름 배너 */}
       <div className="bg-frame/70 p-[1.5px]" style={{ clipPath: HEX }}>
@@ -200,16 +198,12 @@ export function SwordStage({
         </div>
       </div>
 
-      {/* 성공률(외곽 없는 텍스트). lg+ 에선 검 오른쪽으로 옮기되, 여기서는 invisible 로 공간만
-          유지해 컬럼 높이가 그대로라 세로 중앙정렬된 검 위치가 흔들리지 않는다(흐름에서 빼면 검이 재중앙됨). */}
-      <div className="lg:invisible">{successStat}</div>
     </div>
   )
 }
 
 // 성공률 텍스트(외곽 없음) — 라벨 + 값만. 값 색은 신호등 분기를 valueClassName 으로 주입받는다.
-// py 패딩은 흐름상(invisible) 인스턴스의 높이를 유지해 lg 에서 검 위치가 흔들리지 않게 하는
-// 용도로 남긴다(외곽만 사라지고 차지하는 공간은 동일).
+// items-center 로 라벨·값을 묶음 중앙정렬한다(검 아래 가운데). px/py 패딩은 검과의 간격용.
 function Stat({
   label,
   value,

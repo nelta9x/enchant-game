@@ -5,6 +5,7 @@ import {
   finish,
   latestRunning,
   pump,
+  runningEventsOf,
   startable,
   type Effect,
   type EffectSpec,
@@ -99,6 +100,22 @@ describe('latestRunning — 같은 kind 중 최신(id 최댓값)', () => {
   it('해당 kind 가 없으면 null', () => {
     expect(latestRunning([fx(1, { kind: 'a' })], 'b')).toBeNull()
     expect(latestRunning([], 'a')).toBeNull()
+  })
+})
+
+describe('runningEventsOf — 같은 kind 의 실행 중 효과 전부', () => {
+  it('같은 kind 를 running 순서대로 모두 반환한다(다른 kind 제외)', () => {
+    const running = [
+      fx(3, { kind: 'burst' }),
+      fx(5, { kind: 'other' }),
+      fx(7, { kind: 'burst' }),
+    ]
+    expect(runningEventsOf(running, 'burst').map((e) => e.id)).toEqual([3, 7])
+  })
+
+  it('해당 kind 가 없으면 빈 배열', () => {
+    expect(runningEventsOf([fx(1, { kind: 'a' })], 'b')).toEqual([])
+    expect(runningEventsOf([], 'a')).toEqual([])
   })
 })
 

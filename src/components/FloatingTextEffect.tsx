@@ -19,7 +19,7 @@ import { useOneShot } from './useOneShot'
 // SwordStage 의 spriteOverlay 슬롯에 얹어 검 박스 위 전면에 그린다 — 그 슬롯은 떨림 레이어 밖 형제라
 // (HammerStrike 와 동일) 텍스트가 검과 함께 흔들리지 않는다. 좌표 관례도 HammerStrike 와 같다:
 // 박스 중심(0,0) 기준, x+ 오른쪽 · y- 위. delay 로 결과 분출("터진다") 박자에 맞춰 등장한다.
-// spriteOverlay 는 ProtectionWard(좌상단 결계 서클)·성공률 스탯보다 먼저 렌더되어 그 형제 UI 가 위에
+// spriteOverlay 는 ProtectionWard(좌상단 결계 서클)보다 먼저 렌더되어 그 형제 UI 가 위에
 // 그려지므로, 컨테이너에 z-50 을 줘 텍스트를 최전면으로 끌어올린다(검 박스는 z-index 가 없어 stacking
 // context 가 아니라 형제 비교에서 z-50 이 auto 를 이긴다 — pointer-events-none 이라 결계 클릭은 그대로 통과).
 //

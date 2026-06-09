@@ -2,6 +2,7 @@ import type {
   CommissionConfig,
   FloatingTextData,
   FloatingTextEntry,
+  GameConfig,
   ItemData,
   ShopItem,
   SwordData,
@@ -11,6 +12,7 @@ import { loadShop } from './loadShop'
 import { loadItems } from './loadItems'
 import { loadCommission } from './loadCommission'
 import { loadFloatingText } from './loadFloatingText'
+import { loadConfig } from './loadConfig'
 
 // 중앙 데이터 관리자.
 // 게임이 켜질 때 load()로 데이터를 적재하고, 모든 게임 데이터는
@@ -21,6 +23,7 @@ export class DataManager {
   private items: readonly ItemData[] = []
   private commission: CommissionConfig | null = null
   private floatingText: FloatingTextData = {}
+  private config: GameConfig | null = null
   private loaded = false
 
   // 데이터 파일(sources/*.json)을 검증·적재한다(동기).
@@ -45,6 +48,8 @@ export class DataManager {
     this.commission = loadCommission(knownItemIds)
     // 플로팅 텍스트 연출 데이터 — 검·아이템·의뢰와 무관(이벤트 키 → 문구만)이라 순서 제약 없음.
     this.floatingText = loadFloatingText()
+    // 게임플레이 튜닝 설정(강화 딜레이 등) — 다른 데이터와 무관한 독립 스칼라라 순서 제약 없음.
+    this.config = loadConfig()
     this.loaded = true
   }
 
@@ -127,6 +132,13 @@ export class DataManager {
   getFloatingTexts(eventKey: string): readonly FloatingTextEntry[] {
     this.ensureLoaded()
     return this.floatingText[eventKey] ?? []
+  }
+
+  // 게임플레이 튜닝 설정(강화 입력 딜레이 등). GameScreen 셸이 읽어 잠금/연출 길이에 쓴다(load 이후 호출 보장).
+  getConfig(): GameConfig {
+    this.ensureLoaded()
+    // loaded 면 config 는 항상 채워져 있다(load 가 적재). 방어적 non-null(commission 패턴 동일).
+    return this.config as GameConfig
   }
 }
 

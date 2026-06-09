@@ -7,7 +7,7 @@ import { countOf, PROTECTION_TICKET_ID } from '../lib/items'
 import { sound } from '../lib/sound'
 import { swordSpriteUrl } from '../lib/sprites'
 import { useEffectStore } from '../store/effectStore'
-import { latestRunning } from '../store/effectQueue'
+import { latestRunning, runningEventsOf, type Effect } from '../store/effectQueue'
 import { useGameStore } from '../store/gameStore'
 import { useCommissionStore } from '../store/commissionStore'
 import type { Commission } from '../store/commissionQueue'
@@ -58,6 +58,27 @@ const ANNOUNCE_KEY: Record<string, TranslationKey> = {
   successBurst: 'toast.success',
   destruction: 'toast.destroyed',
   protectedShake: 'toast.protected',
+}
+
+// 실행 중 버스트 효과(성공·파괴)를 연출 이벤트로 투영한다 — 같은 kind 를 전부 뽑아(runningEventsOf:
+// 겹친 옛 버스트 유실 방지) {id, spriteUrl, particleCount} 로 매핑한다. spriteUrl 없는 효과(자리만 있는
+// 잠금 등)는 제외(빈 배열). 성공·파괴가 동일 형태라 한 곳에서 만든다 — 두 memo 의 중복을 없애 payload
+// 필드를 늘려도 한쪽만 고쳐 어긋나는 일이 없게 한다.
+function toBurstEvents(
+  running: Effect[],
+  kind: string,
+): { id: number; spriteUrl: string; particleCount: number }[] {
+  return runningEventsOf(running, kind).flatMap((e) =>
+    e.payload?.spriteUrl
+      ? [
+          {
+            id: e.id,
+            spriteUrl: e.payload.spriteUrl,
+            particleCount: e.payload.particleCount ?? 0,
+          },
+        ]
+      : [],
+  )
 }
 
 // 메인 강화 화면. 레퍼런스 레이아웃을 따른 가로 스테이지:
@@ -281,17 +302,18 @@ export function GameScreen() {
       setFloatingText({ id: floatTextKey.current, textKey: pickedTextKey })
     }
 
-    // 강화 버튼 잠금(0.4s)은 성공·파괴 공통 — 연출과 별개의 병렬 효과(lockCount). SHAKE_SEC 가 단일 출처.
+    // 강화 버튼 잠금(연타 딜레이)은 성공·파괴·방지 공통 — 연출과 별개의 병렬 효과(lockCount). 길이는
+    // 데이터(config.enhanceDelayMs)에서 읽어 떨림(SHAKE_SEC) 연출과 독립적으로 조절한다.
     const lockEnhance = () =>
       enqueueEffect({
         kind: 'enhanceLock',
         exclusive: false,
         locksEnhance: true,
-        durationMs: SHAKE_SEC * 1000,
+        durationMs: dataManager.getConfig().enhanceDelayMs,
       })
 
     if (result.outcome === 'success') {
-      // 성공 = (실패와 동일 안무) 떨림 → 황금 파티클 분출 + 상위 검 등장(잠금X) ∥ 강화 버튼 잠금(0.4s).
+      // 성공 = (실패와 동일 안무) 떨림 → 황금 파티클 분출 + 상위 검 등장(잠금X) ∥ 강화 버튼 잠금(강화 딜레이).
       // 잔상은 강화 전 검(fromId), 파티클 수는 도달 검(toId)의 단계에 비례 — 둘 다 이 뷰 경계에서 해석(원칙 2).
       const from = dataManager.getSwordById(result.fromId)
       const next = dataManager.getSwordById(result.toId)
@@ -307,7 +329,7 @@ export function GameScreen() {
           },
         })
         // 새(상위) 검 등장을 떨림 구간(0.4s)만 가린다 — 파괴와 동일(분출에서 드러나듯 등장).
-        // 잠금 해제(0.4s) 후 재강화로 마운트되는 새 검이 잘못 지연돼 사라지지 않도록 연출 전체가 아닌 0.4s만.
+        // 잠금 해제(강화 딜레이) 후 재강화로 마운트되는 새 검이 잘못 지연돼 사라지지 않도록 연출 전체가 아닌 0.4s만.
         enqueueEffect({
           kind: 'entranceSuppress',
           exclusive: false,
@@ -322,7 +344,7 @@ export function GameScreen() {
     } else if (result.outcome === 'destroyed') {
       // 파괴 폭발 효과음 — 떨림(0.4s)이 끝나 폭발이 터지는 순간에 맞춰 울린다('캉!' 직후가 아닌 분출 시점).
       sound.playSfx('enchant_destroyed', { delayMs: SHAKE_SEC * 1000 })
-      // 파괴 = 폭발 연출(잠금X·~1초) ∥ 강화 버튼 잠금(0.4s). 파티클 수는 파괴된 검(fromId)의 단계에 비례.
+      // 파괴 = 폭발 연출(잠금X·~1초) ∥ 강화 버튼 잠금(강화 딜레이). 파티클 수는 파괴된 검(fromId)의 단계에 비례.
       // 스프라이트(fromId)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
       const target = destructionTargetOf(result)
       const destroyed = target ? dataManager.getSwordById(target.id) : undefined
@@ -338,7 +360,7 @@ export function GameScreen() {
           },
         })
         // 새 검(+0) 등장을 떨림 구간(0.4s)만 가린다 — 파괴 연출 전체(~1초)가 아니라.
-        // 그래야 잠금 해제(0.4s) 후 +0 을 재강화해 성공해도 새 검이 0.4s 사라지지 않는다.
+        // 그래야 잠금 해제(강화 딜레이) 후 +0 을 재강화해 성공해도 새 검이 0.4s 사라지지 않는다.
         enqueueEffect({
           kind: 'entranceSuppress',
           exclusive: false,
@@ -366,7 +388,7 @@ export function GameScreen() {
         locksEnhance: false,
         durationMs: SHAKE_SEC * 1000,
       })
-      // 강화 버튼 잠금(0.4s)은 성공·파괴와 동일하게 건다 — 마우스·스페이스 모두 강화 딜레이가 일관되도록.
+      // 강화 버튼 잠금(강화 딜레이)은 성공·파괴와 동일하게 건다 — 마우스·스페이스 모두 강화 딜레이가 일관되도록.
       lockEnhance()
     }
   }
@@ -387,28 +409,22 @@ export function GameScreen() {
     onOpenShop: openShop,
   })
 
-  // 연출 트리거는 effectStore 의 running 에서 "가장 최근"으로 뽑는다(latestRunning — 겹친 새 효과 유실 방지).
-  // 생명주기·타이밍은 Effect 시스템이 소유한다.
-  const destructionEvent = useMemo<DestructionEvent | null>(() => {
-    const fx = latestRunning(running, 'destruction')
-    return fx?.payload?.spriteUrl
-      ? {
-          id: fx.id,
-          spriteUrl: fx.payload.spriteUrl,
-          particleCount: fx.payload.particleCount ?? 0,
-        }
-      : null
-  }, [running])
-  const successEvent = useMemo<SuccessEvent | null>(() => {
-    const fx = latestRunning(running, 'successBurst')
-    return fx?.payload?.spriteUrl
-      ? {
-          id: fx.id,
-          spriteUrl: fx.payload.spriteUrl,
-          particleCount: fx.payload.particleCount ?? 0,
-        }
-      : null
-  }, [running])
+  // 연출 트리거는 effectStore 의 running 에서 뽑는다(생명주기·타이밍은 Effect 시스템이 소유). 대부분은
+  // "가장 최근" 1개만(latestRunning — 겹친 새 효과 유실 방지)이지만, 성공·파괴 버스트는 running 의 해당
+  // 효과를 전부 렌더한다(toBurstEvents) — 연출 중 재강화해도 옛 버스트가 잘리지 않고 끝까지 터지도록
+  // (파티클은 떨림 0.4s 뒤에 나오는데, 잠금 해제 직후 재강화하면 최신 1개만 그릴 경우 버스트가 매번
+  // 리셋돼 안 나온다). 동시 개수는 잠금(config.enhanceDelayMs)이 버스트(~1s)보다 짧아 보통 ~2~3개로
+  // 바운드되지만, 잠금을 버스트보다 훨씬 짧게(권장 하한 ~400ms 미만) 두면 마우스 연타로 더 누적될 수 있다.
+  // 주의: flatMap 이 running 변경마다 새 이벤트 객체를 만들어 각 연출의 useOneShot 백스톱 타이머가 매번
+  // 리셋되지만 무해하다 — 실제 unmount 는 effectStore 의 _finish(durationMs)가 소유하고 백스톱은 보조다.
+  const destructionEvents = useMemo<DestructionEvent[]>(
+    () => toBurstEvents(running, 'destruction'),
+    [running],
+  )
+  const successEvents = useMemo<SuccessEvent[]>(
+    () => toBurstEvents(running, 'successBurst'),
+    [running],
+  )
   const coinFlightEvent = useMemo<CoinFlightEvent | null>(() => {
     const fx = latestRunning(running, 'coinFlight')
     return fx ? { id: fx.id, coinCount: fx.payload?.coinCount ?? 0 } : null
@@ -503,8 +519,14 @@ export function GameScreen() {
               }}
               spriteOverlay={
                 <>
-                  <DestructionEffect event={destructionEvent} />
-                  <SuccessEffect event={successEvent} />
+                  {/* 성공·파괴 버스트는 동시에 여러 개가 떠 있을 수 있다(재강화 시 옛 버스트 유지) —
+                      각 효과를 id 로 키잉해 독립 재생한다. */}
+                  {destructionEvents.map((ev) => (
+                    <DestructionEffect key={ev.id} event={ev} />
+                  ))}
+                  {successEvents.map((ev) => (
+                    <SuccessEffect key={ev.id} event={ev} />
+                  ))}
                   {/* 망치는 결과 연출 위(전면)에 그려 내려치는 순간이 가려지지 않게 한다(맨 뒤 렌더). */}
                   <HammerStrike event={hammerStrikeEvent} />
                   {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
