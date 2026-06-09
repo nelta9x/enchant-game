@@ -23,6 +23,12 @@ import { coinCount } from './coins'
 import { CoinFlight, COIN_FLIGHT_MS, type CoinFlightEvent } from './CoinFlight'
 import { DropScatter, DROP_LIFETIME_MS, type DropEvent } from './DropScatter'
 import { ItemFlight, ITEM_FLIGHT_MS, type ItemFlightEvent } from './ItemFlight'
+import {
+  HammerStrike,
+  HAMMER_STRIKE_MS,
+  HAMMER_IMPACT_MS,
+  type HammerStrikeEvent,
+} from './HammerStrike'
 import { EnhanceButton } from './EnhanceButton'
 import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import { InventoryPanel } from './InventoryPanel'
@@ -232,8 +238,18 @@ export function GameScreen() {
     const result = enhance(effectiveProtection)
     if (!result) return
 
-    // 강화 '캉!' 타격음 — 결과(성공·파괴·방지)와 무관하게 내려치는 순간 한 번 재생(버튼·스페이스 공통 경로).
-    sound.playSfx('enhance')
+    // 강화 '캉!' 타격음 — 결과(성공·파괴·방지)와 무관하게 한 번 재생. 망치가 검에 닿는 순간(HAMMER_IMPACT_MS,
+    // 분출 직전)에 맞춰 미뤄, 화면에서 내리꽂는 순간 울리도록 한다(버튼·스페이스 공통 경로).
+    sound.playSfx('enhance', { delayMs: HAMMER_IMPACT_MS })
+
+    // 망치 내려치기 연출 — 결과와 무관하게 강화 시도마다 검 위로 호라드릭 망치가 내리꽂힌다(잠금X·병렬).
+    // 잠금은 아래 enhanceLock 가 전담하고, 이 효과는 순수 시각(임팩트가 분출 직전에 맞물려 친다→터진다).
+    enqueueEffect({
+      kind: 'hammerStrike',
+      exclusive: false,
+      locksEnhance: false,
+      durationMs: HAMMER_STRIKE_MS,
+    })
 
     // 강화 버튼 잠금(0.4s)은 성공·파괴 공통 — 연출과 별개의 병렬 효과(lockCount). SHAKE_SEC 가 단일 출처.
     const lockEnhance = () =>
@@ -371,6 +387,10 @@ export function GameScreen() {
     const fx = latestRunning(running, 'itemFlight')
     return fx?.payload?.itemId ? { id: fx.id, itemId: fx.payload.itemId } : null
   }, [running])
+  const hammerStrikeEvent = useMemo<HammerStrikeEvent | null>(() => {
+    const fx = latestRunning(running, 'hammerStrike')
+    return fx ? { id: fx.id } : null
+  }, [running])
   const dropEvent = useMemo<DropEvent | null>(() => {
     const fx = latestRunning(running, 'drop')
     return fx?.payload?.drops?.length
@@ -455,6 +475,8 @@ export function GameScreen() {
                 <>
                   <DestructionEffect event={destructionEvent} />
                   <SuccessEffect event={successEvent} />
+                  {/* 망치는 결과 연출 위(전면)에 그려 내려치는 순간이 가려지지 않게 한다(맨 뒤 렌더). */}
+                  <HammerStrike event={hammerStrikeEvent} />
                 </>
               }
               // 새 검 등장 지연은 "떨림 구간"에만(entranceSuppress 효과의 수명 = 0.4s) — 파괴 연출
