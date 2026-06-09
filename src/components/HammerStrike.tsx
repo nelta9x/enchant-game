@@ -116,8 +116,9 @@ export function HammerStrike({ event }: { event: HammerStrikeEvent | null }) {
                 ease: 'easeOut',
               },
             }}
-            // 연출 중 새 강화로 교체되면 끊기지 않게 부드럽게 사라진다(다른 연출과 동일).
-            exit={{ opacity: 0, transition: { duration: 0.12 } }}
+            // 연출 중 다시 강화하면(망치 위에 망치) 옛 망치를 즉시 지우고 새 타격을 처음부터 튼다 —
+            // exit 페이드를 두지 않아 AnimatePresence 가 키 교체 시 옛 노드를 곧장 제거한다(교차 페이드
+            // 겹침 없는 하드 컷). 자연 종료 시엔 이미 마지막 키프레임이 opacity 0 이라 사라짐에 차이 없다.
           />
         )}
       </AnimatePresence>
