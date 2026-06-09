@@ -121,7 +121,7 @@ export function EnhanceButton({
       disabled={disabled}
       aria-keyshortcuts="Space"
       aria-disabled={charging || undefined}
-      whileTap={ready ? { scale: 0.95 } : undefined}
+      whileTap={{ scale: 0.95 }}
       className={`relative flex w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border bg-gradient-to-b from-panel-soft to-panel px-3 py-5 transition-opacity ${
         ready
           ? 'cursor-pointer border-gold/60 shadow-[0_0_28px_-4px_var(--color-gold)]' // 가능 — 금색 글로우 + 펄스
