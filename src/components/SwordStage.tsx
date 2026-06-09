@@ -1,11 +1,12 @@
 import { useEffect, type ReactNode, type Ref } from 'react'
 import { motion, useAnimationControls } from 'motion/react'
-import { useT } from '../i18n'
+import { useI18nStore, useT } from '../i18n'
 import type { SwordData } from '../data/types'
-import { formatRate } from '../lib/format'
+import { formatAmount, formatGold, formatRate } from '../lib/format'
 import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, SHAKE_TRANSITION } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
+import { Coin } from './Coin'
 
 // 중앙 검 스테이지: 글로우 + 마법진(결계) + 스프라이트 + 레벨 뱃지 + 이름 배너 + 스탯 바.
 // 파괴보호장치는 검을 감싸는 "보호 결계"로 표현한다 — 발동(armed) 시 마법진이 강화색으로 점등하고
@@ -26,6 +27,9 @@ type SwordStageProps = {
   shakeKey?: number
   // 검 스프라이트 박스에 대한 ref — 판매 코인 연출이 "코인이 뿜어져 나올 출발점"을 측정하는 데 쓴다.
   swordBoxRef?: Ref<HTMLDivElement>
+  // 판매가 강조(pop) 트리거. shakeKey 와 같은 idiom — 값이 바뀔 때마다 가격 표시가 한 번 통 튄다.
+  // 강화 성공으로 가격이 오른 순간에만 호출 측이 올린다(보관·장착·판매로 가격이 바뀔 땐 올리지 않음).
+  pricePopKey?: number
 }
 
 // 양피지 위에 얹는 가로 육각형 배너 클립.
@@ -40,8 +44,10 @@ export function SwordStage({
   entranceDelay = 0,
   shakeKey = 0,
   swordBoxRef,
+  pricePopKey = 0,
 }: SwordStageProps) {
   const t = useT()
+  const lang = useI18nStore((s) => s.lang)
   const hasSword = sword !== undefined && level !== null
   // 결계 발동(armed) 여부 — 배경 마법진 점등·실드 돔을 켜는 단일 플래그(순수 상태에서 유도).
   const armed = protection.state.kind === 'armed'
@@ -54,6 +60,18 @@ export function SwordStage({
       shakeControls.start({ ...SHAKE_KEYFRAMES, transition: SHAKE_TRANSITION })
     }
   }, [shakeKey, shakeControls])
+
+  // 판매가 강조(pop) — 강화 성공으로 가격이 오를 때 pricePopKey 가 바뀌며 한 번 "커졌다 원래대로" 튄다
+  // (shakeControls 와 동일 idiom — RecordGauge 의 통 튀는 연출 미러). 첫 마운트(0)엔 조용.
+  const priceControls = useAnimationControls()
+  useEffect(() => {
+    if (pricePopKey > 0) {
+      priceControls.start({
+        scale: [1, 1.35, 1], // 원래 크기 → 커졌다가 → 원래 크기
+        transition: { duration: 0.4, ease: 'easeOut', times: [0, 0.45, 1] },
+      })
+    }
+  }, [pricePopKey, priceControls])
 
   const successText =
     sword && sword.successRate !== null
@@ -69,6 +87,10 @@ export function SwordStage({
     if (pct >= 55) return 'text-rate-mid'
     return 'text-rate-low'
   })()
+
+  // 판매가(검의 sellPrice) 표시 여부 — 검 없음/판매 불가(null·0)면 자리만 지키고 숨긴다.
+  const hasPrice =
+    !!sword && sword.sellPrice !== null && sword.sellPrice > 0
 
   // 성공률 스탯 — 외곽(테두리·배경) 없이 텍스트만 둔다. 모든 폭에서 이름 배너 아래 흐름에 한 번만
   // 두어 검 아래 가운데(부모가 flex flex-col items-center)에 놓는다 — 라벨·값은 Stat 의 items-center 로
@@ -176,10 +198,37 @@ export function SwordStage({
         <ProtectionWard {...protection} />
       </div>
 
-      {/* 성공률(외곽 없는 텍스트) — 검 바로 아래·이름 배너 위 흐름에 두어 모든 폭에서 가운데에 놓는다.
-          -mt-2 로 컬럼 간격(gap-5)을 이 한 자식만 0.5rem 좁혀 성공률을 조금 더 위로 올린다 — 간격 토큰에서
+      {/* 성공률 + 판매가(외곽 없는 텍스트) — 검 바로 아래·이름 배너 위 흐름에 한 묶음으로 두어 모든 폭에서
+          가운데에 놓는다. -mt-2 로 컬럼 간격(gap-5)을 이 한 자식만 0.5rem 좁혀 위로 올린다 — 간격 토큰에서
           자동 도출되지 않는 수동 오프셋이라, gap-5 를 바꾸면 이 보정값도 함께 재조정해야 한다. */}
-      <div className="-mt-2">{successStat}</div>
+      <div className="-mt-2 flex flex-col items-center gap-0.5">
+        {successStat}
+        {/* 판매가(코인 + 금색 숫자) — 강화 성공으로 오를 때 한 번 통 튄다(priceControls). 라벨 없이
+            코인이 통화를 대신하고, 통화 맥락은 aria-label(formatGold)로 보존한다(SellButton 미러).
+            판매 불가(검 없음/판매가 null·0)면 invisible 로 자리만 지켜 스테이지 높이를 고정한다. */}
+        <motion.div
+          animate={priceControls}
+          aria-label={
+            hasPrice
+              ? `${t('cost.sell')}: ${formatGold(sword.sellPrice as number, lang)}`
+              : undefined
+          }
+          aria-hidden={hasPrice ? undefined : true}
+          className={`flex min-h-[1.75rem] items-center justify-center gap-1.5 text-xl font-bold tabular-nums text-gold ${
+            hasPrice ? '' : 'invisible'
+          }`}
+          style={{ textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}
+        >
+          <Coin className="h-6 w-6" />
+          {/* 판매가 영역의 자리(폭·높이)를 고정해 0강(가격 없음)과 가격 표시, 자릿수 변화에도 UI가
+              들썩이지 않게 한다. 코인+숫자가 가운데 정렬이라 숫자 폭이 바뀌면 행이 다시 중앙으로 맞춰지며
+              코인이 좌우로 움직인다. 그래서 숫자에 고정 폭(min-w)+text-center, 행에 min-h 를 줘 가격 유무·
+              자릿수와 무관하게 자리를 고정한다(SellButton 의 min-w 슬롯 관례). 없으면 invisible 로 숨긴다. */}
+          <span className="min-w-[5rem] whitespace-nowrap text-center">
+            {hasPrice ? formatAmount(sword.sellPrice as number) : ' '}
+          </span>
+        </motion.div>
+      </div>
 
       {/* 이름 배너 */}
       <div className="bg-frame/70 p-[1.5px]" style={{ clipPath: HEX }}>

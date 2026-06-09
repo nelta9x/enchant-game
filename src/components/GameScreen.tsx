@@ -182,6 +182,11 @@ export function GameScreen() {
     setGoldGain({ id: goldGainKey.current, amount })
   }, [])
 
+  // 판매가 강조(pop) 트리거 — 강화 성공으로 검 가치(sellPrice)가 오른 순간에만 올린다(아래 handleEnhance
+  // 성공 분기). SwordStage 가 shakeKey 와 같은 방식으로 소비해 가격 표시를 한 번 통 튀게 한다. 보관·장착·
+  // 판매로 currentSwordId(→가격)가 바뀔 때는 이 분기를 타지 않으므로 pop 이 터지지 않는다.
+  const [pricePopKey, setPricePopKey] = useState(0)
+
   // 강화 결과 플로팅 텍스트("아이구!..." 등) — 데이터(floatingText.json) 기반. 강화 결과(성공/실패/방지)를
   // 이벤트 키로 매핑해 후보 한 줄을 뽑아 검 중상단에 띄운다. id 단조 증가로 연타도 교체 재생되며, 빈
   // 슬롯(미설정 문구)이면 null 이라 아무것도 안 뜬다.
@@ -336,6 +341,17 @@ export function GameScreen() {
           locksEnhance: false,
           durationMs: SHAKE_SEC * 1000,
         })
+      }
+      // 가치 상승 강조 — 도달 검(toId)이 강화 전(fromId)보다 비싸면 가격 표시를 한 번 통 튀게 한다.
+      // "강화 성공으로 올랐다"는 사실은 이 분기에만 있으므로 여기서 트리거한다(장착·판매와 구분).
+      if (
+        next &&
+        from &&
+        next.sellPrice !== null &&
+        from.sellPrice !== null &&
+        next.sellPrice > from.sellPrice
+      ) {
+        setPricePopKey((k) => k + 1)
       }
       lockEnhance()
       // 최종 검(다음 단계 없음)에 도달하면 게임 클리어. id 하드코딩 대신 nextId === null 로 판별해
@@ -540,6 +556,8 @@ export function GameScreen() {
               }
               // 방지 시 실제 검을 떨게 한다(파괴와 구분 — 폭발 없이 떨림만).
               shakeKey={shakeKey}
+              // 강화 성공으로 가치(판매가)가 오른 순간 가격 표시를 한 번 통 튀게 한다.
+              pricePopKey={pricePopKey}
               // 판매 코인이 뿜어져 나올 출발점(검 박스) 측정용.
               swordBoxRef={swordBoxRef}
             />
@@ -557,7 +575,7 @@ export function GameScreen() {
             </div>
           </div>
 
-          {/* 우: 강화 카드(비용 포함) + 판매 버튼(판매가 포함) + 보관 버튼(세로 중앙).
+          {/* 우: 강화 카드(비용 포함) + 판매 버튼 + 보관 버튼(세로 중앙). 판매가는 검 스테이지에 금색으로 표시.
               보유 골드는 좌측 인벤토리 패널의 별도 섹션으로 옮겼다(화폐 분리). */}
           <div className="flex flex-col items-center justify-center">
             {/* 액션 패널 = 인벤토리 패널과 동일 크기. 폭은 컬럼(16rem)으로 이미 같고, 높이는 인벤토리
@@ -570,11 +588,7 @@ export function GameScreen() {
                 onEnhance={handleEnhance}
                 enhanceCost={sword?.enhanceCost ?? null}
               />
-              <SellButton
-                disabled={!canSell}
-                onSell={handleSell}
-                sellPrice={sword?.sellPrice ?? null}
-              />
+              <SellButton disabled={!canSell} onSell={handleSell} />
               <StoreButton disabled={!canStore} onStore={handleStore} />
             </div>
           </div>
