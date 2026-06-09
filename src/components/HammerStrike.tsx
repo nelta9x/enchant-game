@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { itemSpriteUrl } from '../lib/sprites'
 import { SHAKE_SEC } from './shake'
 import { useOneShot } from './useOneShot'
@@ -34,6 +35,14 @@ const BASE_ROTATE = 0 // 임팩트 기준 자세(머리=위, 손잡이=아래). 
 const WINDUP_TILT = 56 // 치켜들 때 머리를 오른쪽으로 젖힌 정도(스윙 윈드업) — 클수록 크게 휘두름
 const FOLLOW_TILT = 22 // 임팩트에서 휘둘러 따라넘긴 정도(반대 방향 기울임)
 
+// 좁은(세로) 화면 보정 — 치켜든 자세(START·HOLD·LIFT)의 +x 가 검 박스 중심에서 오른쪽으로 멀리 나가, 폭이
+// 좁으면 화면 밖으로 넘쳐 가로 스크롤/줌(확대처럼 보임)을 만든다. 그 raised 위치의 x 만 안쪽으로 줄여
+// (임팩트 부근 위치는 그대로) 화면 안에서 시작하게 한다. 임팩트/반동/정착은 검 근처라 영향 없음.
+// 값(0.6)·기준폭(sm=640px)은 눈으로 맞추는 튜닝값 — 거슬리면 조정. (가로 넘침 자체는 루트의 overflow-x 가
+// 한 번 더 막는다 — GameScreen 최상위 컨테이너.)
+const NARROW_RAISE_QUERY = '(max-width: 640px)'
+const NARROW_RAISE_X_SCALE = 0.6
+
 // ── 타임라인(초, t=0 = 강화 시점) ───────────────────────────────────────────────
 // 핵심: 0→HOLD_UNTIL 은 치켜든 채 대기(윈드업)하고, HOLD_UNTIL→IMPACT_AT 에 짧고 빠르게 내리꽂는다
 // (스냅 = 쾌감). 임팩트는 결과 분출(BURST_AT = SHAKE_SEC) "직전"에 둬 친다 → 한 박자 뒤 터진다.
@@ -59,6 +68,10 @@ export type HammerStrikeEvent = { id: number }
 export function HammerStrike({ event }: { event: HammerStrikeEvent | null }) {
   const active = useOneShot(event, HAMMER_STRIKE_MS)
 
+  // 좁은(세로) 화면이면 치켜든 위치의 x 를 안쪽으로 줄여 화면 밖에서 시작하지 않게 한다(위 주석 참고).
+  const narrowRaise = useMediaQuery(NARROW_RAISE_QUERY)
+  const raiseX = (v: number) => (narrowRaise ? v * NARROW_RAISE_X_SCALE : v)
+
   return (
     <div
       className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-visible"
@@ -74,7 +87,7 @@ export function HammerStrike({ event }: { event: HammerStrikeEvent | null }) {
             className="h-24 w-24 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)] sm:h-28 sm:w-28"
             style={{ imageRendering: 'pixelated' }}
             initial={{
-              x: START.x,
+              x: raiseX(START.x),
               y: START.y,
               rotate: BASE_ROTATE + WINDUP_TILT,
               scale: 0.9,
@@ -83,7 +96,14 @@ export function HammerStrike({ event }: { event: HammerStrikeEvent | null }) {
             animate={{
               // 치켜듦(START)→윈드업(HOLD) 대기 → 빠른 스냅으로 내리꽂아 따라넘김(-FOLLOW_TILT)·확대로
               // 강타(IMPACT) → 반동(RECOIL) → 정착(SETTLE) → 다시 오른쪽 위로 젖히며 사라짐(LIFT).
-              x: [START.x, HOLD.x, IMPACT.x, RECOIL.x, SETTLE.x, LIFT.x],
+              x: [
+                raiseX(START.x),
+                raiseX(HOLD.x),
+                IMPACT.x,
+                RECOIL.x,
+                SETTLE.x,
+                raiseX(LIFT.x),
+              ],
               y: [START.y, HOLD.y, IMPACT.y, RECOIL.y, SETTLE.y, LIFT.y],
               rotate: [
                 BASE_ROTATE + WINDUP_TILT,
