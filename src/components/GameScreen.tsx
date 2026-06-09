@@ -126,8 +126,12 @@ export function GameScreen() {
   const canSell = canSellFn()
   const canStore = canStoreFn()
 
-  // 강화 버튼과 스페이스 단축키가 공유하는 단일 게이트(강화 불가거나 연출 잠금 중이면 비활성).
-  const enhanceDisabled = !canEnhance || lockCount > 0
+  // 강화 쿨다운(연출 잠금) 중인지 — 강화 직후 enhanceDelayMs 동안 lockCount>0 이다.
+  const enhanceLocked = lockCount > 0
+  // 스페이스 단축키 게이트 — 꾹 누름 연사 박자가 이 잠금에 묶여 있으므로(useEnhanceHotkey) 잠금을 포함해 둔다.
+  // 버튼은 잠금 동안 '비활성(흐림)'이 아니라 쿨다운 오버레이로 표현하므로, 아래에서 disabled={!canEnhance} 로
+  // 따로 게이팅한다(클릭은 handleEnhance 의 잠금 가드가 막는다).
+  const enhanceDisabled = !canEnhance || enhanceLocked
 
   // 상점 팝업 열림 상태.
   const [shopOpen, setShopOpen] = useState(false)
@@ -274,6 +278,10 @@ export function GameScreen() {
   }
 
   const handleEnhance = () => {
+    // 쿨다운(강화 딜레이) 중엔 강화 자체를 막는다 — 버튼은 더 이상 disabled 가 아니라(클릭 가능) 쿨다운
+    // 오버레이만 덮으므로, 클릭이 통과해도 여기서 무시해 enhanceDelayMs 가 throttle 로 동작하게 한다.
+    // (스페이스 단축키는 enhanceDisabled 게이트로 이미 막히지만, 이 가드는 마우스 클릭 경로의 안전장치다.)
+    if (enhanceLocked) return
     const result = enhance(effectiveProtection)
     if (!result) return
 
@@ -584,7 +592,9 @@ export function GameScreen() {
                 콘텐츠 높이의 일반 flex 스택. (인벤토리 목록 높이를 바꾸면 이 23.375rem 도 같이 고칠 것.) */}
             <div className="flex w-full flex-col items-center gap-3 lg:grid lg:h-[23.375rem] lg:grid-rows-[2fr_1fr_1fr] lg:items-stretch">
               <EnhanceButton
-                disabled={enhanceDisabled}
+                disabled={!canEnhance}
+                charging={enhanceLocked}
+                chargeMs={dataManager.getConfig().enhanceDelayMs}
                 onEnhance={handleEnhance}
                 enhanceCost={sword?.enhanceCost ?? null}
               />
