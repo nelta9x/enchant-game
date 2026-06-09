@@ -1,8 +1,16 @@
-import type { CommissionConfig, ItemData, ShopItem, SwordData } from './types'
+import type {
+  CommissionConfig,
+  FloatingTextData,
+  FloatingTextEntry,
+  ItemData,
+  ShopItem,
+  SwordData,
+} from './types'
 import { loadSwords } from './loadSwords'
 import { loadShop } from './loadShop'
 import { loadItems } from './loadItems'
 import { loadCommission } from './loadCommission'
+import { loadFloatingText } from './loadFloatingText'
 
 // 중앙 데이터 관리자.
 // 게임이 켜질 때 load()로 데이터를 적재하고, 모든 게임 데이터는
@@ -12,6 +20,7 @@ export class DataManager {
   private shop: readonly ShopItem[] = []
   private items: readonly ItemData[] = []
   private commission: CommissionConfig | null = null
+  private floatingText: FloatingTextData = {}
   private loaded = false
 
   // 데이터 파일(sources/*.json)을 검증·적재한다(동기).
@@ -34,6 +43,8 @@ export class DataManager {
     // 카탈로그(재료)에는 없지만 거래 제안 보상으로 지급할 수 있어야 한다(기준가는 없어도 됨, 고정 지급).
     for (const sku of this.shop) knownItemIds.add(sku.itemId)
     this.commission = loadCommission(knownItemIds)
+    // 플로팅 텍스트 연출 데이터 — 검·아이템·의뢰와 무관(이벤트 키 → 문구만)이라 순서 제약 없음.
+    this.floatingText = loadFloatingText()
     this.loaded = true
   }
 
@@ -109,6 +120,13 @@ export class DataManager {
     this.ensureLoaded()
     // loaded 면 commission 은 항상 채워져 있다(load 가 셋 다 적재). 방어적 non-null.
     return this.commission as CommissionConfig
+  }
+
+  // 이벤트 타이밍 키(예: 'enhanceFail')의 플로팅 텍스트 후보 목록. 미설정 키·빈 슬롯은 빈 배열
+  // (호출 측 pickFloatingText 가 빈 배열 → null 로 처리해 아무것도 안 띄운다).
+  getFloatingTexts(eventKey: string): readonly FloatingTextEntry[] {
+    this.ensureLoaded()
+    return this.floatingText[eventKey] ?? []
   }
 }
 

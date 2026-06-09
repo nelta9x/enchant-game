@@ -30,6 +30,11 @@ import {
   type HammerStrikeEvent,
 } from './HammerStrike'
 import { EnhanceButton } from './EnhanceButton'
+import {
+  FloatingTextEffect,
+  type FloatingTextEvent,
+} from './FloatingTextEffect'
+import { pickFloatingText } from './floatingText'
 import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import { InventoryPanel } from './InventoryPanel'
 import { particleCount } from './particles'
@@ -156,6 +161,14 @@ export function GameScreen() {
     setGoldGain({ id: goldGainKey.current, amount })
   }, [])
 
+  // 강화 결과 플로팅 텍스트("아이구!..." 등) — 데이터(floatingText.json) 기반. 강화 결과(성공/실패/방지)를
+  // 이벤트 키로 매핑해 후보 한 줄을 뽑아 검 중상단에 띄운다. id 단조 증가로 연타도 교체 재생되며, 빈
+  // 슬롯(미설정 문구)이면 null 이라 아무것도 안 뜬다.
+  const [floatingText, setFloatingText] = useState<FloatingTextEvent | null>(
+    null,
+  )
+  const floatTextKey = useRef(0)
+
   // originEl 은 코인 비행의 "출발점"(연출 전용·선택)이다 — 납품(검 소모·보상·생명주기)은 store 가 소유하며
   // 엘리먼트 유무와 무관하게 진행된다. 연출 엘리먼트에 게임 액션을 묶지 않는다(키보드 납품이 막히던 버그의 근본 차단).
   const handleFulfill = (commission: Commission, originEl: HTMLElement | null) => {
@@ -250,6 +263,23 @@ export function GameScreen() {
       locksEnhance: false,
       durationMs: HAMMER_STRIKE_MS,
     })
+
+    // 강화 결과 플로팅 텍스트(데이터 기반) — 결과를 이벤트 키로 매핑해 후보 한 줄을 뽑아 검 중상단에
+    // 띄운다. 빈 슬롯(미설정)이면 null → 미표시. 분기보다 앞에 둬 어느 분기가 빠져도 안전하며, 화면
+    // 등장 타이밍은 연출 컴포넌트의 delay(결과 분출 박자)가 맞춘다.
+    const floatEventKey =
+      result.outcome === 'success'
+        ? 'enhanceSuccess'
+        : result.outcome === 'protected'
+          ? 'enhanceProtected'
+          : 'enhanceFail' // 'destroyed' → 실패(네이밍 브릿지)
+    const pickedTextKey = pickFloatingText(
+      dataManager.getFloatingTexts(floatEventKey),
+    )
+    if (pickedTextKey) {
+      floatTextKey.current += 1
+      setFloatingText({ id: floatTextKey.current, textKey: pickedTextKey })
+    }
 
     // 강화 버튼 잠금(0.4s)은 성공·파괴 공통 — 연출과 별개의 병렬 효과(lockCount). SHAKE_SEC 가 단일 출처.
     const lockEnhance = () =>
@@ -477,6 +507,8 @@ export function GameScreen() {
                   <SuccessEffect event={successEvent} />
                   {/* 망치는 결과 연출 위(전면)에 그려 내려치는 순간이 가려지지 않게 한다(맨 뒤 렌더). */}
                   <HammerStrike event={hammerStrikeEvent} />
+                  {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
+                  <FloatingTextEffect event={floatingText} />
                 </>
               }
               // 새 검 등장 지연은 "떨림 구간"에만(entranceSuppress 효과의 수명 = 0.4s) — 파괴 연출

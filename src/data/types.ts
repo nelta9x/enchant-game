@@ -39,6 +39,17 @@ export type ItemData = {
   sprite: string | null
 }
 
+// 플로팅 텍스트 연출 데이터(언어 중립). "이벤트 타이밍" 키 → 후보 텍스트 목록. 이벤트가 뜨면 후보 중
+// weight 비례로 한 줄을 골라(pickFloatingText) 무기 근처에 띄운다(데이터 기반 — 코드 상수가 아니라
+// floatingText.json). 문구는 데이터에 박지 않고 i18n 키(TranslationKey)로 두어 표시 시점에 t()로
+// 해석한다(검·아이템의 nameKey 파생 패턴 미러).
+//  - text: 표시 문구 i18n 키
+//  - weight: 후보 간 상대 가중치(>0). 합이 1이 아니어도 됨 — pickFloatingText 가 정규화해 1개 선택.
+export type FloatingTextEntry = { text: TranslationKey; weight: number }
+
+// 이벤트 타이밍 키(예: 'enhanceFail') → 후보 엔트리 목록. 빈 배열 = 아직 안 채운 슬롯(미표시).
+export type FloatingTextData = Record<string, FloatingTextEntry[]>
+
 // 의뢰 버킷에서 출제될 거래 1종(언어 중립). 등장 확률(weight) + "지불(cost)" + "보상(reward)"을 아이템별로 둔다.
 // 거래는 비용·보상이 각각 골드 또는 아이템이라 4조합이 가능하다(단 골드 비용은 아이템 보상만 — 아래 제약).
 //

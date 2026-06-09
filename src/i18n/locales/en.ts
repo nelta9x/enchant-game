@@ -57,6 +57,9 @@ export const en: Record<TranslationKey, string> = {
   'gameClear.body': 'You forged the Divine Rapier. Congratulations!',
   'gameClear.close': 'Close',
 
+  // 강화 결과 플로팅 텍스트
+  'floatingText.enhanceFail.slip': 'Oops! My hand slipped.',
+
   // 아이템 표시명
   'item.protection_ticket': 'Protection Ticket',
   'item.iron_scrap': 'Iron Scrap',

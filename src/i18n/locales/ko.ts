@@ -56,6 +56,9 @@ export const ko = {
   'gameClear.body': '신성한 레이피어를 완성했습니다. 축하합니다!',
   'gameClear.close': '닫기',
 
+  // 강화 결과 플로팅 텍스트(무기 근처에 떠오르는 연출 문구 — floatingText.json 의 이벤트별 후보)
+  'floatingText.enhanceFail.slip': '아이구! 손이 미끄러졌네.',
+
   // 아이템 표시명 (파괴보호장치 · 잡템 — 인벤토리/드랍 표시에 사용)
   // 재료로 쓰이는 검(sword_<level>)은 검 이름 키(sword.N.name)로 해석한다.
   'item.protection_ticket': '파괴보호장치',
