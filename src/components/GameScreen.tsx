@@ -7,7 +7,11 @@ import { countOf, PROTECTION_TICKET_ID } from '../lib/items'
 import { sound } from '../lib/sound'
 import { swordSpriteUrl } from '../lib/sprites'
 import { useEffectStore } from '../store/effectStore'
-import { latestRunning, runningEventsOf, type Effect } from '../store/effectQueue'
+import {
+  latestRunning,
+  runningEventsOf,
+  type Effect,
+} from '../store/effectQueue'
 import { useGameStore } from '../store/gameStore'
 import { useCommissionStore } from '../store/commissionStore'
 import type { Commission } from '../store/commissionQueue'
@@ -199,9 +203,37 @@ export function GameScreen() {
   )
   const floatTextKey = useRef(0)
 
+  // ── 강화 결과의 "공개(reveal)" 시점 ─────────────────────────────────────────────
+  // 강화 결과는 망치가 검을 내려친 뒤에 드러나야 한다 — store 는 결과를 즉시 반영하지만(검 교체),
+  // 그러면 연출(망치·떨림)이 끝나기 전에 장착 검 이름이 새 검으로 바뀌어 몰입이 깨졌다(요구사항).
+  // 무대 스프라이트는 이미 떨림(entranceSuppress) 동안 숨었다가 등장하므로(entranceDelay), 이름·
+  // 판매가·성공률·인벤토리 장착행도 그 등장과 같은 박자에 전환되도록 "공개된 검(revealedSword)"을
+  // 따로 둔다. heldSwordId 가 있으면(강화 직후 떨림 동안) 강화 전 검을 그대로 보여 주고, 망치가
+  // 내려친 뒤(SHAKE_SEC) 공개 타이머가 이를 비우면 현재(결과) 검으로 전환한다. 떨림이 없는 변화
+  // (보관·장착·판매·방지)는 heldSwordId 가 null 이라 currentSwordId 를 즉시 따른다(별도 처리 불필요).
+  const entranceSuppressed = !!latestRunning(running, 'entranceSuppress')
+  const [heldSwordId, setHeldSwordId] = useState<string | null>(null)
+  const revealedSwordId = heldSwordId ?? currentSwordId
+  const revealedSword =
+    revealedSwordId !== null
+      ? dataManager.getSwordById(revealedSwordId)
+      : undefined
+  // 공개 타이머 — setState 는 타이머 콜백·이벤트 핸들러에서만 호출해 effect 동기 setState 규칙을
+  // 지킨다(useOneShot·effectStore 와 동일 관례). 언마운트 시 남은 타이머를 정리한다.
+  const revealTimer = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (revealTimer.current !== null) clearTimeout(revealTimer.current)
+    },
+    [],
+  )
+
   // originEl 은 코인 비행의 "출발점"(연출 전용·선택)이다 — 납품(검 소모·보상·생명주기)은 store 가 소유하며
   // 엘리먼트 유무와 무관하게 진행된다. 연출 엘리먼트에 게임 액션을 묶지 않는다(키보드 납품이 막히던 버그의 근본 차단).
-  const handleFulfill = (commission: Commission, originEl: HTMLElement | null) => {
+  const handleFulfill = (
+    commission: Commission,
+    originEl: HTMLElement | null,
+  ) => {
     // 생명주기·검 소모는 store 가 소유 — 수락(true)일 때만 연출을 띄운다.
     if (!useCommissionStore.getState().fulfill(commission.id)) return
     // 보상 획득 '짤랑' 효과음 — 판매와 동일(검·재료를 내주고 보상을 받는 순간).
@@ -283,8 +315,24 @@ export function GameScreen() {
     // (연타 throttle 자체는 강화 잠금 lockCount(~600ms)와 hold 연사의 min-gap(400ms)이 책임진다 — 이
     //  가드는 그 이중 발사 방지턱이 아니라 쿨다운 중 단발 활성화 차단이다. hold 는 useHoldRepeat 가 동일 게이팅.)
     if (enhanceLocked) return
+    // 강화 전(현재) 검 — store 는 enhance() 에서 즉시 검을 교체하지만, currentSwordId 는 이번 렌더의
+    // 스냅샷이라 이 핸들러 안에선 강화 전 값을 유지한다. 결과 공개 전까지 이름·스탯에 보여 줄 검이다.
+    const prevSwordId = currentSwordId
     const result = enhance(effectiveProtection)
     if (!result) return
+
+    // 결과 공개 지연: 강화 전 검을 떨림 동안 이름·스탯에 유지했다가, 망치가 내려친 뒤(SHAKE_SEC)
+    // 결과 검으로 한 번에 전환한다. 가격 강조·게임 클리어도 그 시점에 함께 푼다(연출 전 스포일 방지).
+    const scheduleReveal = (pricePop: boolean, terminal: boolean) => {
+      setHeldSwordId(prevSwordId)
+      if (revealTimer.current !== null) clearTimeout(revealTimer.current)
+      revealTimer.current = window.setTimeout(() => {
+        revealTimer.current = null
+        setHeldSwordId(null)
+        if (pricePop) setPricePopKey((k) => k + 1)
+        if (terminal) setCleared(true)
+      }, SHAKE_SEC * 1000)
+    }
 
     // 강화 '캉!' 타격음 — 결과(성공·파괴·방지)와 무관하게 한 번 재생. 망치가 검에 닿는 순간(HAMMER_IMPACT_MS,
     // 분출 직전)에 맞춰 미뤄, 화면에서 내리꽂는 순간 울리도록 한다(버튼·스페이스 공통 경로).
@@ -352,20 +400,20 @@ export function GameScreen() {
         })
       }
       // 가치 상승 강조 — 도달 검(toId)이 강화 전(fromId)보다 비싸면 가격 표시를 한 번 통 튀게 한다.
-      // "강화 성공으로 올랐다"는 사실은 이 분기에만 있으므로 여기서 트리거한다(장착·판매와 구분).
-      if (
-        next &&
-        from &&
+      // "강화 성공으로 올랐다"는 사실은 이 분기에만 있으므로 여기서 판정한다(장착·판매와 구분).
+      const pricePop =
+        !!next &&
+        !!from &&
         next.sellPrice !== null &&
         from.sellPrice !== null &&
         next.sellPrice > from.sellPrice
-      ) {
-        setPricePopKey((k) => k + 1)
-      }
-      lockEnhance()
       // 최종 검(다음 단계 없음)에 도달하면 게임 클리어. id 하드코딩 대신 nextId === null 로 판별해
-      // 최고 단계가 바뀌어도 자동 동작한다. 성공 분출 연출과 함께 축하 모달을 띄운다.
-      if (next && next.nextId === null) setCleared(true)
+      // 최고 단계가 바뀌어도 자동 동작한다.
+      const terminal = !!next && next.nextId === null
+      lockEnhance()
+      // 이름·판매가·가격 강조·클리어 모달을 망치 내려치기 후(SHAKE_SEC) 한 번에 공개한다 — store 는
+      // 검을 즉시 교체하지만 그 결과가 연출 전에 새지 않도록 미룬다(스프라이트 등장과 같은 박자).
+      scheduleReveal(pricePop, terminal)
     } else if (result.outcome === 'destroyed') {
       // 파괴 폭발 효과음 — 떨림(0.4s)이 끝나 폭발이 터지는 순간에 맞춰 울린다('캉!' 직후가 아닌 분출 시점).
       sound.playSfx('enchant_destroyed', { delayMs: SHAKE_SEC * 1000 })
@@ -405,6 +453,9 @@ export function GameScreen() {
         })
       }
       lockEnhance()
+      // 파괴로 시작 검(+1)으로 리셋된 결과도 망치 내려치기 후에 이름이 바뀌도록 공개를 미룬다
+      // (떨림·폭발 동안은 파괴된 검 이름을 유지 → 폭발이 드러나는 순간 +1 로 전환).
+      scheduleReveal(false, false)
     } else if (result.outcome === 'protected') {
       // 방지 = 떨림만(폭발 없음) → 파괴보호장치 덕분에 살아남았음을 인지시킨다.
       enqueueEffect({
@@ -517,8 +568,9 @@ export function GameScreen() {
                 lg+(데스크탑)에선 컬럼 높이에서 세로 중앙 정렬(고정 높이 박스, 꽉 채우지 않음). */}
             <div ref={inventoryRef}>
               <InventoryPanel
-                sword={sword}
-                level={sword?.level ?? null}
+                // 장착행도 무대 이름과 같은 박자로 공개한다(강화 결과가 망치 전에 새지 않도록).
+                sword={revealedSword}
+                level={revealedSword?.level ?? null}
                 items={items}
                 onEquip={handleEquip}
                 gold={gold}
@@ -534,6 +586,10 @@ export function GameScreen() {
             <SwordStage
               sword={sword}
               level={sword?.level ?? null}
+              // 스프라이트는 live 검(즉시 교체 → 떨림 동안 숨김), 이름·판매가·성공률은 공개된 검
+              // (망치 내려치기 후 등장과 같은 박자)으로 그린다 — 연출 전 결과(이름) 누설 방지.
+              displaySword={revealedSword}
+              displayLevel={revealedSword?.level ?? null}
               // 보호 결계: 순수 상태 + 토글(발동)·상점(부족 보충)·플레어(방지 발동) 트리거.
               // blockKey 는 protectedShake 와 같은 트리거(shakeKey)를 공유 — 막아낸 순간 결계가 번쩍인다.
               protection={{
@@ -560,9 +616,7 @@ export function GameScreen() {
               }
               // 새 검 등장 지연은 "떨림 구간"에만(entranceSuppress 효과의 수명 = 0.4s) — 파괴 연출
               // 전체가 아니라. 그래야 연출 도중 재강화로 마운트되는 새 검이 잘못 지연돼 사라지지 않는다.
-              entranceDelay={
-                latestRunning(running, 'entranceSuppress') ? SHAKE_SEC : 0
-              }
+              entranceDelay={entranceSuppressed ? SHAKE_SEC : 0}
               // 방지 시 실제 검을 떨게 한다(파괴와 구분 — 폭발 없이 떨림만).
               shakeKey={shakeKey}
               // 강화 성공으로 가치(판매가)가 오른 순간 가격 표시를 한 번 통 튀게 한다.

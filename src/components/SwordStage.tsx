@@ -15,6 +15,13 @@ import { Coin } from './Coin'
 type SwordStageProps = {
   sword: SwordData | undefined
   level: number | null
+  // 이름 배너·판매가·성공률에 "공개된(reveal)" 검을 쓴다 — 강화 결과는 망치가 검을 내려친 뒤
+  // (스프라이트가 떨림 뒤에서 등장하는 박자)에 드러나야 하므로, 호출 측이 결과를 그 시점까지 지연
+  // 반영한 검을 준다. 스프라이트(sword/level)는 결과 즉시 새 검으로 교체돼 떨림 동안 숨었다가
+  // 등장하지만, 이름·스탯은 이 displaySword 로 떨림 동안 강화 전 값을 유지한다(연출 전 결과 누설 방지).
+  // 미지정이면 sword/level 을 그대로 써 지연이 없다(보관·장착·판매 등 즉시 반영 경로).
+  displaySword?: SwordData | undefined
+  displayLevel?: number | null
   // 보호 결계(필요/보유·발동 상태 + 토글/상점/플레어). 순수 상태 계산은 protection.ts 가 맡는다.
   protection: ProtectionWardProps
   // 스프라이트 자리 위에 겹쳐 그릴 오버레이 슬롯(파괴 연출 등). SwordStage 는 내용·타이밍을
@@ -40,6 +47,8 @@ const HEX =
 export function SwordStage({
   sword,
   level,
+  displaySword = sword,
+  displayLevel = level,
   protection,
   spriteOverlay,
   entranceDelay = 0,
@@ -49,7 +58,9 @@ export function SwordStage({
 }: SwordStageProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
+  // hasSword 는 스프라이트(즉시 교체되는 live 검)용, hasDisplaySword 는 이름·스탯(지연 공개되는 검)용.
   const hasSword = sword !== undefined && level !== null
+  const hasDisplaySword = displaySword !== undefined && displayLevel !== null
   // 결계 발동(armed) 여부 — 배경 마법진 점등·실드 돔을 켜는 단일 플래그(순수 상태에서 유도).
   const armed = protection.state.kind === 'armed'
 
@@ -75,8 +86,11 @@ export function SwordStage({
   }, [pricePopKey, priceControls])
 
   // 판매가(검의 sellPrice) 표시 여부 — 검 없음/판매 불가(null·0)면 자리만 지키고 숨긴다.
+  // 이름·스탯과 함께 지연 공개되는 displaySword 기준(강화 직후 새 가격이 먼저 새지 않게).
   const hasPrice =
-    !!sword && sword.sellPrice !== null && sword.sellPrice > 0
+    !!displaySword &&
+    displaySword.sellPrice !== null &&
+    displaySword.sellPrice > 0
 
   return (
     <div className="flex flex-col items-center gap-5">
@@ -174,8 +188,8 @@ export function SwordStage({
 
         {/* 강화 성공률 결계 — 검 우하단(보호 결계와 대각선). 성공률 %를 신호등 색 마법진으로 점등. */}
         <SuccessRateSigil
-          successRate={sword?.successRate ?? null}
-          hasSword={hasSword}
+          successRate={displaySword?.successRate ?? null}
+          hasSword={hasDisplaySword}
         />
       </div>
 
@@ -190,7 +204,7 @@ export function SwordStage({
           animate={priceControls}
           aria-label={
             hasPrice
-              ? `${t('cost.sell')}: ${formatGold(sword.sellPrice as number, lang)}`
+              ? `${t('cost.sell')}: ${formatGold(displaySword.sellPrice as number, lang)}`
               : undefined
           }
           aria-hidden={hasPrice ? undefined : true}
@@ -205,7 +219,7 @@ export function SwordStage({
               코인이 좌우로 움직인다. 그래서 숫자에 고정 폭(min-w)+text-center, 행에 min-h 를 줘 가격 유무·
               자릿수와 무관하게 자리를 고정한다(SellButton 의 min-w 슬롯 관례). 없으면 invisible 로 숨긴다. */}
           <span className="min-w-[5rem] whitespace-nowrap text-center">
-            {hasPrice ? formatAmount(sword.sellPrice as number) : ' '}
+            {hasPrice ? formatAmount(displaySword.sellPrice as number) : ' '}
           </span>
         </motion.div>
       </div>
@@ -217,16 +231,15 @@ export function SwordStage({
           style={{ clipPath: HEX }}
         >
           <span className="whitespace-nowrap text-center text-2xl font-extrabold tracking-tight text-on-dark">
-            {hasSword ? t(sword.nameKey) : t('sword.none')}
+            {hasDisplaySword ? t(displaySword.nameKey) : t('sword.none')}
           </span>
-          {hasSword && (
+          {hasDisplaySword && (
             <span className="ml-2 text-xl font-bold tabular-nums text-gold">
-              +{level}
+              +{displayLevel}
             </span>
           )}
         </div>
       </div>
-
     </div>
   )
 }
