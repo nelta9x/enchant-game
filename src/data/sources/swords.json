@@ -10,7 +10,7 @@
     "successRate": 1,
     "sellPrice": null,
     "protectionTickets": 0,
-    "sprite": "rusty_dagger.png"
+    "sprite": "sword.png"
   },
   {
     "id": "sword_2",
@@ -23,7 +23,7 @@
     "successRate": 0.99,
     "sellPrice": 200,
     "protectionTickets": 0,
-    "sprite": "decent_dagger.png"
+    "sprite": "sabre.png"
   },
   {
     "id": "sword_3",
@@ -36,7 +36,7 @@
     "successRate": 0.97,
     "sellPrice": 500,
     "protectionTickets": 0,
-    "sprite": "sturdy_dagger.png"
+    "sprite": "vikingsword.png"
   },
   {
     "id": "sword_4",
@@ -49,7 +49,7 @@
     "successRate": 0.95,
     "sellPrice": 1000,
     "protectionTickets": 0,
-    "sprite": "viking_sword.png"
+    "sprite": "kukri.png"
   },
   {
     "id": "sword_5",
@@ -62,7 +62,7 @@
     "successRate": 0.95,
     "sellPrice": 800,
     "protectionTickets": 0,
-    "sprite": "burning_sword.png"
+    "sprite": "kriss.png"
   },
   {
     "id": "sword_6",
@@ -75,7 +75,7 @@
     "successRate": 0.9,
     "sellPrice": 1600,
     "protectionTickets": 0,
-    "sprite": "frost_sword.png"
+    "sprite": "gladius.png"
   },
   {
     "id": "sword_7",
@@ -92,7 +92,7 @@
       "itemId": "iron_scrap",
       "count": 1
     },
-    "sprite": "double_edged_sword.png"
+    "sprite": "wangfu.png"
   },
   {
     "id": "sword_8",
@@ -109,7 +109,7 @@
       "itemId": "iron_scrap",
       "count": 1
     },
-    "sprite": "judicators_greatsword.png"
+    "sprite": "cutlass.png"
   },
   {
     "id": "sword_9",
@@ -126,7 +126,7 @@
       "itemId": "iron_scrap",
       "count": 1
     },
-    "sprite": "arcane_sword.png"
+    "sprite": "ssaurabillongsword.png"
   },
   {
     "id": "sword_10",
@@ -143,7 +143,7 @@
       "itemId": "iron_scrap",
       "count": 2
     },
-    "sprite": "tau_sword.png"
+    "sprite": "zard.png"
   },
   {
     "id": "sword_11",
@@ -160,7 +160,7 @@
       "itemId": "faded_fluorescent",
       "count": 1
     },
-    "sprite": "fluorescent_sword.png"
+    "sprite": "alibaba.png"
   },
   {
     "id": "sword_12",
@@ -177,7 +177,7 @@
       "itemId": "iron_scrap",
       "count": 5
     },
-    "sprite": "bloodstained_sword.png"
+    "sprite": "witsend.png"
   },
   {
     "id": "sword_13",
@@ -194,7 +194,7 @@
       "itemId": "iron_scrap",
       "count": 5
     },
-    "sprite": "flame_twin_swords.png"
+    "sprite": "blackwidow.png"
   },
   {
     "id": "sword_14",
@@ -211,7 +211,7 @@
       "itemId": "flame_sword_handle",
       "count": 1
     },
-    "sprite": "blazing_demon_blade.png"
+    "sprite": "redlotus.png"
   },
   {
     "id": "sword_15",
@@ -228,7 +228,7 @@
       "itemId": "dark_matter",
       "count": 1
     },
-    "sprite": "apophis_the_demon_sword.png"
+    "sprite": "sachsen.png"
   },
   {
     "id": "sword_16",
@@ -245,7 +245,7 @@
       "itemId": "iron_scrap",
       "count": 15
     },
-    "sprite": "demon_battle_axe.png"
+    "sprite": "maxcalibur.png"
   },
   {
     "id": "sword_17",
@@ -262,7 +262,7 @@
       "itemId": "iron_scrap",
       "count": 20
     },
-    "sprite": "invisible_sword.png"
+    "sprite": "frostfang.png"
   },
   {
     "id": "sword_18",
@@ -275,7 +275,7 @@
     "successRate": 0.55,
     "sellPrice": 20000000,
     "protectionTickets": 9,
-    "sprite": "swift_dragon_sword.png"
+    "sprite": "doombringer.png"
   },
   {
     "id": "sword_19",
@@ -288,7 +288,7 @@
     "successRate": 0.5,
     "sellPrice": 30000000,
     "protectionTickets": 10,
-    "sprite": "shiny_sword.png"
+    "sprite": "diffusalblade.png"
   },
   {
     "id": "sword_20",
@@ -302,7 +302,7 @@
     "sellPrice": 47500000,
     "protectionTickets": 12,
     "notes": ["storable"],
-    "sprite": "wangpuyasha.png"
+    "sprite": "flameblade.png"
   },
   {
     "id": "sword_21",
@@ -315,7 +315,7 @@
     "successRate": 0.45,
     "sellPrice": 68300000,
     "protectionTickets": 15,
-    "sprite": "prismatic_sword.png"
+    "sprite": "bloodthirster.png"
   },
   {
     "id": "sword_22",
@@ -330,7 +330,7 @@
     "sellPrice": 101000000,
     "protectionTickets": 17,
     "notes": ["storable"],
-    "sprite": "tempest_gold.png"
+    "sprite": "mastersword.png"
   },
   {
     "id": "sword_23",
@@ -345,7 +345,7 @@
     "sellPrice": 160000000,
     "protectionTickets": 20,
     "notes": ["storable"],
-    "sprite": "sharp_walker.png"
+    "sprite": "grandfather.png"
   },
   {
     "id": "sword_24",
@@ -359,7 +359,7 @@
     "successRate": 0.4,
     "sellPrice": 230000000,
     "protectionTickets": 22,
-    "sprite": "pierrots_twin_swords.png"
+    "sprite": "infinityedge.png"
   },
   {
     "id": "sword_25",
@@ -373,7 +373,7 @@
     "successRate": 0.4,
     "sellPrice": 300000000,
     "protectionTickets": 23,
-    "sprite": "dragonslaying_saber.png"
+    "sprite": "evilswordapophis.png"
   },
   {
     "id": "sword_26",
@@ -387,7 +387,7 @@
     "successRate": 0.35,
     "sellPrice": 400000000,
     "protectionTickets": 23,
-    "sprite": "unimposing_sword.png"
+    "sprite": "divinerapier.png"
   },
   {
     "id": "sword_27",
@@ -400,7 +400,7 @@
     "successRate": 0.5,
     "sellPrice": 1800000000,
     "protectionTickets": "disabled",
-    "sprite": "medusa.png"
+    "sprite": "ashbringer.png"
   },
   {
     "id": "sword_28",
@@ -414,7 +414,7 @@
     "successRate": 0.4,
     "sellPrice": 2500000000,
     "protectionTickets": "disabled",
-    "sprite": "odyssey_sword.png"
+    "sprite": "frostmourne.png"
   },
   {
     "id": "sword_29",
@@ -426,7 +426,7 @@
     "successRate": 0.15,
     "sellPrice": null,
     "protectionTickets": "disabled",
-    "sprite": "mosaikal.png"
+    "sprite": "holyswordonidance.png"
   },
   {
     "id": "sword_30",
@@ -436,6 +436,6 @@
     "successRate": null,
     "sellPrice": null,
     "protectionTickets": "disabled",
-    "sprite": "flame_tempered_sword.png"
+    "sprite": "excalibur.png"
   }
 ]

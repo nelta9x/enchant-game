@@ -266,7 +266,7 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     expect(last?.enhanceCost).toBeNull()
     expect(last?.successRate).toBeNull()
     expect(last?.nextId).toBeNull()
-    // +29(폭풍일격)은 더 이상 종료가 아니라 +30 으로 강화된다(무료·15%).
+    // +29(성검 오니던스)는 더 이상 종료가 아니라 +30 으로 강화된다(무료·15%).
     const prev = swords.find((s) => s.level === 29)
     expect(prev?.nextId).toBe('sword_30')
     expect(prev?.enhanceCost).toEqual({ kind: 'free' })
@@ -309,11 +309,11 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     const swords = loadSwords()
     const spriteOf = (level: number) =>
       swords.find((s) => s.level === level)?.sprite
-    expect(spriteOf(1)).toBe('rusty_dagger.png')
-    expect(spriteOf(5)).toBe('burning_sword.png')
-    expect(spriteOf(15)).toBe('apophis_the_demon_sword.png')
-    expect(spriteOf(20)).toBe('wangpuyasha.png')
-    expect(spriteOf(26)).toBe('unimposing_sword.png')
-    expect(spriteOf(30)).toBe('flame_tempered_sword.png')
+    expect(spriteOf(1)).toBe('sword.png')
+    expect(spriteOf(5)).toBe('kriss.png')
+    expect(spriteOf(15)).toBe('sachsen.png')
+    expect(spriteOf(20)).toBe('flameblade.png')
+    expect(spriteOf(26)).toBe('divinerapier.png')
+    expect(spriteOf(30)).toBe('excalibur.png')
   })
 })

@@ -164,6 +164,23 @@ describe('아이템 아이콘 ↔ 스프라이트 무결성', () => {
   })
 })
 
+// 검 아이콘 무결성: 라이브 데이터의 모든 검(SwordData.sprite)이 public/sprites/swords/ 에 실제 PNG 로
+// 존재해야 한다. 위 아이템 블록은 검 스프라이트를 의도적으로 제외하므로, 검 파일명 오타·누락 → 깨진
+// 이미지를 잡아줄 곳이 여기 외에 없다(스프라이트 전면 교체 시 회귀 가드).
+describe('검 아이콘 ↔ 스프라이트 무결성', () => {
+  it('라이브 데이터의 모든 검에 전용 스프라이트 파일이 존재한다', () => {
+    dataManager.load()
+    const swords = dataManager.getSwords()
+    expect(swords.length).toBeGreaterThan(0) // 검증 대상이 비어 통과하는 일이 없게 가드
+    for (const sword of swords) {
+      expect(
+        existsSync(resolve('public/sprites/swords', sword.sprite)),
+        `'${sword.id}' 스프라이트 파일이 없다: ${sword.sprite}`,
+      ).toBe(true)
+    }
+  })
+})
+
 // 아이템 카탈로그(items.json)의 모든 nameKey 가 번역 리소스에 존재해야 한다(검 규약과 동일).
 describe('아이템 카탈로그 ↔ i18n 무결성', () => {
   it('모든 ItemData nameKey 가 번역 리소스에 존재한다', () => {
