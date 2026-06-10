@@ -4,6 +4,7 @@ import { useT } from '../i18n'
 import { PROTECTION_TICKET_ID } from '../lib/items'
 import { type ProtectionState } from './protection'
 import { ItemIcon } from './ItemIcon'
+import { SigilRunes } from './Sigil'
 
 // 검 좌상단에 떠 있는 "보호 결계 서클"(프레젠테이션 전용). 파괴보호장치를 추상 뱃지가 아니라
 // 마법진처럼 표현한다 — 이 서클에서 흘러나온 마력이 검을 감싸 파괴를 막는다는 연출.
@@ -21,21 +22,6 @@ export type ProtectionWardProps = {
   onShop: () => void
   // 파괴보호장치로 살아남은 순간(protected) 결계가 폭발을 튕겨내는 흰빛 플레어 트리거(0 무시).
   blockKey: number
-}
-
-type Tone = 'armed' | 'ready' | 'short' | 'off'
-
-function toneOf(state: ProtectionState): Tone {
-  switch (state.kind) {
-    case 'armed':
-      return 'armed'
-    case 'ready':
-      return 'ready'
-    case 'insufficient':
-      return 'short'
-    case 'unavailable':
-      return 'off'
-  }
 }
 
 export function ProtectionWard({
@@ -58,8 +44,6 @@ export function ProtectionWard({
     }
   }, [blockKey, flare])
 
-  const tone = toneOf(state)
-
   return (
     <div className="pointer-events-none absolute inset-0 overflow-visible">
       {/* 흰빛 실드-블록 플레어(파괴보호장치 발동 순간) — 검 중심에서 흰 링이 퍼진다. */}
@@ -74,7 +58,6 @@ export function ProtectionWard({
       <div className="absolute" style={{ left: '-17%', top: '6%' }}>
         <ProtectionSigil
           state={state}
-          tone={tone}
           onToggle={onToggle}
           onShop={onShop}
           t={t}
@@ -86,13 +69,11 @@ export function ProtectionWard({
 
 function ProtectionSigil({
   state,
-  tone,
   onToggle,
   onShop,
   t,
 }: {
   state: ProtectionState
-  tone: Tone
   onToggle: () => void
   onShop: () => void
   t: ReturnType<typeof useT>
@@ -115,13 +96,13 @@ function ProtectionSigil({
     // 마법진(회전 룬)이 가운데 충전 수치를 감싼다. 발동 시 흰빛 글로우가 더해진다(기존 활성화 효과).
     <div
       className="relative h-16 w-16"
-      style={
-        armed
-          ? { filter: 'drop-shadow(0 0 7px rgba(255,255,255,0.9))' }
-          : undefined
-      }
+      style={{
+        // 마법진 룬은 currentColor 로 그려진다 — 상태색(발동·충분=흰빛 / 부족·보호불가=회색)을 여기서 물들인다.
+        color: lit ? '#ffffff' : 'var(--color-ink-soft)',
+        filter: armed ? 'drop-shadow(0 0 7px rgba(255,255,255,0.9))' : undefined,
+      }}
     >
-      <SigilRunes tone={tone} />
+      <SigilRunes />
       {/* 파괴보호장치 아이템 — 마법진 한가운데(중심 원)에 놓는다. 보호불가는 빗금 방패. */}
       <span className="absolute inset-0 grid place-items-center">
         {unavailable ? (
@@ -175,73 +156,6 @@ function ProtectionSigil({
     >
       {body}
     </button>
-  )
-}
-
-// 회전하는 마법진 룬 — 바깥 링(시계방향)과 안쪽 삼각/점선(반시계)이 엇갈려 도는 결계.
-// 색은 상태(발동·충분=흰빛 · 부족·보호불가=회색). currentColor 로 받아 한 번에 물들인다.
-function SigilRunes({ tone }: { tone: Tone }) {
-  const color =
-    tone === 'armed' || tone === 'ready'
-      ? '#ffffff'
-      : 'var(--color-ink-soft)'
-
-  return (
-    <>
-      <motion.div
-        aria-hidden
-        className="absolute inset-0"
-        style={{ color }}
-        animate={{ rotate: 360 }}
-        transition={{ duration: 26, repeat: Infinity, ease: 'linear' }}
-      >
-        <svg
-          viewBox="0 0 64 64"
-          className="h-full w-full"
-          fill="none"
-          stroke="currentColor"
-        >
-          <circle cx="32" cy="32" r="29" strokeWidth="1.4" opacity="0.85" />
-          {Array.from({ length: 8 }, (_, i) => {
-            const a = (i * Math.PI) / 4
-            return (
-              <line
-                key={i}
-                x1={32 + 25 * Math.cos(a)}
-                y1={32 + 25 * Math.sin(a)}
-                x2={32 + 29 * Math.cos(a)}
-                y2={32 + 29 * Math.sin(a)}
-                strokeWidth="1.4"
-              />
-            )
-          })}
-        </svg>
-      </motion.div>
-      <motion.div
-        aria-hidden
-        className="absolute inset-0"
-        style={{ color }}
-        animate={{ rotate: -360 }}
-        transition={{ duration: 19, repeat: Infinity, ease: 'linear' }}
-      >
-        <svg
-          viewBox="0 0 64 64"
-          className="h-full w-full"
-          fill="none"
-          stroke="currentColor"
-        >
-          <circle
-            cx="32"
-            cy="32"
-            r="22"
-            strokeWidth="1"
-            strokeDasharray="3 3"
-            opacity="0.7"
-          />
-          <circle cx="32" cy="32" r="15" strokeWidth="0.8" opacity="0.5" />
-        </svg>
-      </motion.div>
-    </>
   )
 }
 
