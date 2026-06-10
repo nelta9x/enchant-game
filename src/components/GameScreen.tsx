@@ -597,7 +597,7 @@ export function GameScreen() {
                 charging={enhanceLocked}
                 chargeMs={dataManager.getConfig().enhanceDelayMs}
                 onEnhance={handleEnhance}
-                enhanceCost={sword?.enhanceCost ?? null}
+                enchantCost={sword?.enchantCost ?? null}
               />
               <SellButton disabled={!canSell} onSell={handleSell} />
               <StoreButton disabled={!canStore} onStore={handleStore} />

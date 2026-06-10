@@ -31,13 +31,13 @@ export class Enhancer {
   private validate(input: EnhanceInput): string | null {
     const { sword, supply, useProtection } = input
 
-    if (sword.enhanceCost === null || sword.successRate === null)
+    if (sword.enchantCost === null || sword.successRate === null)
       return `Cannot enhance a terminal sword (level ${sword.level})`
     // 강화 가능한 검은 성공 시 되는 검(nextId)을 반드시 가진다. 없으면 데이터 오류.
     if (sword.nextId === null)
       return `Enhanceable sword is missing nextId (data error): ${sword.id}`
 
-    const cost = sword.enhanceCost
+    const cost = sword.enchantCost
     if (cost.kind === 'gold' && supply.gold < cost.amount)
       return `Insufficient gold: need ${cost.amount}, have ${supply.gold}`
     if (
@@ -69,8 +69,8 @@ export class Enhancer {
     if (reason !== null) throw new Error(reason)
 
     const { sword, useProtection } = input
-    // validate 통과 → enhanceCost / successRate / nextId 는 non-null 임이 보장된다.
-    const cost = sword.enhanceCost!
+    // validate 통과 → enchantCost / successRate / nextId 는 non-null 임이 보장된다.
+    const cost = sword.enchantCost!
     const rate = sword.successRate!
     const fromId = sword.id
 

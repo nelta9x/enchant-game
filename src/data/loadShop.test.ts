@@ -79,11 +79,13 @@ describe('parseShop — 구조 검증', () => {
 })
 
 describe('loadShop — 실제 번들 데이터(shop.json)', () => {
-  it('파괴보호장치를 골드(100만)로만 판매한다(철조각 교환 경로 제거됨)', () => {
+  it('파괴보호장치를 골드로만 판매한다(철조각 교환 경로 제거됨)', () => {
     const items = loadShop()
     const gold = items.find((i) => i.id === 'protection_ticket_gold')
     expect(gold?.itemId).toBe('protection_ticket')
-    expect(gold?.price).toEqual({ kind: 'gold', amount: 1_000_000 })
+    // 골드 결제임만 본다 — 정확한 가격(amount)은 밸런스 값이라 단언하지 않는다.
+    expect(gold?.price.kind).toBe('gold')
+    if (gold?.price.kind === 'gold') expect(gold.price.amount).toBeGreaterThan(0)
     // 철조각(iron_scrap)으로 파괴방지권을 사는 항목은 더 이상 없다.
     expect(items.find((i) => i.id === 'protection_ticket_scrap')).toBeUndefined()
     expect(items.some((i) => i.price.kind === 'item')).toBe(false)

@@ -21,7 +21,7 @@ function fail(msg: string): never {
   throw new Error(`Sword data validation failed: ${msg}`)
 }
 
-// Material(가격/비용) 검증 전용 실패 — 검 enhanceCost·상점 price 가 공유하므로 중립 접두사를 쓴다.
+// Material(가격/비용) 검증 전용 실패 — 검 enchantCost·상점 price 가 공유하므로 중립 접두사를 쓴다.
 function failMaterial(msg: string): never {
   throw new Error(`Material validation failed: ${msg}`)
 }
@@ -31,7 +31,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 // 임의 입력을 Material(gold / item / free)로 검증한다. ctx 는 에러 문맥 라벨.
-// 검 enhanceCost 와 상점 price 가 공유하는 언어 중립 가격 모델 파서다.
+// 검 enchantCost 와 상점 price 가 공유하는 언어 중립 가격 모델 파서다.
 export function parseMaterial(raw: unknown, ctx: string): Material {
   if (!isRecord(raw)) failMaterial(`${ctx} material is not an object`)
   const kind = raw.kind
@@ -88,16 +88,16 @@ function parseSword(raw: unknown): ParsedSword {
     nextId = raw.nextId
   }
 
-  // enhanceCost / successRate 는 둘 다 null 이면 최종 단계(terminal)다.
+  // enchantCost / successRate 는 둘 다 null 이면 최종 단계(terminal)다.
   // 한쪽만 null 이면 데이터 오류로 본다.
-  const costNull = raw.enhanceCost === null
+  const costNull = raw.enchantCost === null
   const rateNull = raw.successRate === null
   if (costNull !== rateNull)
     fail(
-      `${ctx} enhanceCost and successRate must both be null (terminal) or both be set`,
+      `${ctx} enchantCost and successRate must both be null (terminal) or both be set`,
     )
 
-  const enhanceCost = costNull ? null : parseMaterial(raw.enhanceCost, ctx)
+  const enchantCost = costNull ? null : parseMaterial(raw.enchantCost, ctx)
 
   let successRate: number | null = null
   if (!rateNull) {
@@ -159,7 +159,7 @@ function parseSword(raw: unknown): ParsedSword {
     nextId,
     level,
     nameKey,
-    enhanceCost,
+    enchantCost,
     successRate,
     sellPrice,
     protectionTickets,

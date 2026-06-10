@@ -132,7 +132,7 @@ export type SwordNote = 'storable' | 'easyBug'
 
 // 검 정의 데이터(언어 중립).
 // 표시명은 코드에 박지 않고 nameKey(i18n 키)로 두어 표시 시점에 t()로 해석한다.
-// enhanceCost / successRate 가 null 이면 더 이상 강화할 수 없는 최종 단계(terminal)다.
+// enchantCost / successRate 가 null 이면 더 이상 강화할 수 없는 최종 단계(terminal)다.
 export type SwordData = {
   // 검 식별자 = 인벤토리 itemId. 검은 이 id로 조회한다(레벨을 문자열에서 파싱하지 않는다).
   id: string
@@ -141,7 +141,7 @@ export type SwordData = {
   // 표시(+N)·밸런스·정렬용 속성(식별자가 아님 — 식별은 id).
   level: number
   nameKey: TranslationKey
-  enhanceCost: Material | null // null = 최종 단계(강화 불가)
+  enchantCost: Material | null // null = 최종 단계(강화 불가)
   successRate: number | null // 0~1, null = 최종 단계
   sellPrice: number | null // null = 판매 불가
   protectionTickets: number | 'disabled' // 'disabled' = 파괴보호장치 사용 불가

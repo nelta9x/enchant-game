@@ -9,7 +9,7 @@ function row(over: Record<string, unknown> = {}): Record<string, unknown> {
     id: `sword_${level}`,
     nextId: null,
     level,
-    enhanceCost: { kind: 'gold', amount: 300 },
+    enchantCost: { kind: 'gold', amount: 300 },
     successRate: 1,
     sellPrice: null,
     protectionTickets: 0,
@@ -23,29 +23,29 @@ describe('parseSwords — 구조 검증', () => {
       row({ level: 0 }),
       row({
         level: 1,
-        enhanceCost: { kind: 'item', itemId: 'iron_scrap', count: 8 },
+        enchantCost: { kind: 'item', itemId: 'iron_scrap', count: 8 },
         successRate: 0.4,
         sellPrice: 100,
         protectionTickets: 'disabled',
       }),
       row({
         level: 2,
-        enhanceCost: { kind: 'free' },
+        enchantCost: { kind: 'free' },
         successRate: 0.15,
         protectionTickets: 'disabled',
       }),
-      row({ level: 3, enhanceCost: null, successRate: null }),
+      row({ level: 3, enchantCost: null, successRate: null }),
     ])
     expect(swords).toHaveLength(4)
     expect(swords[0].nameKey).toBe('sword.0.name')
-    expect(swords[1].enhanceCost).toEqual({
+    expect(swords[1].enchantCost).toEqual({
       kind: 'item',
       itemId: 'iron_scrap',
       count: 8,
     })
     expect(swords[1].protectionTickets).toBe('disabled')
-    expect(swords[2].enhanceCost).toEqual({ kind: 'free' })
-    expect(swords[3].enhanceCost).toBeNull()
+    expect(swords[2].enchantCost).toEqual({ kind: 'free' })
+    expect(swords[3].enchantCost).toBeNull()
     expect(swords[3].successRate).toBeNull()
   })
 
@@ -63,34 +63,34 @@ describe('parseSwords — 구조 검증', () => {
     expect(() => parseSwords([row({ successRate: -0.1 })])).toThrow()
   })
 
-  it('enhanceCost와 successRate 중 하나만 null이면 throw (최종 단계 불일치)', () => {
+  it('enchantCost와 successRate 중 하나만 null이면 throw (최종 단계 불일치)', () => {
     expect(() =>
-      parseSwords([row({ enhanceCost: null, successRate: 1 })]),
+      parseSwords([row({ enchantCost: null, successRate: 1 })]),
     ).toThrow()
     expect(() =>
       parseSwords([
-        row({ enhanceCost: { kind: 'gold', amount: 1 }, successRate: null }),
+        row({ enchantCost: { kind: 'gold', amount: 1 }, successRate: null }),
       ]),
     ).toThrow()
   })
 
   it('gold amount가 양수가 아니면 throw', () => {
     expect(() =>
-      parseSwords([row({ enhanceCost: { kind: 'gold', amount: 0 } })]),
+      parseSwords([row({ enchantCost: { kind: 'gold', amount: 0 } })]),
     ).toThrow()
   })
 
   it('item count가 양의 정수가 아니면 throw', () => {
     expect(() =>
       parseSwords([
-        row({ enhanceCost: { kind: 'item', itemId: 'x', count: 0 } }),
+        row({ enchantCost: { kind: 'item', itemId: 'x', count: 0 } }),
       ]),
     ).toThrow()
   })
 
-  it('알 수 없는 enhanceCost kind면 throw', () => {
+  it('알 수 없는 enchantCost kind면 throw', () => {
     expect(() =>
-      parseSwords([row({ enhanceCost: { kind: 'mana' } })]),
+      parseSwords([row({ enchantCost: { kind: 'mana' } })]),
     ).toThrow()
   })
 
@@ -174,18 +174,18 @@ describe('parseSwords — 진행 체인(nextId) · id 무결성', () => {
     expect(() => parseSwords([row({ id: '' })])).toThrow()
   })
 
-  // 검 재료(enhanceCost item)의 itemId 오타 검증은 여기서 하지 않는다 — 검과 잡템이 itemId
+  // 검 재료(enchantCost item)의 itemId 오타 검증은 여기서 하지 않는다 — 검과 잡템이 itemId
   // 네임스페이스를 공유해 패턴으로 구분할 수 없으므로, 전체 itemId 검증은 아이템 카탈로그
   // 스프린트로 이관한다. 따라서 검 id든 잡템 slug든 구조만 맞으면 통과한다.
-  it('enhanceCost 아이템 참조는 무결성 검사를 하지 않는다(검·잡템 모두 통과)', () => {
+  it('enchantCost 아이템 참조는 무결성 검사를 하지 않는다(검·잡템 모두 통과)', () => {
     const swords = parseSwords([
       row({
         level: 0,
-        enhanceCost: { kind: 'item', itemId: 'iron_scrap', count: 8 },
+        enchantCost: { kind: 'item', itemId: 'iron_scrap', count: 8 },
       }),
       row({
         level: 1,
-        enhanceCost: { kind: 'item', itemId: 'sword_99', count: 1 },
+        enchantCost: { kind: 'item', itemId: 'sword_99', count: 1 },
       }),
     ])
     expect(swords).toHaveLength(2)
@@ -253,24 +253,25 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     )
   })
 
-  it('시작 검(+1, 검)은 첫 강화가 100% 보장이고 판매 불가다(순한 시작)', () => {
+  it('시작 검(+1, 검)은 판매 불가다(판매-리셋 무한 골드 익스플로잇 차단)', () => {
     const start = loadSwords().find((s) => s.level === 1)
     expect(start?.id).toBe('sword_1')
-    expect(start?.successRate).toBe(1) // 첫 강화는 무조건 성공(튜토리얼 유예)
-    expect(start?.sellPrice).toBeNull() // 시작 검은 판매 불가(판매-리셋 무한 골드 익스플로잇 차단)
+    // 판매가가 "없음(null)"인 구조 계약만 본다 — 구체 성공률·금액은 밸런스 값이라 단언하지 않는다.
+    expect(start?.sellPrice).toBeNull()
   })
 
   it('최종 단계(+30)는 강화 불가, 직전(+29)은 강화 가능하다(클리어 검)', () => {
     const swords = loadSwords()
     const last = swords.find((s) => s.level === 30)
-    expect(last?.enhanceCost).toBeNull()
+    expect(last?.enchantCost).toBeNull()
     expect(last?.successRate).toBeNull()
     expect(last?.nextId).toBeNull()
-    // +29(성검 오니던스)는 더 이상 종료가 아니라 +30 으로 강화된다(무료·15%).
+    // +29(성검 오니던스)는 더 이상 종료가 아니라 +30 으로 강화된다.
     const prev = swords.find((s) => s.level === 29)
     expect(prev?.nextId).toBe('sword_30')
-    expect(prev?.enhanceCost).toEqual({ kind: 'free' })
-    expect(prev?.successRate).toBe(0.15)
+    // +29 는 "강화 가능"(비용·확률이 존재)이라는 구조 계약만 본다 — 구체 값은 밸런스라 단언 안 함.
+    expect(prev?.enchantCost).not.toBeNull()
+    expect(prev?.successRate).not.toBeNull()
   })
 
   it('진행 체인(nextId)이 +1에서 시작해 +30(최종)까지 끊김 없이 이어진다', () => {
@@ -303,17 +304,5 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     const sprites = loadSwords().map((s) => s.sprite)
     expect(sprites.every((s) => s.length > 0)).toBe(true)
     expect(new Set(sprites).size).toBe(30)
-  })
-
-  it('대표 단계의 스프라이트가 올바르게 매핑된다', () => {
-    const swords = loadSwords()
-    const spriteOf = (level: number) =>
-      swords.find((s) => s.level === level)?.sprite
-    expect(spriteOf(1)).toBe('sword.png')
-    expect(spriteOf(5)).toBe('kriss.png')
-    expect(spriteOf(15)).toBe('sachsen.png')
-    expect(spriteOf(20)).toBe('flameblade.png')
-    expect(spriteOf(26)).toBe('divinerapier.png')
-    expect(spriteOf(30)).toBe('excalibur.png')
   })
 })

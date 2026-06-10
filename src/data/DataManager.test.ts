@@ -82,7 +82,6 @@ describe('DataManager', () => {
       .getSwords()
       .reduce((max, s) => Math.max(max, s.level), 0)
     expect(dm.getMaxSwordLevel()).toBe(expected)
-    expect(dm.getMaxSwordLevel()).toBe(30) // 현재 데이터: sword_30(엑스칼리버)
   })
 
   it('getSwordByLevel: 레벨로 검을 조회한다(레벨↔검 1:1) — 범위 밖은 undefined', () => {
@@ -135,7 +134,7 @@ describe('아이템 아이콘 ↔ 스프라이트 무결성', () => {
     dataManager.load()
     const ids = new Set<string>()
     for (const sword of dataManager.getSwords()) {
-      if (sword.enhanceCost?.kind === 'item') ids.add(sword.enhanceCost.itemId)
+      if (sword.enchantCost?.kind === 'item') ids.add(sword.enchantCost.itemId)
       if (sword.dropOnFail) ids.add(sword.dropOnFail.itemId)
     }
     for (const item of dataManager.getShopItems()) {

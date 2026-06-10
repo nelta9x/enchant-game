@@ -29,7 +29,7 @@ function sword(over: Partial<SwordData> = {}): SwordData {
     level,
     // 엔진은 nameKey를 읽지 않지만, level override 시에도 id/nextId/level과 어긋나지 않도록 파생한다.
     nameKey: `sword.${level}.name` as SwordData['nameKey'],
-    enhanceCost: { kind: 'gold', amount: 100 },
+    enchantCost: { kind: 'gold', amount: 100 },
     successRate: 0.5,
     sellPrice: 1000,
     protectionTickets: 0,
@@ -74,7 +74,7 @@ describe('Enhancer — 확률 판정', () => {
 
 describe('Enhancer — 재료 부족 (req 2)', () => {
   it('골드가 부족하면 throw', () => {
-    const s = sword({ enhanceCost: { kind: 'gold', amount: 500 } })
+    const s = sword({ enchantCost: { kind: 'gold', amount: 500 } })
     expect(() =>
       new Enhancer(alwaysSucceeds).enhance({
         sword: s,
@@ -85,7 +85,7 @@ describe('Enhancer — 재료 부족 (req 2)', () => {
 
   it('아이템 재료가 부족하면 throw, 충분하면 진행한다', () => {
     const s = sword({
-      enhanceCost: { kind: 'item', itemId: 'sword_19', count: 1 },
+      enchantCost: { kind: 'item', itemId: 'sword_19', count: 1 },
     })
     expect(() =>
       new Enhancer(alwaysSucceeds).enhance({
@@ -100,15 +100,15 @@ describe('Enhancer — 재료 부족 (req 2)', () => {
     expect(ok.outcome).toBe('success')
   })
 
-  it('최종 단계(enhanceCost null)는 강화할 수 없다 — throw', () => {
-    const terminal = sword({ enhanceCost: null, successRate: null })
+  it('최종 단계(enchantCost null)는 강화할 수 없다 — throw', () => {
+    const terminal = sword({ enchantCost: null, successRate: null })
     expect(() =>
       new Enhancer(alwaysSucceeds).enhance({ sword: terminal, supply: RICH }),
     ).toThrow()
   })
 
   it('canEnhance 는 전제조건 충족 여부를 반환한다(비던짐)', () => {
-    const s = sword({ enhanceCost: { kind: 'gold', amount: 500 } })
+    const s = sword({ enchantCost: { kind: 'gold', amount: 500 } })
     const enhancer = new Enhancer(alwaysSucceeds)
     expect(
       enhancer.canEnhance({ sword: s, supply: { gold: 100, items: [] } }),

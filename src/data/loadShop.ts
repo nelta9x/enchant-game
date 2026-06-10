@@ -7,7 +7,7 @@ import { parseMaterial } from './loadSwords'
 // 원칙:
 //  - 상점 카탈로그는 코드 상수가 아니라 별도 데이터 파일(JSON)에 둔다.
 //  - JSON은 컴파일 타임 타입 보장이 없으므로 로드 시점에 런타임 검증으로 형태를 강제한다.
-//  - 가격(price)은 검 enhanceCost 와 같은 Material 모델을 재사용한다(parseMaterial 공유).
+//  - 가격(price)은 검 enchantCost 와 같은 Material 모델을 재사용한다(parseMaterial 공유).
 //  - 표시명 검증(itemId → i18n 키 해석 가능 여부)은 하지 않는다 — 표시명 무결성은
 //    DataManager 시드 테스트가 강제한다(현재는 구조 검증만).
 //

@@ -31,7 +31,7 @@ type EnhanceButtonProps = {
   charging: boolean
   chargeMs: number
   onEnhance: () => void
-  enhanceCost: Material | null
+  enchantCost: Material | null
 }
 
 export function EnhanceButton({
@@ -39,7 +39,7 @@ export function EnhanceButton({
   charging,
   chargeMs,
   onEnhance,
-  enhanceCost,
+  enchantCost,
 }: EnhanceButtonProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
@@ -82,19 +82,19 @@ export function EnhanceButton({
 
   // 강화 조건 칩 — 골드/아이템만 표시(무료·최종 단계는 null). 아이콘+수량만 시각화하고 aria-label 로 설명.
   const renderCost = () => {
-    if (enhanceCost === null || enhanceCost.kind === 'free') return null
+    if (enchantCost === null || enchantCost.kind === 'free') return null
     const { icon, qty, label } =
-      enhanceCost.kind === 'gold'
+      enchantCost.kind === 'gold'
         ? {
             icon: <Coin className="h-5 w-5" />,
             // 금화 아이콘이 통화를 대신하므로 단위 없이 금액만 표시. aria-label 엔 단위 포함(formatGold).
-            qty: formatAmount(enhanceCost.amount),
-            label: formatGold(enhanceCost.amount, lang),
+            qty: formatAmount(enchantCost.amount),
+            label: formatGold(enchantCost.amount, lang),
           }
         : {
-            icon: <ItemIcon itemId={enhanceCost.itemId} className="h-5 w-5" />,
-            qty: `×${enhanceCost.count}`,
-            label: `${itemDisplayName(enhanceCost.itemId, t)} ×${enhanceCost.count}`,
+            icon: <ItemIcon itemId={enchantCost.itemId} className="h-5 w-5" />,
+            qty: `×${enchantCost.count}`,
+            label: `${itemDisplayName(enchantCost.itemId, t)} ×${enchantCost.count}`,
           }
     return (
       <>
