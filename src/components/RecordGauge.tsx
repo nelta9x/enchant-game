@@ -12,7 +12,7 @@ import { ItemIcon } from './ItemIcon'
 // 현재 장착 검의 +레벨(SwordStage)과 별개로, 한 번이라도 도달한 최고치(maxLevelReached, 단조)를 보여준다.
 // 기록을 세운 "검"은 별도 상태가 아니라 maxLevelReached(레벨)에서 파생한다(레벨↔검 1:1 — getSwordByLevel).
 // gold 채움 끝(현재 위치)은 currentSwordId 의 레벨을 따라간다 — 강화로 늘고, 더 낮은 검 장착·판매로 줄며
-// 늘 best 이하다(현재 ≤ 최고). 현재 < 최고면 그 사이가 frame 으로 남아 "잃은 만큼"이 보인다(현재 +0 은 채움 없음).
+// 늘 best 이하다(현재 ≤ 최고). 현재 < 최고면 그 사이가 frame 으로 남아 "잃은 만큼"이 보인다(검 없음이면 채움 없음).
 // 가운데 칸(TopControls)에서 전체 폭으로 stretch 되며 위(라벨)→아래(바) 순으로 중앙상단에 앵커된다.
 // 최고치가 갱신될 때만 숫자가 한 번 통 튄다(상승 시에만 — 첫 마운트·무관한 리렌더에는 조용).
 export function RecordGauge() {

@@ -145,10 +145,10 @@ describe('parseCommissionConfig — buckets 구조 검증', () => {
   })
 
   it('itemId 가 출제 가능 집합(판매 가능 검·카탈로그)에 없으면 throw (익스플로잇 가드)', () => {
-    // sword_0(판매 불가) 은 KNOWN 에 없다 → 거부(무한 골드 익스플로잇 차단).
+    // sword_1(판매 불가 = 시작 검) 은 KNOWN 에 없다 → 거부(무한 골드 익스플로잇 차단).
     expect(() =>
       parse({
-        buckets: [bucket({ items: [{ itemId: 'sword_0', weight: 1 }] })],
+        buckets: [bucket({ items: [{ itemId: 'sword_1', weight: 1 }] })],
       }),
     ).toThrow()
     // 오타/미지의 itemId 도 즉시 실패.
@@ -322,7 +322,7 @@ describe('parseCommissionConfig — 물물교환(아이템 보상) 항목', () =
     expect(() =>
       parse({
         buckets: [
-          bucket({ items: [itemRewardEntry({ rewardItemId: 'sword_0' })] }),
+          bucket({ items: [itemRewardEntry({ rewardItemId: 'sword_1' })] }),
         ],
       }),
     ).toThrow()

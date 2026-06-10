@@ -14,7 +14,7 @@ export type DestructionEvent = {
 
 // 강화 결과로부터 "무엇을" 터뜨릴지 결정한다.
 //  - 'destroyed' 일 때만 연출(방지·성공은 별도).
-//  - 대상은 fromId(터진 검)다. 스토어는 파괴 즉시 검을 +0 으로 교체하므로
+//  - 대상은 fromId(터진 검)다. 스토어는 파괴 즉시 검을 시작 검(+1)으로 교체하므로
 //    현재 장착 검(toId/새 검)이 아니라 파괴된 검을 잔상으로 그려야 한다.
 export function destructionTargetOf(
   result: EnhanceResult | null,

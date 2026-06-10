@@ -1,8 +1,8 @@
 [
   {
-    "id": "sword_0",
-    "level": 0,
-    "nextId": "sword_1",
+    "id": "sword_1",
+    "level": 1,
+    "nextId": "sword_2",
     "enhanceCost": {
       "kind": "gold",
       "amount": 300
@@ -13,9 +13,9 @@
     "sprite": "rusty_dagger.png"
   },
   {
-    "id": "sword_1",
-    "level": 1,
-    "nextId": "sword_2",
+    "id": "sword_2",
+    "level": 2,
+    "nextId": "sword_3",
     "enhanceCost": {
       "kind": "gold",
       "amount": 300
@@ -26,9 +26,9 @@
     "sprite": "decent_dagger.png"
   },
   {
-    "id": "sword_2",
-    "level": 2,
-    "nextId": "sword_3",
+    "id": "sword_3",
+    "level": 3,
+    "nextId": "sword_4",
     "enhanceCost": {
       "kind": "gold",
       "amount": 500
@@ -39,9 +39,9 @@
     "sprite": "sturdy_dagger.png"
   },
   {
-    "id": "sword_3",
-    "level": 3,
-    "nextId": "sword_4",
+    "id": "sword_4",
+    "level": 4,
+    "nextId": "sword_5",
     "enhanceCost": {
       "kind": "gold",
       "amount": 500
@@ -52,9 +52,9 @@
     "sprite": "viking_sword.png"
   },
   {
-    "id": "sword_4",
-    "level": 4,
-    "nextId": "sword_5",
+    "id": "sword_5",
+    "level": 5,
+    "nextId": "sword_6",
     "enhanceCost": {
       "kind": "gold",
       "amount": 1000
@@ -65,9 +65,9 @@
     "sprite": "burning_sword.png"
   },
   {
-    "id": "sword_5",
-    "level": 5,
-    "nextId": "sword_6",
+    "id": "sword_6",
+    "level": 6,
+    "nextId": "sword_7",
     "enhanceCost": {
       "kind": "gold",
       "amount": 1500
@@ -78,9 +78,9 @@
     "sprite": "frost_sword.png"
   },
   {
-    "id": "sword_6",
-    "level": 6,
-    "nextId": "sword_7",
+    "id": "sword_7",
+    "level": 7,
+    "nextId": "sword_8",
     "enhanceCost": {
       "kind": "gold",
       "amount": 2000
@@ -95,9 +95,9 @@
     "sprite": "double_edged_sword.png"
   },
   {
-    "id": "sword_7",
-    "level": 7,
-    "nextId": "sword_8",
+    "id": "sword_8",
+    "level": 8,
+    "nextId": "sword_9",
     "enhanceCost": {
       "kind": "gold",
       "amount": 2000
@@ -112,9 +112,9 @@
     "sprite": "judicators_greatsword.png"
   },
   {
-    "id": "sword_8",
-    "level": 8,
-    "nextId": "sword_9",
+    "id": "sword_9",
+    "level": 9,
+    "nextId": "sword_10",
     "enhanceCost": {
       "kind": "gold",
       "amount": 3000
@@ -129,9 +129,9 @@
     "sprite": "arcane_sword.png"
   },
   {
-    "id": "sword_9",
-    "level": 9,
-    "nextId": "sword_10",
+    "id": "sword_10",
+    "level": 10,
+    "nextId": "sword_11",
     "enhanceCost": {
       "kind": "gold",
       "amount": 5000
@@ -146,9 +146,9 @@
     "sprite": "tau_sword.png"
   },
   {
-    "id": "sword_10",
-    "level": 10,
-    "nextId": "sword_11",
+    "id": "sword_11",
+    "level": 11,
+    "nextId": "sword_12",
     "enhanceCost": {
       "kind": "gold",
       "amount": 10900
@@ -163,9 +163,9 @@
     "sprite": "fluorescent_sword.png"
   },
   {
-    "id": "sword_11",
-    "level": 11,
-    "nextId": "sword_12",
+    "id": "sword_12",
+    "level": 12,
+    "nextId": "sword_13",
     "enhanceCost": {
       "kind": "gold",
       "amount": 20000
@@ -180,9 +180,9 @@
     "sprite": "bloodstained_sword.png"
   },
   {
-    "id": "sword_12",
-    "level": 12,
-    "nextId": "sword_13",
+    "id": "sword_13",
+    "level": 13,
+    "nextId": "sword_14",
     "enhanceCost": {
       "kind": "gold",
       "amount": 35000
@@ -197,9 +197,9 @@
     "sprite": "flame_twin_swords.png"
   },
   {
-    "id": "sword_13",
-    "level": 13,
-    "nextId": "sword_14",
+    "id": "sword_14",
+    "level": 14,
+    "nextId": "sword_15",
     "enhanceCost": {
       "kind": "gold",
       "amount": 55000
@@ -214,9 +214,9 @@
     "sprite": "blazing_demon_blade.png"
   },
   {
-    "id": "sword_14",
-    "level": 14,
-    "nextId": "sword_15",
+    "id": "sword_15",
+    "level": 15,
+    "nextId": "sword_16",
     "enhanceCost": {
       "kind": "gold",
       "amount": 100000
@@ -231,9 +231,9 @@
     "sprite": "apophis_the_demon_sword.png"
   },
   {
-    "id": "sword_15",
-    "level": 15,
-    "nextId": "sword_16",
+    "id": "sword_16",
+    "level": 16,
+    "nextId": "sword_17",
     "enhanceCost": {
       "kind": "gold",
       "amount": 180000
@@ -248,9 +248,9 @@
     "sprite": "demon_battle_axe.png"
   },
   {
-    "id": "sword_16",
-    "level": 16,
-    "nextId": "sword_17",
+    "id": "sword_17",
+    "level": 17,
+    "nextId": "sword_18",
     "enhanceCost": {
       "kind": "gold",
       "amount": 300000
@@ -265,9 +265,9 @@
     "sprite": "invisible_sword.png"
   },
   {
-    "id": "sword_17",
-    "level": 17,
-    "nextId": "sword_18",
+    "id": "sword_18",
+    "level": 18,
+    "nextId": "sword_19",
     "enhanceCost": {
       "kind": "gold",
       "amount": 300000
@@ -278,9 +278,9 @@
     "sprite": "swift_dragon_sword.png"
   },
   {
-    "id": "sword_18",
-    "level": 18,
-    "nextId": "sword_19",
+    "id": "sword_19",
+    "level": 19,
+    "nextId": "sword_20",
     "enhanceCost": {
       "kind": "gold",
       "amount": 500000
@@ -291,9 +291,9 @@
     "sprite": "shiny_sword.png"
   },
   {
-    "id": "sword_19",
-    "level": 19,
-    "nextId": "sword_20",
+    "id": "sword_20",
+    "level": 20,
+    "nextId": "sword_21",
     "enhanceCost": {
       "kind": "gold",
       "amount": 800000
@@ -305,9 +305,9 @@
     "sprite": "wangpuyasha.png"
   },
   {
-    "id": "sword_20",
-    "level": 20,
-    "nextId": "sword_21",
+    "id": "sword_21",
+    "level": 21,
+    "nextId": "sword_22",
     "enhanceCost": {
       "kind": "gold",
       "amount": 1500000
@@ -318,12 +318,12 @@
     "sprite": "prismatic_sword.png"
   },
   {
-    "id": "sword_21",
-    "level": 21,
-    "nextId": "sword_22",
+    "id": "sword_22",
+    "level": 22,
+    "nextId": "sword_23",
     "enhanceCost": {
       "kind": "item",
-      "itemId": "sword_19",
+      "itemId": "sword_20",
       "count": 1
     },
     "successRate": 0.4,
@@ -333,12 +333,12 @@
     "sprite": "tempest_gold.png"
   },
   {
-    "id": "sword_22",
-    "level": 22,
-    "nextId": "sword_23",
+    "id": "sword_23",
+    "level": 23,
+    "nextId": "sword_24",
     "enhanceCost": {
       "kind": "item",
-      "itemId": "sword_21",
+      "itemId": "sword_22",
       "count": 2
     },
     "successRate": 0.4,
@@ -348,9 +348,9 @@
     "sprite": "sharp_walker.png"
   },
   {
-    "id": "sword_23",
-    "level": 23,
-    "nextId": "sword_24",
+    "id": "sword_24",
+    "level": 24,
+    "nextId": "sword_25",
     "enhanceCost": {
       "kind": "item",
       "itemId": "iron_scrap",
@@ -362,12 +362,12 @@
     "sprite": "pierrots_twin_swords.png"
   },
   {
-    "id": "sword_24",
-    "level": 24,
-    "nextId": "sword_25",
+    "id": "sword_25",
+    "level": 25,
+    "nextId": "sword_26",
     "enhanceCost": {
       "kind": "item",
-      "itemId": "sword_22",
+      "itemId": "sword_23",
       "count": 1
     },
     "successRate": 0.4,
@@ -376,9 +376,9 @@
     "sprite": "dragonslaying_saber.png"
   },
   {
-    "id": "sword_25",
-    "level": 25,
-    "nextId": "sword_26",
+    "id": "sword_26",
+    "level": 26,
+    "nextId": "sword_27",
     "enhanceCost": {
       "kind": "item",
       "itemId": "iron_scrap",
@@ -390,9 +390,9 @@
     "sprite": "unimposing_sword.png"
   },
   {
-    "id": "sword_26",
-    "level": 26,
-    "nextId": "sword_27",
+    "id": "sword_27",
+    "level": 27,
+    "nextId": "sword_28",
     "enhanceCost": {
       "kind": "gold",
       "amount": 5000000
@@ -403,9 +403,9 @@
     "sprite": "medusa.png"
   },
   {
-    "id": "sword_27",
-    "level": 27,
-    "nextId": "sword_28",
+    "id": "sword_28",
+    "level": 28,
+    "nextId": "sword_29",
     "enhanceCost": {
       "kind": "item",
       "itemId": "iron_scrap",
@@ -417,9 +417,9 @@
     "sprite": "odyssey_sword.png"
   },
   {
-    "id": "sword_28",
-    "level": 28,
-    "nextId": "sword_29",
+    "id": "sword_29",
+    "level": 29,
+    "nextId": "sword_30",
     "enhanceCost": {
       "kind": "free"
     },
@@ -429,26 +429,13 @@
     "sprite": "mosaikal.png"
   },
   {
-    "id": "sword_29",
-    "level": 29,
-    "nextId": "sword_30",
-    "enhanceCost": {
-      "kind": "gold",
-      "amount": 10000000
-    },
-    "successRate": 0.5,
-    "sellPrice": null,
-    "protectionTickets": "disabled",
-    "sprite": "flame_tempered_sword.png"
-  },
-  {
     "id": "sword_30",
     "level": 30,
     "nextId": null,
     "enhanceCost": null,
     "successRate": null,
     "sellPrice": null,
-    "protectionTickets": 0,
-    "sprite": "divine_rapier.png"
+    "protectionTickets": "disabled",
+    "sprite": "flame_tempered_sword.png"
   }
 ]

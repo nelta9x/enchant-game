@@ -16,9 +16,9 @@ describe('destructionTargetOf — 연출 대상 판정(순수 로직)', () => {
     expect(destructionTargetOf(result)).toEqual({ id: 'sword_7' })
   })
 
-  // 핵심 결정: 스토어는 파괴 즉시 검을 +0 으로 교체하지만(gameStore.test 참조),
+  // 핵심 결정: 스토어는 파괴 즉시 검을 시작 검(+1)으로 교체하지만(gameStore.test 참조),
   // 연출 대상은 새 검이 아니라 "터진 검(fromId)"이어야 한다.
-  it('새 검(+0)이 아니라 파괴된 검(fromId)을 가리킨다', () => {
+  it('새 검(+1)이 아니라 파괴된 검(fromId)을 가리킨다', () => {
     const result: EnhanceResult = {
       outcome: 'destroyed',
       fromId: 'sword_14',

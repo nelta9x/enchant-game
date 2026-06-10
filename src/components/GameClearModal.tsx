@@ -8,7 +8,7 @@ import { dataManager } from '../data/DataManager'
 import { useT } from '../i18n'
 import { swordSpriteUrl } from '../lib/sprites'
 
-// 게임 클리어(승리) 모달. 최종 검(신성한 레이피어)을 완성하면 GameScreen 이 띄운다.
+// 게임 클리어(승리) 모달. 최종 검(엑스칼리버)을 완성하면 GameScreen 이 띄운다.
 // 상점 모달(ShopModal)과 동일한 오버레이·포커스·ESC·트랩 규약을 따른다(닫기만 — 게임 상태는 그대로 둔다).
 type GameClearModalProps = { open: boolean; onClose: () => void }
 

@@ -270,7 +270,7 @@ export function GameScreen() {
   }
 
   // 장착 — 가방의 검을 끼우면 현재 검이 가방으로 옮겨진다(equip → bankOutgoing). 그 나가는 검도
-  // 인벤토리로 빨려 드는 연출을 띄운다. 단, 시작 검(sword_0)은 가방에 들어가지 않고 버려지므로 제외.
+  // 인벤토리로 빨려 드는 연출을 띄운다. 단, 시작 검(sword_1)은 가방에 들어가지 않고 버려지므로 제외.
   const handleEquip = (itemId: string) => {
     const outgoing = canStore ? currentSwordId : null
     equip(itemId)
@@ -384,8 +384,8 @@ export function GameScreen() {
             particleCount: particleCount(destroyed.level),
           },
         })
-        // 새 검(+0) 등장을 떨림 구간(0.4s)만 가린다 — 파괴 연출 전체(~1초)가 아니라.
-        // 그래야 잠금 해제(강화 딜레이) 후 +0 을 재강화해 성공해도 새 검이 0.4s 사라지지 않는다.
+        // 새 검(+1) 등장을 떨림 구간(0.4s)만 가린다 — 파괴 연출 전체(~1초)가 아니라.
+        // 그래야 잠금 해제(강화 딜레이) 후 +1 을 재강화해 성공해도 새 검이 0.4s 사라지지 않는다.
         enqueueEffect({
           kind: 'entranceSuppress',
           exclusive: false,

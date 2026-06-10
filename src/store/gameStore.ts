@@ -8,7 +8,7 @@ import { countOf } from '../lib/items'
 // 시작 자금 / 시작 검. 시작 자금은 사용자 지정값(10만) — 새 플레이어가 의뢰 첫 골드 버킷(보유 50만 미만)에서
 // 시작하도록 한다. 시작 검 획득 방식 등 나머지 '게임 시작 설정'은 디자인 미확정이며 조정될 수 있다.
 export const INITIAL_GOLD = 100_000
-export const INITIAL_SWORD_ID = 'sword_0'
+export const INITIAL_SWORD_ID = 'sword_1'
 
 type GameActions = {
   // 강화 가능 여부(전제조건 충족). UI 버튼 게이팅용.
@@ -29,7 +29,7 @@ type GameActions = {
   buy: (shopId: string, qty?: number) => ShopItem | null
   // 보관 가능 여부(현재 검이 있고 시작 검이 아님). UI 게이팅용.
   canStore: () => boolean
-  // 현재 검을 인벤토리에 보관하고 시작 검(낡은 단검)으로 되돌린다.
+  // 현재 검을 인벤토리에 보관하고 시작 검(검 +1)으로 되돌린다.
   // 보관 불가(검 없음 / 이미 시작 검)면 아무 변화 없음.
   store: () => void
   // 가방의 검(itemId)을 강화 슬롯에 장착한다. 현재 검은 가방으로 보관하고(시작 검이면 버림),
@@ -51,6 +51,9 @@ type GameActions = {
   // cost·reward 는 거래 생성 시 freeze 한 Material — store 에서 재계산하지 않는다(단일 출처).
   // 성사 성공이면 true, 지불 불가면 false(아무 변화 없음).
   fulfillCommission: (cost: Material, reward: Material) => boolean
+  // 데이터 적재 후 1회 호출(main). 전역 store 는 적재 전(모듈 평가 시점) 생성돼 maxLevelReached 가 0 으로
+  // 출발하므로, 현재(시작) 검을 set 래퍼에 다시 흘려보내 최고 도달치를 그 검 레벨까지 끌어올린다.
+  syncRecordToCurrent: () => void
 }
 
 export type GameState = PlayerState & GameActions
@@ -121,12 +124,12 @@ function chargeFor(
   return { gold, items } // free
 }
 
-// 빈 강화 슬롯은 항상 낡은 단검(INITIAL_SWORD_ID, +0)으로 재시작한다(파괴·판매·의뢰완료 공통 규칙).
+// 빈 강화 슬롯은 항상 시작 검(INITIAL_SWORD_ID = 검 +1)으로 재시작한다(파괴·판매·의뢰완료 공통 규칙).
 // 인벤토리에 검이 있어도 자동 장착하지 않는다 — 플레이어가 모르는 사이 보관 검이 강화되는 것을 막기 위함.
 // 보관 검은 가방에 그대로 남고, 다시 쓰려면 명시적으로 equip 해야 한다(items 변화 없음).
 
 // 강화 슬롯에서 빠지는 검(outgoingId)을 가방에 보관한다(보관·장착 공통).
-// 불변식: 가방엔 시작 검(낡은 단검)이 없다 — 빈 슬롯은 시작 검을 '생성'해 채울 뿐
+// 불변식: 가방엔 시작 검(검 +1)이 없다 — 빈 슬롯은 시작 검을 '생성'해 채울 뿐
 // 보관하지 않는 것과 동일하게, 시작 검(과 null=검 없음)은 가방에 두지 않고 버린다.
 function bankOutgoing(
   items: readonly ItemStack[],
@@ -151,7 +154,7 @@ export function createGameStore(opts: CreateOpts = {}) {
     // ── 단조 최고 도달 레벨(maxLevelReached)의 단일 출처 ──
     // currentSwordId 가 "더 높은 레벨" 검으로 바뀌는 모든 갱신을 가로채 maxLevelReached 를 끌어올린다.
     // 강화 성공·장착(보관검·의뢰 보상검)·향후 검 상점 등 경로에 무관하게 자동 반영되고(어느 액션에서
-    // currentSwordId 를 올리든 한 곳에서 잡는다), 파괴·판매로 +0 이 돼도 내려가지 않는다(high-water-mark).
+    // currentSwordId 를 올리든 한 곳에서 잡는다), 파괴·판매로 시작 검(+1)이 돼도 내려가지 않는다(high-water-mark).
     // next 를 그대로 펼치고 maxLevelReached 만 더하므로 다른 상태(골드·아이템 등)는 손대지 않는다(안전).
     // 모든 액션은 set 을 단일 인자(부분 상태 또는 갱신 함수)로만 호출한다 — zustand 의 replace 인자는 쓰지 않는다.
     const set = (
@@ -190,10 +193,11 @@ export function createGameStore(opts: CreateOpts = {}) {
           : INITIAL_SWORD_ID,
       items: opts.items ?? [],
       pendingDrops: [],
-      // 역대 최고 도달 강화 레벨(단조). 기본 시작 검(sword_0 = 레벨 0)은 0으로 둔다 — 전역 store 생성은
-      // dataManager.load() 이전(모듈 평가 시점)이라 여기서 검을 조회하면 안 된다(미적재 → throw). null 은
-      // levelOf 가 dataManager 없이 0 으로 단락한다. 테스트처럼 currentSwordId 를 지정하면(load 이후 생성)
-      // 그 검 레벨에서 시작한다. 이후 상승은 위 set 래퍼가 단일 지점에서 반영한다.
+      // 역대 최고 도달 강화 레벨(단조). 전역 store 생성은 dataManager.load() 이전(모듈 평가 시점)이라
+      // 여기서 검을 조회하면 안 된다(미적재 → throw). opts.currentSwordId 미지정(전역)은 null 로 단락해 0 —
+      // 시작 검(sword_1 = +1)을 들고도 0 으로 출발하므로, main 이 적재 후 syncRecordToCurrent 로 +1 까지 보정한다.
+      // 테스트처럼 currentSwordId 를 지정하면(load 이후 생성) 그 검 레벨에서 시작한다.
+      // 이후 상승은 위 set 래퍼가 단일 지점에서 반영한다.
       maxLevelReached: levelOf(opts.currentSwordId ?? null),
 
       canEnhance: (useProtection) => {
@@ -211,7 +215,7 @@ export function createGameStore(opts: CreateOpts = {}) {
           // 소모 적용(골드 + consumed.items). 드랍은 즉시 items 에 넣지 않는다 — "수집 연출"에서
           // 토큰이 인벤토리에 도착할 때 collectDrop 으로 옮긴다(deferred). 그 전까지 pendingDrops 에 둔다.
           const baseItems = subtractItems(state.items, result.consumed.items)
-          // 파괴 시 낡은 단검(+0)으로 재시작한다(판매·의뢰완료와 동일 규칙).
+          // 파괴 시 시작 검(+1)으로 재시작한다(판매·의뢰완료와 동일 규칙).
           // 인벤토리 검은 자동 장착하지 않고 그대로 둔다 — 보관 검의 의도치 않은 강화 방지.
           // 성공(다음 검)·방지(유지)는 엔진 결과의 toId를 그대로 따른다.
           if (result.outcome === 'destroyed') {
@@ -248,7 +252,7 @@ export function createGameStore(opts: CreateOpts = {}) {
 
         const price = sword.sellPrice
         set((state) => {
-          // 판매 후 빈 슬롯은 낡은 단검(+0)으로 채운다(파괴·의뢰완료와 동일 규칙).
+          // 판매 후 빈 슬롯은 시작 검(+1)으로 채운다(파괴·의뢰완료와 동일 규칙).
           // 인벤토리 검은 자동 장착하지 않고 그대로 둔다 — 보관 검의 의도치 않은 강화 방지.
           return {
             gold: state.gold + price,
@@ -392,7 +396,7 @@ export function createGameStore(opts: CreateOpts = {}) {
             )
             return true
           }
-          // 가방에 없고 현재 장착 검이 요구 검이면(수량 1) 그것을 소모하고 낡은 단검(+0)으로 재시작한다
+          // 가방에 없고 현재 장착 검이 요구 검이면(수량 1) 그것을 소모하고 시작 검(+1)으로 재시작한다
           // (판매·파괴와 동일 규칙). 재료 itemId 는 currentSwordId 와 일치할 수 없어 이 분기를 타지 않는다.
           if (cost.count === 1 && state.currentSwordId === cost.itemId) {
             set({ ...grant(state.items, state.gold), currentSwordId: INITIAL_SWORD_ID })
@@ -400,6 +404,13 @@ export function createGameStore(opts: CreateOpts = {}) {
           }
         }
         return false // 지불 불가 — 변화 없음
+      },
+
+      // 데이터 적재 후(main) 전역 store 의 최고 도달치를 현재 검 레벨로 보정한다. 현재 검을 그대로
+      // set 에 다시 흘려보내면 위 set 래퍼가 levelOf 로 maxLevelReached 를 끌어올린다(단일 출처 재사용 —
+      // 상수·레벨 파싱 없음). 같은 검이라 다른 상태는 건드리지 않고, 단조라 이미 더 높으면 무변화다.
+      syncRecordToCurrent: () => {
+        set((s) => ({ currentSwordId: s.currentSwordId }))
       },
     }
   })

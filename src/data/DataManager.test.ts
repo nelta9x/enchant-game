@@ -10,7 +10,7 @@ describe('DataManager', () => {
   it('load() 호출 전 조회하면 에러를 던진다', () => {
     const dm = new DataManager()
     expect(() => dm.getSwords()).toThrow()
-    expect(() => dm.getSwordById('sword_0')).toThrow()
+    expect(() => dm.getSwordById('sword_1')).toThrow()
   })
 
   it('load() 후 전체 검 데이터를 조회할 수 있다', () => {
@@ -22,9 +22,9 @@ describe('DataManager', () => {
   it('id로 검을 조회한다(정식·유일 식별 경로) — 없는 id·잡템은 undefined', () => {
     const dm = new DataManager()
     dm.load()
-    expect(dm.getSwordById('sword_0')?.id).toBe('sword_0')
-    expect(dm.getSwordById('sword_0')?.level).toBe(0)
-    // 최종 단계는 이제 sword_30(신성한 레이피어) — sword_29 는 +30 으로 강화된다.
+    expect(dm.getSwordById('sword_1')?.id).toBe('sword_1')
+    expect(dm.getSwordById('sword_1')?.level).toBe(1)
+    // 최종 단계는 sword_30(엑스칼리버) — sword_29 는 +30 으로 강화된다.
     expect(dm.getSwordById('sword_30')?.level).toBe(30)
     expect(dm.getSwordById('sword_30')?.nextId).toBeNull()
     expect(dm.getSwordById('sword_29')?.nextId).toBe('sword_30')
@@ -70,8 +70,8 @@ describe('DataManager', () => {
     expect(dm.getItemBasePrice('iron_scrap')).toBe(
       dm.getItemById('iron_scrap')?.basePrice,
     )
-    // 판매 불가 검(sword_0, sellPrice=null)·미지의 id → undefined.
-    expect(dm.getItemBasePrice('sword_0')).toBeUndefined()
+    // 판매 불가 검(sword_1 = 시작 검, sellPrice=null)·미지의 id → undefined.
+    expect(dm.getItemBasePrice('sword_1')).toBeUndefined()
     expect(dm.getItemBasePrice('nonexistent')).toBeUndefined()
   })
 
@@ -82,13 +82,14 @@ describe('DataManager', () => {
       .getSwords()
       .reduce((max, s) => Math.max(max, s.level), 0)
     expect(dm.getMaxSwordLevel()).toBe(expected)
-    expect(dm.getMaxSwordLevel()).toBe(30) // 현재 데이터: sword_30(신성한 레이피어)
+    expect(dm.getMaxSwordLevel()).toBe(30) // 현재 데이터: sword_30(엑스칼리버)
   })
 
   it('getSwordByLevel: 레벨로 검을 조회한다(레벨↔검 1:1) — 범위 밖은 undefined', () => {
     const dm = new DataManager()
     dm.load()
-    expect(dm.getSwordByLevel(0)?.id).toBe('sword_0')
+    expect(dm.getSwordByLevel(0)).toBeUndefined() // 레벨 0(시작 검 이전)은 더 이상 없다
+    expect(dm.getSwordByLevel(1)?.id).toBe('sword_1')
     expect(dm.getSwordByLevel(23)?.level).toBe(23)
     expect(dm.getSwordByLevel(30)?.id).toBe('sword_30')
     expect(dm.getSwordByLevel(31)).toBeUndefined()

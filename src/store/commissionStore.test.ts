@@ -195,7 +195,7 @@ describe('commissionStore — 단일 스폰 타이머', () => {
     const target = store.getState().active[0]
     expect(costItemId(target.cost)).toBe('iron_scrap')
     useGameStore.setState({
-      currentSwordId: 'sword_0',
+      currentSwordId: 'sword_1',
       items: [{ itemId: 'iron_scrap', count: 3 }],
       gold: 1_500_000,
     })
@@ -205,7 +205,7 @@ describe('commissionStore — 단일 스폰 타이머', () => {
       useGameStore.getState().items.find((i) => i.itemId === 'iron_scrap')
         ?.count,
     ).toBe(2) // 1개 차감
-    expect(useGameStore.getState().currentSwordId).toBe('sword_0') // 장착검 불변
+    expect(useGameStore.getState().currentSwordId).toBe('sword_1') // 장착검 불변
     store.getState().stop()
   })
 
@@ -257,7 +257,7 @@ describe('commissionStore — 단일 스폰 타이머', () => {
   it('fulfill: 물물교환 — 재료 requiredCount 개 소모하고 아이템 보상을 지급한다', () => {
     useGameStore.setState({
       gold: 777,
-      currentSwordId: 'sword_0',
+      currentSwordId: 'sword_1',
       items: [{ itemId: 'faded_fluorescent', count: 3 }],
     })
     const store = createCommissionStore({ rng: () => 0.5, config: BARTER })
@@ -271,14 +271,14 @@ describe('commissionStore — 단일 스폰 타이머', () => {
     expect(items.find((i) => i.itemId === 'faded_fluorescent')?.count).toBe(1) // 3→1 (2 소모)
     expect(items.find((i) => i.itemId === 'sword_12')?.count).toBe(1) // 검 1개 지급
     expect(useGameStore.getState().gold).toBe(777) // 골드 불변(아이템 보상)
-    expect(useGameStore.getState().currentSwordId).toBe('sword_0') // 장착검 불변
+    expect(useGameStore.getState().currentSwordId).toBe('sword_1') // 장착검 불변
     store.getState().stop()
   })
 
   it('fulfill: 물물교환 — 재료가 requiredCount 미만이면 납품 불가(false)', () => {
     useGameStore.setState({
       gold: 0,
-      currentSwordId: 'sword_0',
+      currentSwordId: 'sword_1',
       items: [{ itemId: 'faded_fluorescent', count: 1 }], // 2개 필요한데 1개뿐
     })
     const store = createCommissionStore({ rng: () => 0.5, config: BARTER })

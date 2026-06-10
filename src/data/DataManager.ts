@@ -33,7 +33,7 @@ export class DataManager {
   //
   // 로드 순서: 검·아이템 카탈로그를 먼저, 의뢰를 나중에 — loadCommission 검증이
   // "의뢰 itemId 가 판매 가능한 검이거나 아이템 카탈로그에 존재하는가"를 강제하므로
-  // 알려진 itemId 집합(knownItemIds)을 먼저 만들어 주입한다(sword_0 등 비판매 검 출제 차단).
+  // 알려진 itemId 집합(knownItemIds)을 먼저 만들어 주입한다(sword_1 등 비판매 검 출제 차단).
   load(): void {
     this.swords = loadSwords()
     this.shop = loadShop()

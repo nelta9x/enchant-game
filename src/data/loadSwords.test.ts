@@ -245,12 +245,19 @@ describe('parseSwords — 스프라이트 폴백', () => {
 })
 
 describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
-  it('+0~+30 전체(31단계)를 로드하고 단계가 연속한다', () => {
+  it('+1~+30 전체(30단계)를 로드하고 단계가 연속한다', () => {
     const swords = loadSwords()
-    expect(swords).toHaveLength(31)
+    expect(swords).toHaveLength(30)
     expect(swords.map((s) => s.level)).toEqual(
-      Array.from({ length: 31 }, (_, i) => i),
+      Array.from({ length: 30 }, (_, i) => i + 1),
     )
+  })
+
+  it('시작 검(+1, 검)은 첫 강화가 100% 보장이고 판매 불가다(순한 시작)', () => {
+    const start = loadSwords().find((s) => s.level === 1)
+    expect(start?.id).toBe('sword_1')
+    expect(start?.successRate).toBe(1) // 첫 강화는 무조건 성공(튜토리얼 유예)
+    expect(start?.sellPrice).toBeNull() // 시작 검은 판매 불가(판매-리셋 무한 골드 익스플로잇 차단)
   })
 
   it('최종 단계(+30)는 강화 불가, 직전(+29)은 강화 가능하다(클리어 검)', () => {
@@ -259,29 +266,29 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     expect(last?.enhanceCost).toBeNull()
     expect(last?.successRate).toBeNull()
     expect(last?.nextId).toBeNull()
-    // +29(화염에 달군 검)은 더 이상 종료가 아니라 +30 으로 강화된다(골드 1000만·50%).
+    // +29(폭풍일격)은 더 이상 종료가 아니라 +30 으로 강화된다(무료·15%).
     const prev = swords.find((s) => s.level === 29)
     expect(prev?.nextId).toBe('sword_30')
-    expect(prev?.enhanceCost).toEqual({ kind: 'gold', amount: 10_000_000 })
-    expect(prev?.successRate).toBe(0.5)
+    expect(prev?.enhanceCost).toEqual({ kind: 'free' })
+    expect(prev?.successRate).toBe(0.15)
   })
 
-  it('진행 체인(nextId)이 +0에서 시작해 +30(최종)까지 끊김 없이 이어진다', () => {
+  it('진행 체인(nextId)이 +1에서 시작해 +30(최종)까지 끊김 없이 이어진다', () => {
     const byId = new Map(loadSwords().map((s) => [s.id, s]))
-    let cur = byId.get('sword_0')
+    let cur = byId.get('sword_1')
     let hops = 0
     while (cur && cur.nextId !== null) {
       cur = byId.get(cur.nextId)
       hops++
     }
-    expect(hops).toBe(30) // 0→1→…→30
+    expect(hops).toBe(29) // 1→2→…→30
     expect(cur?.id).toBe('sword_30')
     expect(cur?.nextId).toBeNull()
   })
 
-  it('이지버그 단계(+26~+28)는 파괴보호장치 사용 불가다', () => {
+  it('이지버그 단계(+27~+29)는 파괴보호장치 사용 불가다', () => {
     const swords = loadSwords()
-    for (const level of [26, 27, 28]) {
+    for (const level of [27, 28, 29]) {
       expect(swords.find((s) => s.level === level)?.protectionTickets).toBe(
         'disabled',
       )
@@ -292,23 +299,21 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     expect(() => loadSwords()).not.toThrow()
   })
 
-  it('+0~+30 전 단계가 고유한 전용 스프라이트를 가진다(폴백 불필요)', () => {
+  it('+1~+30 전 단계가 고유한 전용 스프라이트를 가진다(폴백 불필요)', () => {
     const sprites = loadSwords().map((s) => s.sprite)
     expect(sprites.every((s) => s.length > 0)).toBe(true)
-    expect(new Set(sprites).size).toBe(31)
+    expect(new Set(sprites).size).toBe(30)
   })
 
   it('대표 단계의 스프라이트가 올바르게 매핑된다', () => {
     const swords = loadSwords()
     const spriteOf = (level: number) =>
       swords.find((s) => s.level === level)?.sprite
-    expect(spriteOf(0)).toBe('rusty_dagger.png')
-    expect(spriteOf(4)).toBe('burning_sword.png')
-    expect(spriteOf(5)).toBe('frost_sword.png')
-    expect(spriteOf(14)).toBe('apophis_the_demon_sword.png')
-    expect(spriteOf(19)).toBe('wangpuyasha.png')
-    expect(spriteOf(25)).toBe('unimposing_sword.png')
-    expect(spriteOf(29)).toBe('flame_tempered_sword.png')
-    expect(spriteOf(30)).toBe('divine_rapier.png')
+    expect(spriteOf(1)).toBe('rusty_dagger.png')
+    expect(spriteOf(5)).toBe('burning_sword.png')
+    expect(spriteOf(15)).toBe('apophis_the_demon_sword.png')
+    expect(spriteOf(20)).toBe('wangpuyasha.png')
+    expect(spriteOf(26)).toBe('unimposing_sword.png')
+    expect(spriteOf(30)).toBe('flame_tempered_sword.png')
   })
 })

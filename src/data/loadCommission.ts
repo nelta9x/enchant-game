@@ -15,7 +15,7 @@ import type {
 //
 // 출제 itemId 무결성(load-bearing): 버킷의 모든 itemId 는 "판매 가능한 검 또는 아이템 카탈로그"에
 // 존재해야 한다. DataManager 가 그 집합(knownItemIds = 판매 가능 검 ∪ 카탈로그)을 주입한다 —
-// 이는 commissionQueue 의 런타임 sellPrice 필터를 로드 시점으로 옮긴 것으로, sword_0(판매 불가) 출제 →
+// 이는 commissionQueue 의 런타임 sellPrice 필터를 로드 시점으로 옮긴 것으로, sword_1(판매 불가) 출제 →
 // "무한 골드" 익스플로잇을 차단한다. 동시에 미지의(오타) itemId 도 여기서 즉시 실패한다.
 //
 // 골드 버킷 커버리지(load-bearing): buckets[] 는 보유 골드 [0, ∞) 를 빈틈·겹침 없이 덮어야 한다 —
@@ -137,7 +137,7 @@ function parseBucket(
             const itemId = it.itemId
             if (typeof itemId !== 'string' || itemId.length === 0)
               fail(`${iw}.itemId must be a non-empty string`)
-            // load-bearing 무결성: 판매 가능 검 또는 카탈로그 아이템만 납품 가능(sword_0 등 비판매·미지 id 차단).
+            // load-bearing 무결성: 판매 가능 검 또는 카탈로그 아이템만 납품 가능(sword_1 등 비판매·미지 id 차단).
             if (!knownItemIds.has(itemId))
               fail(`${iw}.itemId is not a sellable sword or catalog item: ${itemId}`)
             const requiredCount =
