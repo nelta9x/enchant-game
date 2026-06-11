@@ -50,12 +50,22 @@ export type FloatingTextEntry = { text: TranslationKey; weight: number }
 // 이벤트 타이밍 키(예: 'enhanceFail') → 후보 엔트리 목록. 빈 배열 = 아직 안 채운 슬롯(미표시).
 export type FloatingTextData = Record<string, FloatingTextEntry[]>
 
-// 게임플레이 튜닝 설정(코드 상수가 아니라 데이터 파일 config.json 에서 적재). 연출 길이(SHAKE_SEC 등)와
-// 무관하게 따로 조절할 전역 값을 모은다 — 항목이 늘면 여기에 필드를 추가한다.
-//  - enhanceDelayMs: 강화 1회 후 다음 강화까지의 입력 잠금 길이(ms, 정수 >= 0). 0 = 딜레이 없음.
-//    (참고: 떨림/등장 억제 창 ~400ms 보다 짧으면 새 검 등장이 깜빡일 수 있으나 강제하진 않는다.)
-export type GameConfig = {
-  enhanceDelayMs: number
+// 강화 연출 시퀀스의 타이밍 설정(코드 상수가 아니라 별도 데이터 파일 animation.json 에서 적재).
+// "시퀀스 타이밍"(언제 망치가 닿고, 떨림이 얼마나 가고, 언제 다시 강화 가능한지)만 데이터로 둔다 —
+// 개별 파티클·모션의 "모양" 상수(분출 반경·파티클 비행 시간 등)는 프레젠테이션 코드에 남긴다(경계는
+// loadAnimation 주석 참고). 강화 1회의 연출 타임라인은 enhanceTimeline.ts 가 이 값 + 매회 랜덤 떨림
+// 시간으로 도출한다(단일 출처).
+//  - hammerImpactMs: 강화 시작(t=0)부터 망치가 검에 닿기까지(정수 >= 0). 떨림 시작·Hit 불꽃·'캉' 타격음의
+//    공통 앵커. 망치 윈드업은 고정이라 이 값은 매회 동일(랜덤이 아님).
+//  - weaponShakeMinMs / weaponShakeMaxMs: 망치가 닿은 뒤 무기가 덜덜 떠는 시간 범위(ms). 매 강화마다
+//    이 구간에서 무작위로 뽑는다(min <= max, 둘 다 정수 >= 0). 떨림이 끝나는 순간 성공/실패 버스트가 터진다.
+//  - reEnhanceGuardMs: 성공/실패 버스트 발생 후 다시 강화할 수 있기까지의 입력 잠금(ms, 정수 >= 0).
+//    UI 가드 전용(게임 로직 불변) — 0 = 버스트 즉시 재강화 가능.
+export type AnimationConfig = {
+  hammerImpactMs: number
+  weaponShakeMinMs: number
+  weaponShakeMaxMs: number
+  reEnhanceGuardMs: number
 }
 
 // 의뢰 버킷에서 출제될 거래 1종(언어 중립). 등장 확률(weight) + "지불(cost)" + "보상(reward)"을 아이템별로 둔다.

@@ -15,6 +15,11 @@ export type EffectPayload = {
   coinCount?: number // 분출할 코인 수(판매 — 판매가에 비례)
   drops?: { itemId: string; count: number }[] // 파괴 드롭 스택(검 아래 흩뿌림 연출)
   itemId?: string // 인벤토리로 빨려드는 아이템(보관·장착 비행)
+  // 강화 연출 타임라인(매회 다름) — 뷰가 떨림 시작·버스트·등장 지연을 맞추는 데 쓴다(enhanceTimeline 도출).
+  impactMs?: number // 망치가 닿는 시각(떨림 시작) — 버스트·방지 떨림
+  shakeMs?: number // 이번 강화의 무작위 떨림 길이 — 버스트·방지 떨림
+  appearDelaySec?: number // 드롭 재료가 떨어지기 시작하는 시각(초, 버스트 후) — drop
+  entranceDelaySec?: number // 새 검 스프라이트 등장 지연(초, = burstAt) — entranceSuppress
 }
 
 // 효과 명세(호출 측이 enqueue 에 넘기는 것 — id 는 시스템이 부여).

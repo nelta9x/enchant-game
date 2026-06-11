@@ -17,22 +17,18 @@ import { useCommissionStore } from '../store/commissionStore'
 import type { Commission } from '../store/commissionQueue'
 import { useUiStore } from '../store/uiStore'
 import { CommissionBar } from './CommissionBar'
-import {
-  DestructionEffect,
-  DESTRUCTION_DURATION_MS,
-  type DestructionEvent,
-} from './DestructionEffect'
+import { DestructionEffect, type DestructionEvent } from './DestructionEffect'
 import { destructionTargetOf } from './destruction'
 import { coinCount } from './coins'
 import { CoinFlight, COIN_FLIGHT_MS, type CoinFlightEvent } from './CoinFlight'
-import { DropScatter, DROP_LIFETIME_MS, type DropEvent } from './DropScatter'
+import { DropScatter, type DropEvent } from './DropScatter'
+import { dropAppearSec, dropLifetimeMs } from './drops'
 import { ItemFlight, ITEM_FLIGHT_MS, type ItemFlightEvent } from './ItemFlight'
-import {
-  HammerStrike,
-  HAMMER_STRIKE_MS,
-  HAMMER_IMPACT_MS,
-  type HammerStrikeEvent,
-} from './HammerStrike'
+import { HammerStrike, type HammerStrikeEvent } from './HammerStrike'
+import { hammerStrikeMs } from './hammerTiming'
+import { HitSparkEffect } from './HitSparkEffect'
+import { ParticleEmitProvider, ParticlePool } from './ParticlePool'
+import { computeEnhanceTimeline, rollShakeMs } from './enhanceTimeline'
 import { EnhanceButton } from './EnhanceButton'
 import {
   FloatingTextEffect,
@@ -45,14 +41,10 @@ import { particleCount } from './particles'
 import { protectionState, isProtectionActive } from './protection'
 import { SellButton } from './SellButton'
 import { StoreButton } from './StoreButton'
-import { SHAKE_SEC } from './shake'
 import { ShopModal } from './ShopModal'
 import { GameClearModal } from './GameClearModal'
-import {
-  SuccessEffect,
-  SUCCESS_DURATION_MS,
-  type SuccessEvent,
-} from './SuccessEffect'
+import { SuccessEffect, type SuccessEvent } from './SuccessEffect'
+import type { ShakeBurstEvent } from './ShakeBurstEffect'
 import { SwordStage } from './SwordStage'
 import { TopControls } from './TopControls'
 
@@ -64,14 +56,11 @@ const ANNOUNCE_KEY: Record<string, TranslationKey> = {
   protectedShake: 'toast.protected',
 }
 
-// 실행 중 버스트 효과(성공·파괴)를 연출 이벤트로 투영한다 — 같은 kind 를 전부 뽑아(runningEventsOf:
-// 겹친 옛 버스트 유실 방지) {id, spriteUrl, particleCount} 로 매핑한다. spriteUrl 없는 효과(자리만 있는
-// 잠금 등)는 제외(빈 배열). 성공·파괴가 동일 형태라 한 곳에서 만든다 — 두 memo 의 중복을 없애 payload
-// 필드를 늘려도 한쪽만 고쳐 어긋나는 일이 없게 한다.
-function toBurstEvents(
-  running: Effect[],
-  kind: string,
-): { id: number; spriteUrl: string; particleCount: number }[] {
+// 실행 중 버스트 효과(성공·파괴)를 연출 이벤트(ShakeBurstEvent)로 투영한다 — 같은 kind 를 전부 뽑아
+// (runningEventsOf: 겹친 옛 버스트 유실 방지) payload 를 이벤트로 매핑한다. spriteUrl 없는 효과(자리만 있는
+// 잠금 등)는 제외(빈 배열). 성공·파괴가 동일 형태(ShakeBurstEvent)라 한 곳에서 만든다 — 반환 타입을 그 명명
+// 타입으로 두어 payload 필드를 늘릴 때 투영 누락이 컴파일에서 잡히게 한다.
+function toBurstEvents(running: Effect[], kind: string): ShakeBurstEvent[] {
   return runningEventsOf(running, kind).flatMap((e) =>
     e.payload?.spriteUrl
       ? [
@@ -79,6 +68,9 @@ function toBurstEvents(
             id: e.id,
             spriteUrl: e.payload.spriteUrl,
             particleCount: e.payload.particleCount ?? 0,
+            // 떨림 시작(impact)·길이(shake)는 ShakeBurstEffect 가 잔상 떨림→버스트 시점을 정하는 데 쓴다.
+            impactMs: e.payload.impactMs ?? 0,
+            shakeMs: e.payload.shakeMs ?? 0,
           },
         ]
       : [],
@@ -117,6 +109,10 @@ export function GameScreen() {
       ? dataManager.getSwordById(currentSwordId)
       : undefined
 
+  // 강화 연출 타이밍(망치 임팩트·떨림 범위·재강화 가드) — 데이터에서 1회 읽어 매 강화의 타임라인과
+  // 임팩트 의존 props(망치·Hit 불꽃·보호 플레어)에 쓴다. load 이후라 안전(컴포넌트는 적재 후 렌더).
+  const anim = dataManager.getAnimation()
+
   // 보호 결계 상태(보호불가/부족/대기/발동) — 흩어진 조건 대신 순수 코어 한 곳에서 계산한다.
   // 검이 없으면 'disabled'(이 단계 보호 불가)로 본다. 실제 강화 적용 여부는 armed 일 때만.
   const ownedTickets = countOf(items, PROTECTION_TICKET_ID)
@@ -130,7 +126,7 @@ export function GameScreen() {
   const canSell = canSellFn()
   const canStore = canStoreFn()
 
-  // 강화 쿨다운(연출 잠금) 중인지 — 강화 직후 enhanceDelayMs 동안 lockCount>0 이다.
+  // 강화 쿨다운(연출 잠금) 중인지 — 강화 직후 타임라인 lockMs(= 떨림 끝 + 재강화 가드) 동안 lockCount>0 이다.
   const enhanceLocked = lockCount > 0
   // 스페이스 단축키 게이트 — 꾹 누름 연사 박자가 이 잠금에 묶여 있으므로(useEnhanceHotkey) 잠금을 포함해 둔다.
   // 버튼은 잠금 동안 '비활성(흐림)'이 아니라 쿨다운 오버레이로 표현하므로, 아래에서 disabled={!canEnhance} 로
@@ -195,6 +191,12 @@ export function GameScreen() {
   // 판매로 currentSwordId(→가격)가 바뀔 때는 이 분기를 타지 않으므로 pop 이 터지지 않는다.
   const [pricePopKey, setPricePopKey] = useState(0)
 
+  // 직전 강화의 재강화 잠금 길이(ms) — 매 강화마다 떨림 길이에 따라 다르므로 버튼 충전 오버레이가 같은
+  // 길이로 걷히도록 보관한다(handleEnhance 가 타임라인 lockMs 로 갱신). 첫 강화 전엔 최소 떨림 기준 추정치.
+  const [lastLockMs, setLastLockMs] = useState(
+    () => computeEnhanceTimeline(anim, anim.weaponShakeMinMs).lockMs,
+  )
+
   // 강화 결과 플로팅 텍스트("아이구!..." 등) — 데이터(floatingText.json) 기반. 강화 결과(성공/실패/방지)를
   // 이벤트 키로 매핑해 후보 한 줄을 뽑아 검 중상단에 띄운다. id 단조 증가로 연타도 교체 재생되며, 빈
   // 슬롯(미설정 문구)이면 null 이라 아무것도 안 뜬다.
@@ -208,10 +210,13 @@ export function GameScreen() {
   // 그러면 연출(망치·떨림)이 끝나기 전에 장착 검 이름이 새 검으로 바뀌어 몰입이 깨졌다(요구사항).
   // 무대 스프라이트는 이미 떨림(entranceSuppress) 동안 숨었다가 등장하므로(entranceDelay), 이름·
   // 판매가·성공률·인벤토리 장착행도 그 등장과 같은 박자에 전환되도록 "공개된 검(revealedSword)"을
-  // 따로 둔다. heldSwordId 가 있으면(강화 직후 떨림 동안) 강화 전 검을 그대로 보여 주고, 망치가
-  // 내려친 뒤(SHAKE_SEC) 공개 타이머가 이를 비우면 현재(결과) 검으로 전환한다. 떨림이 없는 변화
+  // 따로 둔다. heldSwordId 가 있으면(강화 직후 떨림 동안) 강화 전 검을 그대로 보여 주고, 떨림이 끝나는
+  // 순간(burstAt) 공개 타이머가 이를 비우면 현재(결과) 검으로 전환한다. 떨림이 없는 변화
   // (보관·장착·판매·방지)는 heldSwordId 가 null 이라 currentSwordId 를 즉시 따른다(별도 처리 불필요).
-  const entranceSuppressed = !!latestRunning(running, 'entranceSuppress')
+  // 새 스프라이트 등장 지연(초)은 entranceSuppress 효과 payload(= 이번 강화의 burstAt)에서 읽는다 —
+  // 잔상 소멸과 정확히 같은 burstAt 을 써 정확히 교대시킨다(강화 전/후 검 동시 노출 방지의 단일 출처).
+  const entranceDelaySec =
+    latestRunning(running, 'entranceSuppress')?.payload?.entranceDelaySec ?? 0
   const [heldSwordId, setHeldSwordId] = useState<string | null>(null)
   const revealedSwordId = heldSwordId ?? currentSwordId
   const revealedSword =
@@ -310,10 +315,9 @@ export function GameScreen() {
   }
 
   const handleEnhance = () => {
-    // 쿨다운(강화 딜레이) 중 들어온 강화는 무시한다 — 버튼이 더 이상 disabled 가 아니라(클릭/Enter 가능)
-    // 쿨다운 오버레이만 덮으므로, 이 가드로 '쿨다운 중 단발 입력'을 no-op 으로 만든다.
-    // (연타 throttle 자체는 강화 잠금 lockCount(~600ms)와 hold 연사의 min-gap(400ms)이 책임진다 — 이
-    //  가드는 그 이중 발사 방지턱이 아니라 쿨다운 중 단발 활성화 차단이다. hold 는 useHoldRepeat 가 동일 게이팅.)
+    // 쿨다운(재강화 가드) 중 들어온 강화는 무시한다 — 버튼이 더 이상 disabled 가 아니라(클릭/Enter 가능)
+    // 쿨다운 오버레이만 덮으므로, 이 가드로 '쿨다운 중 단발 입력'을 no-op 으로 만든다(요구사항: 재강화는
+    // UI 가드만으로 막는다 — 게임 로직은 불변). hold 연사는 useHoldRepeat 가 동일 게이팅.
     if (enhanceLocked) return
     // 강화 전(현재) 검 — store 는 enhance() 에서 즉시 검을 교체하지만, currentSwordId 는 이번 렌더의
     // 스냅샷이라 이 핸들러 안에선 강화 전 값을 유지한다. 결과 공개 전까지 이름·스탯에 보여 줄 검이다.
@@ -321,7 +325,14 @@ export function GameScreen() {
     const result = enhance(effectiveProtection)
     if (!result) return
 
-    // 결과 공개 지연: 강화 전 검을 떨림 동안 이름·스탯에 유지했다가, 망치가 내려친 뒤(SHAKE_SEC)
+    // ── 이번 강화의 연출 타임라인(단일 출처) ──────────────────────────────────────
+    // 떨림 시간(shakeMs)을 1회 무작위로 뽑고, 데이터 타이밍과 합쳐 모든 마일스톤·수명을 도출한다. 아래
+    // 모든 효과·사운드·공개 타이머·잠금이 이 한 객체의 슬라이스를 쓴다 — impact+shake 계산이 곳곳에서
+    // 어긋나(= 강화 전/후 검 동시 노출 버그) 발생하지 않도록 한곳에서만 계산한다.
+    const tl = computeEnhanceTimeline(anim, rollShakeMs(anim))
+    const burstAtSec = tl.burstAtMs / 1000
+
+    // 결과 공개 지연: 강화 전 검을 떨림 동안 이름·스탯에 유지했다가, 떨림이 끝나는 순간(burstAt = revealAt)
     // 결과 검으로 한 번에 전환한다. 가격 강조·게임 클리어도 그 시점에 함께 푼다(연출 전 스포일 방지).
     const scheduleReveal = (pricePop: boolean, terminal: boolean) => {
       setHeldSwordId(prevSwordId)
@@ -331,25 +342,24 @@ export function GameScreen() {
         setHeldSwordId(null)
         if (pricePop) setPricePopKey((k) => k + 1)
         if (terminal) setCleared(true)
-      }, SHAKE_SEC * 1000)
+      }, tl.revealAtMs)
     }
 
-    // 강화 '캉!' 타격음 — 결과(성공·파괴·방지)와 무관하게 한 번 재생. 망치가 검에 닿는 순간(HAMMER_IMPACT_MS,
-    // 분출 직전)에 맞춰 미뤄, 화면에서 내리꽂는 순간 울리도록 한다(버튼·스페이스 공통 경로).
-    sound.playSfx('enhance', { delayMs: HAMMER_IMPACT_MS })
+    // 강화 '캉!' 타격음 — 결과(성공·파괴·방지)와 무관하게 한 번 재생. 망치가 검에 닿는 순간(impactMs)에
+    // 맞춰 미뤄, 화면에서 내리꽂는 순간 울리도록 한다(Hit 불꽃·떨림 시작과 동일 앵커).
+    sound.playSfx('enhance', { delayMs: tl.impactMs })
 
     // 망치 내려치기 연출 — 결과와 무관하게 강화 시도마다 검 위로 호라드릭 망치가 내리꽂힌다(잠금X·병렬).
-    // 잠금은 아래 enhanceLock 가 전담하고, 이 효과는 순수 시각(임팩트가 분출 직전에 맞물려 친다→터진다).
+    // 이 이벤트가 HitSparkEffect 의 불꽃 트리거도 겸한다(임팩트 = 닿는 순간). 잠금은 아래 enhanceLock 전담.
     enqueueEffect({
       kind: 'hammerStrike',
       exclusive: false,
       locksEnhance: false,
-      durationMs: HAMMER_STRIKE_MS,
+      durationMs: hammerStrikeMs(tl.impactMs),
     })
 
     // 강화 결과 플로팅 텍스트(데이터 기반) — 결과를 이벤트 키로 매핑해 후보 한 줄을 뽑아 검 중상단에
-    // 띄운다. 빈 슬롯(미설정)이면 null → 미표시. 분기보다 앞에 둬 어느 분기가 빠져도 안전하며, 화면
-    // 등장 타이밍은 연출 컴포넌트의 delay(결과 분출 박자)가 맞춘다.
+    // 띄운다. 빈 슬롯(미설정)이면 null → 미표시. 등장 타이밍(delaySec)은 떨림이 끝나는 burstAt 에 맞춘다.
     const floatEventKey =
       result.outcome === 'success'
         ? 'enhanceSuccess'
@@ -361,43 +371,67 @@ export function GameScreen() {
     )
     if (pickedTextKey) {
       floatTextKey.current += 1
-      setFloatingText({ id: floatTextKey.current, textKey: pickedTextKey })
+      setFloatingText({
+        id: floatTextKey.current,
+        textKey: pickedTextKey,
+        delaySec: burstAtSec,
+      })
     }
 
-    // 강화 버튼 잠금(연타 딜레이)은 성공·파괴·방지 공통 — 연출과 별개의 병렬 효과(lockCount). 길이는
-    // 데이터(config.enhanceDelayMs)에서 읽어 떨림(SHAKE_SEC) 연출과 독립적으로 조절한다.
+    // 강화 버튼 잠금(재강화 가드)은 성공·파괴·방지 공통 — 연출과 별개의 병렬 효과(lockCount). 길이는
+    // 타임라인 lockMs(= 버스트 + 재강화 가드)로, 떨림이 끝나고 가드(0.1s)만큼 뒤에 풀린다(요구사항).
+    // 버튼 충전 오버레이가 같은 길이로 걷히도록 마지막 잠금 길이를 보관한다.
+    setLastLockMs(tl.lockMs)
     const lockEnhance = () =>
       enqueueEffect({
         kind: 'enhanceLock',
         exclusive: false,
         locksEnhance: true,
-        durationMs: dataManager.getConfig().enhanceDelayMs,
+        durationMs: tl.lockMs,
       })
 
+    // "떨림 후 분출 + 새 검 등장 억제"를 한 쌍으로 건다(성공·파괴 공통 안무). 잔상(spriteUrl) 떨림→버스트와
+    // 새 검 등장(burstAt 까지 억제)이 항상 같은 타임라인 슬라이스를 쓰도록 한곳에서 enqueue 한다 — 두 분기가
+    // 따로 작성하면 한쪽 payload(예: 등장 억제 지연)만 고쳐 잔상 소멸·새 검 등장이 어긋나는(강화 전/후 검 동시
+    // 노출) 발산이 생길 수 있어 일반화한다. 파티클 수는 단계(level)에 비례 — 호출 측이 잔상/도달 검을 해석해 넘긴다.
+    const enqueueShakeBurst = (
+      kind: string,
+      spriteUrl: string,
+      level: number,
+    ) => {
+      enqueueEffect({
+        kind,
+        exclusive: false,
+        locksEnhance: false,
+        durationMs: tl.burstLifetimeMs,
+        payload: {
+          spriteUrl,
+          particleCount: particleCount(level),
+          impactMs: tl.impactMs,
+          shakeMs: tl.shakeMs,
+        },
+      })
+      enqueueEffect({
+        kind: 'entranceSuppress',
+        exclusive: false,
+        locksEnhance: false,
+        durationMs: tl.suppressMs,
+        payload: { entranceDelaySec: burstAtSec },
+      })
+    }
+
     if (result.outcome === 'success') {
-      // 성공 = (실패와 동일 안무) 떨림 → 황금 파티클 분출 + 상위 검 등장(잠금X) ∥ 강화 버튼 잠금(강화 딜레이).
+      // 성공 = (실패와 동일 안무) 망치 임팩트 → 떨림(무작위) → 황금 파티클 분출 + 상위 검 등장 ∥ 재강화 가드.
       // 잔상은 강화 전 검(fromId), 파티클 수는 도달 검(toId)의 단계에 비례 — 둘 다 이 뷰 경계에서 해석(원칙 2).
+      // 잔상 소멸·새 검 등장이 같은 burstAt 을 써 정확히 교대한다(강화 전/후 검 동시 노출 없음 — enqueueShakeBurst).
       const from = dataManager.getSwordById(result.fromId)
       const next = dataManager.getSwordById(result.toId)
       if (from) {
-        enqueueEffect({
-          kind: 'successBurst',
-          exclusive: false,
-          locksEnhance: false,
-          durationMs: SUCCESS_DURATION_MS,
-          payload: {
-            spriteUrl: swordSpriteUrl(from.sprite),
-            particleCount: particleCount(next?.level ?? 0),
-          },
-        })
-        // 새(상위) 검 등장을 떨림 구간(0.4s)만 가린다 — 파괴와 동일(분출에서 드러나듯 등장).
-        // 잠금 해제(강화 딜레이) 후 재강화로 마운트되는 새 검이 잘못 지연돼 사라지지 않도록 연출 전체가 아닌 0.4s만.
-        enqueueEffect({
-          kind: 'entranceSuppress',
-          exclusive: false,
-          locksEnhance: false,
-          durationMs: SHAKE_SEC * 1000,
-        })
+        enqueueShakeBurst(
+          'successBurst',
+          swordSpriteUrl(from.sprite),
+          next?.level ?? 0,
+        )
       }
       // 가치 상승 강조 — 도달 검(toId)이 강화 전(fromId)보다 비싸면 가격 표시를 한 번 통 튀게 한다.
       // "강화 성공으로 올랐다"는 사실은 이 분기에만 있으므로 여기서 판정한다(장착·판매와 구분).
@@ -411,60 +445,54 @@ export function GameScreen() {
       // 최고 단계가 바뀌어도 자동 동작한다.
       const terminal = !!next && next.nextId === null
       lockEnhance()
-      // 이름·판매가·가격 강조·클리어 모달을 망치 내려치기 후(SHAKE_SEC) 한 번에 공개한다 — store 는
-      // 검을 즉시 교체하지만 그 결과가 연출 전에 새지 않도록 미룬다(스프라이트 등장과 같은 박자).
+      // 이름·판매가·가격 강조·클리어 모달을 떨림이 끝나는 burstAt 에 한 번에 공개한다 — store 는 검을 즉시
+      // 교체하지만 그 결과가 연출 전에 새지 않도록 미룬다(스프라이트 등장과 같은 박자).
       scheduleReveal(pricePop, terminal)
     } else if (result.outcome === 'destroyed') {
-      // 파괴 폭발 효과음 — 떨림(0.4s)이 끝나 폭발이 터지는 순간에 맞춰 울린다('캉!' 직후가 아닌 분출 시점).
-      sound.playSfx('enchant_destroyed', { delayMs: SHAKE_SEC * 1000 })
-      // 파괴 = 폭발 연출(잠금X·~1초) ∥ 강화 버튼 잠금(강화 딜레이). 파티클 수는 파괴된 검(fromId)의 단계에 비례.
+      // 파괴 폭발 효과음 — 떨림이 끝나 폭발이 터지는 순간(burstAt)에 맞춰 울린다('캉!' 직후가 아닌 분출 시점).
+      sound.playSfx('enchant_destroyed', { delayMs: tl.burstAtMs })
+      // 파괴 = 폭발 연출 ∥ 재강화 가드. 파티클 수는 파괴된 검(fromId)의 단계에 비례.
       // 스프라이트(fromId)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
       const target = destructionTargetOf(result)
       const destroyed = target ? dataManager.getSwordById(target.id) : undefined
       if (target && destroyed) {
-        enqueueEffect({
-          kind: 'destruction',
-          exclusive: false,
-          locksEnhance: false,
-          durationMs: DESTRUCTION_DURATION_MS,
-          payload: {
-            spriteUrl: swordSpriteUrl(destroyed.sprite),
-            particleCount: particleCount(destroyed.level),
-          },
-        })
-        // 새 검(+1) 등장을 떨림 구간(0.4s)만 가린다 — 파괴 연출 전체(~1초)가 아니라.
-        // 그래야 잠금 해제(강화 딜레이) 후 +1 을 재강화해 성공해도 새 검이 0.4s 사라지지 않는다.
-        enqueueEffect({
-          kind: 'entranceSuppress',
-          exclusive: false,
-          locksEnhance: false,
-          durationMs: SHAKE_SEC * 1000,
-        })
+        // 잔상은 파괴된 검(fromId), 등장 억제는 떨림 끝(burstAt)까지 — 성공과 동일 안무(enqueueShakeBurst).
+        enqueueShakeBurst(
+          'destruction',
+          swordSpriteUrl(destroyed.sprite),
+          destroyed.level,
+        )
       }
-      // 드롭이 있으면 재료가 검 아래로 흩어져 떨어지는 연출(잠금X·병렬). 폭발이 드러난 뒤
-      // 떨어지도록 등장은 연출 내부에서 지연한다. 실제 인벤토리 수량은 store 에서 이미 반영됨.
+      // 드롭이 있으면 재료가 검 아래로 흩어져 떨어지는 연출(잠금X·병렬). 폭발(burstAt)이 드러난 직후
+      // 떨어지도록 등장 시각을 타임라인에서 도출한다(무작위 떨림 길이만큼 함께 늦춰짐). 실제 인벤토리 수량은 store 반영됨.
       if (result.drops.length > 0) {
+        const appearSec = dropAppearSec(burstAtSec)
         enqueueEffect({
           kind: 'drop',
           exclusive: false,
           locksEnhance: false,
-          durationMs: DROP_LIFETIME_MS,
-          payload: { drops: result.drops.map((d) => ({ ...d })) },
+          durationMs: dropLifetimeMs(appearSec),
+          payload: {
+            drops: result.drops.map((d) => ({ ...d })),
+            appearDelaySec: appearSec,
+          },
         })
       }
       lockEnhance()
-      // 파괴로 시작 검(+1)으로 리셋된 결과도 망치 내려치기 후에 이름이 바뀌도록 공개를 미룬다
+      // 파괴로 시작 검(+1)으로 리셋된 결과도 떨림이 끝난 뒤 이름이 바뀌도록 공개를 미룬다
       // (떨림·폭발 동안은 파괴된 검 이름을 유지 → 폭발이 드러나는 순간 +1 로 전환).
       scheduleReveal(false, false)
     } else if (result.outcome === 'protected') {
-      // 방지 = 떨림만(폭발 없음) → 파괴보호장치 덕분에 살아남았음을 인지시킨다.
+      // 방지 = 떨림만(폭발 없음) → 파괴보호장치 덕분에 살아남았음을 인지시킨다. 떨림은 망치가 닿는
+      // 순간(impact)부터 무작위 길이(shake)만큼 — 성공/파괴 잔상 떨림과 동일 박자(SwordStage 가 실제 검을 흔든다).
       enqueueEffect({
         kind: 'protectedShake',
         exclusive: false,
         locksEnhance: false,
-        durationMs: SHAKE_SEC * 1000,
+        durationMs: tl.protectedDurationMs,
+        payload: { impactMs: tl.impactMs, shakeMs: tl.shakeMs },
       })
-      // 강화 버튼 잠금(강화 딜레이)은 성공·파괴와 동일하게 건다 — 마우스·스페이스 모두 강화 딜레이가 일관되도록.
+      // 재강화 가드는 성공·파괴와 동일하게 건다 — 마우스·스페이스 모두 일관되도록.
       lockEnhance()
     }
   }
@@ -488,9 +516,10 @@ export function GameScreen() {
   // 연출 트리거는 effectStore 의 running 에서 뽑는다(생명주기·타이밍은 Effect 시스템이 소유). 대부분은
   // "가장 최근" 1개만(latestRunning — 겹친 새 효과 유실 방지)이지만, 성공·파괴 버스트는 running 의 해당
   // 효과를 전부 렌더한다(toBurstEvents) — 연출 중 재강화해도 옛 버스트가 잘리지 않고 끝까지 터지도록
-  // (파티클은 떨림 0.4s 뒤에 나오는데, 잠금 해제 직후 재강화하면 최신 1개만 그릴 경우 버스트가 매번
-  // 리셋돼 안 나온다). 동시 개수는 잠금(config.enhanceDelayMs)이 버스트(~1s)보다 짧아 보통 ~2~3개로
-  // 바운드되지만, 잠금을 버스트보다 훨씬 짧게(권장 하한 ~400ms 미만) 두면 마우스 연타로 더 누적될 수 있다.
+  // (파티클은 떨림(임팩트 + 무작위 시간) 뒤에 나오는데, 잠금 해제 직후 재강화하면 최신 1개만 그릴 경우
+  // 버스트가 매번 리셋돼 안 나온다). 재강화 잠금(lockMs = 버스트 + 가드 ~100ms)은 버스트 효과 수명
+  // (burstLifetimeMs = 버스트 + 파티클 비행 ~660ms)보다 짧아, 빠른 재강화 시 버스트 효과가 running 에
+  // 여러 개 겹칠 수 있다(파티클 풀이 CONCURRENCY 만큼 슬롯을 잡아 그 겹침을 흡수한다).
   // 주의: flatMap 이 running 변경마다 새 이벤트 객체를 만들어 각 연출의 useOneShot 백스톱 타이머가 매번
   // 리셋되지만 무해하다 — 실제 unmount 는 effectStore 의 _finish(durationMs)가 소유하고 백스톱은 보조다.
   const destructionEvents = useMemo<DestructionEvent[]>(
@@ -516,7 +545,12 @@ export function GameScreen() {
   const dropEvent = useMemo<DropEvent | null>(() => {
     const fx = latestRunning(running, 'drop')
     return fx?.payload?.drops?.length
-      ? { id: fx.id, drops: fx.payload.drops }
+      ? {
+          id: fx.id,
+          drops: fx.payload.drops,
+          // 재료 등장 시각(버스트 후) — 이번 강화의 무작위 떨림 길이를 반영한 타임라인 값.
+          appearDelaySec: fx.payload.appearDelaySec ?? 0,
+        }
       : null
   }, [running])
   // 드롭 연출이 끝나면(running 에서 'drop' 효과가 빠져 dropEvent 가 null 이 됨) 미수집 대기분을
@@ -524,7 +558,12 @@ export function GameScreen() {
   useEffect(() => {
     if (dropEvent === null) flushDrops()
   }, [dropEvent, flushDrops])
-  const shakeKey = latestRunning(running, 'protectedShake')?.id ?? 0
+  // 방지(protected) 떨림 트리거 + 이번 강화의 임팩트·떨림 길이(SwordStage 가 실제 검을 그 박자로 흔든다).
+  const protectedFx = latestRunning(running, 'protectedShake')
+  const shakeKey = protectedFx?.id ?? 0
+  const shakeImpactSec = (protectedFx?.payload?.impactMs ?? 0) / 1000
+  const shakeDurationSec =
+    (protectedFx?.payload?.shakeMs ?? anim.weaponShakeMinMs) / 1000
 
   // 결과를 스크린리더에 알린다(시각 연출은 aria-hidden). 가장 최근 알림 대상 효과의 문구.
   let announceFx: { id: number; kind: string } | null = null
@@ -581,62 +620,81 @@ export function GameScreen() {
             </div>
           </div>
 
-          {/* 중앙: 검 스테이지 + 결과 연출(오버레이). 고정폭 28rem 트랙이라 검 주위 여백은 트랙이 제공. */}
-          <div className="relative flex items-center justify-center">
-            <SwordStage
-              sword={sword}
-              level={sword?.level ?? null}
-              // 스프라이트는 live 검(즉시 교체 → 떨림 동안 숨김), 이름·판매가·성공률은 공개된 검
-              // (망치 내려치기 후 등장과 같은 박자)으로 그린다 — 연출 전 결과(이름) 누설 방지.
-              displaySword={revealedSword}
-              displayLevel={revealedSword?.level ?? null}
-              // 보호 결계: 순수 상태 + 토글(발동)·상점(부족 보충)·플레어(방지 발동) 트리거.
-              // blockKey 는 protectedShake 와 같은 트리거(shakeKey)를 공유 — 막아낸 순간 결계가 번쩍인다.
-              protection={{
-                state: protection,
-                onToggle: toggleProtection,
-                onShop: openShop,
-                blockKey: shakeKey,
-              }}
-              spriteOverlay={
-                <>
-                  {/* 성공·파괴 버스트는 동시에 여러 개가 떠 있을 수 있다(재강화 시 옛 버스트 유지) —
-                      각 효과를 id 로 키잉해 독립 재생한다. */}
-                  {destructionEvents.map((ev) => (
-                    <DestructionEffect key={ev.id} event={ev} />
-                  ))}
-                  {successEvents.map((ev) => (
-                    <SuccessEffect key={ev.id} event={ev} />
-                  ))}
-                  {/* 망치는 결과 연출 위(전면)에 그려 내려치는 순간이 가려지지 않게 한다(맨 뒤 렌더). */}
-                  <HammerStrike event={hammerStrikeEvent} />
-                  {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
-                  <FloatingTextEffect event={floatingText} />
-                </>
-              }
-              // 새 검 등장 지연은 "떨림 구간"에만(entranceSuppress 효과의 수명 = 0.4s) — 파괴 연출
-              // 전체가 아니라. 그래야 연출 도중 재강화로 마운트되는 새 검이 잘못 지연돼 사라지지 않는다.
-              entranceDelay={entranceSuppressed ? SHAKE_SEC : 0}
-              // 방지 시 실제 검을 떨게 한다(파괴와 구분 — 폭발 없이 떨림만).
-              shakeKey={shakeKey}
-              // 강화 성공으로 가치(판매가)가 오른 순간 가격 표시를 한 번 통 튀게 한다.
-              pricePopKey={pricePopKey}
-              // 판매 코인이 뿜어져 나올 출발점(검 박스) 측정용.
-              swordBoxRef={swordBoxRef}
-            />
-            {/* 골드 획득 텍스트("+금액") — 검 박스 위로 떠오르는 황금색 연출(SwordStage 위에 그려 전면 표시).
+          {/* 중앙: 검 스테이지 + 결과 연출(오버레이). 고정폭 28rem 트랙이라 검 주위 여백은 트랙이 제공.
+              ParticleEmitProvider 로 감싸 풀(ParticlePool)과 소비자(Hit/버스트)가 같은 emit 을 공유한다. */}
+          <ParticleEmitProvider>
+            <div className="relative flex items-center justify-center">
+              <SwordStage
+                sword={sword}
+                level={sword?.level ?? null}
+                // 스프라이트는 live 검(즉시 교체 → 떨림 동안 숨김), 이름·판매가·성공률은 공개된 검
+                // (떨림이 끝난 뒤 등장과 같은 박자)으로 그린다 — 연출 전 결과(이름) 누설 방지.
+                displaySword={revealedSword}
+                displayLevel={revealedSword?.level ?? null}
+                // 보호 결계: 순수 상태 + 토글(발동)·상점(부족 보충)·플레어(방지 발동) 트리거.
+                // blockKey 는 protectedShake 와 같은 트리거(shakeKey)를 공유 — 막아낸 순간 결계가 번쩍인다.
+                // 플레어는 망치가 닿는 순간(impact)에 맞춰 늦춘다(막아냄은 임팩트에 일어난다).
+                protection={{
+                  state: protection,
+                  onToggle: toggleProtection,
+                  onShop: openShop,
+                  blockKey: shakeKey,
+                  flareDelaySec: anim.hammerImpactMs / 1000,
+                }}
+                spriteOverlay={
+                  <>
+                    {/* 파티클 풀 — 성공/파괴 버스트와 Hit 불꽃의 모든 파티클을 재사용 노드로 그린다(맨 뒤에 둬
+                        검·잔상 위에 파티클이 얹히도록). 풀은 항상 마운트, 소비자가 emit 으로 재생을 요청한다. */}
+                    <ParticlePool />
+                    {/* 성공·파괴 버스트는 동시에 여러 개가 떠 있을 수 있다(재강화 시 옛 버스트 유지) —
+                        각 효과를 id 로 키잉해 독립 재생한다(잔상 떨림·팝업; 파티클은 풀로 emit). */}
+                    {destructionEvents.map((ev) => (
+                      <DestructionEffect key={ev.id} event={ev} />
+                    ))}
+                    {successEvents.map((ev) => (
+                      <SuccessEffect key={ev.id} event={ev} />
+                    ))}
+                    {/* 망치는 결과 연출 위(전면)에 그려 내려치는 순간이 가려지지 않게 한다. impactMs 로 닿는
+                        시점을 데이터에서 받는다(떨림·불꽃·타격음과 동일 앵커). */}
+                    <HammerStrike
+                      event={hammerStrikeEvent}
+                      impactMs={anim.hammerImpactMs}
+                    />
+                    {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 충돌 불티를 풀로 1회 분출(DOM 없음). */}
+                    <HitSparkEffect
+                      event={hammerStrikeEvent}
+                      impactMs={anim.hammerImpactMs}
+                    />
+                    {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
+                    <FloatingTextEffect event={floatingText} />
+                  </>
+                }
+                // 새 검 등장 지연 = 이번 강화의 burstAt(entranceSuppress payload). 잔상이 소멸하는 그 순간
+                // 드러나듯 등장한다(같은 burstAt 을 써 정확히 교대 → 강화 전/후 검 동시 노출 없음).
+                entranceDelay={entranceDelaySec}
+                // 방지 시 실제 검을 떨게 한다(파괴와 구분 — 폭발 없이 떨림만). 망치가 닿는 순간부터 무작위 길이.
+                shakeKey={shakeKey}
+                shakeImpactSec={shakeImpactSec}
+                shakeDurationSec={shakeDurationSec}
+                // 강화 성공으로 가치(판매가)가 오른 순간 가격 표시를 한 번 통 튀게 한다.
+                pricePopKey={pricePopKey}
+                // 판매 코인이 뿜어져 나올 출발점(검 박스) 측정용.
+                swordBoxRef={swordBoxRef}
+              />
+              {/* 골드 획득 텍스트("+금액") — 검 박스 위로 떠오르는 황금색 연출(SwordStage 위에 그려 전면 표시).
                 판매·의뢰완료 공유. 출발점은 항상 검 박스(swordBoxRef) — "장착 무기가 있던 위치". */}
-            <GoldGainText event={goldGain} anchorRef={swordBoxRef} />
-            {/* 결과 음성 알림(시각 연출은 aria-hidden) — 화면엔 보이지 않는 라이브 리전. */}
-            <div
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              className="sr-only"
-            >
-              {announcement}
+              <GoldGainText event={goldGain} anchorRef={swordBoxRef} />
+              {/* 결과 음성 알림(시각 연출은 aria-hidden) — 화면엔 보이지 않는 라이브 리전. */}
+              <div
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                className="sr-only"
+              >
+                {announcement}
+              </div>
             </div>
-          </div>
+          </ParticleEmitProvider>
 
           {/* 우: 강화 카드(비용 포함) + 판매 버튼 + 보관 버튼(세로 중앙). 판매가는 검 스테이지에 금색으로 표시.
               보유 골드는 좌측 인벤토리 패널의 별도 섹션으로 옮겼다(화폐 분리). */}
@@ -649,7 +707,8 @@ export function GameScreen() {
               <EnhanceButton
                 disabled={!canEnhance}
                 charging={enhanceLocked}
-                chargeMs={dataManager.getConfig().enhanceDelayMs}
+                // 충전 오버레이는 직전 강화의 재강화 잠금 길이(매회 떨림에 따라 다름)로 걷힌다.
+                chargeMs={lastLockMs}
                 onEnhance={handleEnhance}
                 enchantCost={sword?.enchantCost ?? null}
               />

@@ -1,0 +1,6 @@
+{
+  "hammerImpactMs": 360,
+  "weaponShakeMinMs": 200,
+  "weaponShakeMaxMs": 500,
+  "reEnhanceGuardMs": 100
+}

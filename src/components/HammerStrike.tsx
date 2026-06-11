@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { itemSpriteUrl } from '../lib/sprites'
-import { SHAKE_SEC } from './shake'
+import { computeHammerMotion, hammerStrikeMs } from './hammerTiming'
 import { useOneShot } from './useOneShot'
 
 // 강화 "내려치기" 연출(프레젠테이션 전용) — 강화 시도마다(성공·파괴·방지 무관) 호라드릭 망치가
@@ -11,14 +11,14 @@ import { useOneShot } from './useOneShot'
 // 소유하고, useOneShot 이 혹시 남는 이벤트를 만료시킨다(백스톱 — 다른 연출과 동일 관례).
 //
 // 쾌감(immediacy)을 위해 "느린 활강"이 아니라 "치켜듦 → 빠른 스냅 → 강타"로 친다: 등장 즉시 오른쪽
-// 위에 치켜든 자세로 나타나(클릭 피드백) 잠깐 윈드업한 뒤, 분출 직전(HOLD_UNTIL→IMPACT_AT)에 짧고
-// 빠르게(easeIn 가속) 내리꽂아 강타한다. 임팩트를 결과 분출 "직전"(IMPACT_AT = SHAKE_SEC - α)에 둬
-// "친다 → (한 박자 뒤) 터진다"로 읽히게 한다(ShakeBurstEffect 분출은 BURST_AT = SHAKE_SEC). GameScreen 이
-// 'enhance' "캉!" 사운드도 HAMMER_IMPACT_MS 로 미뤄 타격음이 바로 이 임팩트에 맞는다.
+// 위에 치켜든 자세로 나타나(클릭 피드백) 잠깐 윈드업한 뒤, 임팩트 직전(HOLD_UNTIL→impactSec)에 짧고
+// 빠르게(easeIn 가속) 내리꽂아 강타한다. 임팩트 시각(impactMs)은 데이터(animation.json)에서 오며, 바로 그
+// 순간 무기 떨림·Hit 불꽃·'캉' 타격음이 시작된다(GameScreen 이 같은 impactMs 로 셋을 맞춘다 — 단일 출처).
+// 이전엔 임팩트를 떨림 길이(SHAKE_SEC)에서 파생했지만, 이제 떨림은 임팩트 "뒤"에 시작하므로 임팩트가 앵커다.
 //
 // SwordStage 의 spriteOverlay 슬롯에 얹어 검 박스 위 전면에 그린다 — 그 슬롯은 떨림 레이어 밖 형제라
 // (SwordStage 주석 참고) 망치는 검과 함께 흔들리지 않는다. overflow-visible 라 박스 밖(오른쪽 위)으로
-// 나가도 잘리지 않는다(ParticleBurst 와 동일). 자세는 스프라이트 자연 방향 그대로 머리=위·손잡이=아래.
+// 나가도 잘리지 않는다(파티클 오버레이와 동일). 자세는 스프라이트 자연 방향 그대로 머리=위·손잡이=아래.
 
 const HAMMER_SPRITE = itemSpriteUrl('horadric_hammer.png')
 
@@ -43,30 +43,20 @@ const FOLLOW_TILT = 22 // 임팩트에서 휘둘러 따라넘긴 정도(반대 �
 const NARROW_RAISE_QUERY = '(max-width: 640px)'
 const NARROW_RAISE_X_SCALE = 0.6
 
-// ── 타임라인(초, t=0 = 강화 시점) ───────────────────────────────────────────────
-// 핵심: 0→HOLD_UNTIL 은 치켜든 채 대기(윈드업)하고, HOLD_UNTIL→IMPACT_AT 에 짧고 빠르게 내리꽂는다
-// (스냅 = 쾌감). 임팩트는 결과 분출(BURST_AT = SHAKE_SEC) "직전"에 둬 친다 → 한 박자 뒤 터진다.
-const IMPACT_AT = SHAKE_SEC - 0.04 // 망치가 닿는 순간(분출 직전). 더 동시면 +α, 더 떨어뜨리려면 -α
-const HOLD_UNTIL = IMPACT_AT - 0.14 // 여기까지 치켜든 채 대기 → 이후 0.14s 동안 빠르게 내리꽂는다(스냅)
-const RECOIL_AT = IMPACT_AT + 0.09 // 반동 정점
-const SETTLE_AT = IMPACT_AT + 0.16 // 정착
-const MOTION_SEC = IMPACT_AT + 0.4 // 임팩트 후 반동+들어올림까지 포함한 전체 모션 길이
-const TAIL_MS = 60 // 모션 종료 후 효과가 running 에서 빠질 때까지 여유(ShakeBurst 의 +60 관례)
-
-// 내부 계산 → 아래 export 는 식별자 참조로 노출한다(react-refresh: 컴포넌트 파일에서 비-컴포넌트
-// export 의 최상위가 함수 호출이면 경고하므로, ShakeBurst 의 TOTAL_MS 관례처럼 const 로 받아 내보낸다).
-const IMPACT_MS = Math.round(IMPACT_AT * 1000)
-const TOTAL_MS = Math.round(MOTION_SEC * 1000) + TAIL_MS
-
-// 망치가 검에 닿는 시각(ms) — GameScreen 이 'enhance'("캉!") 사운드를 이만큼 미뤄 타격음을 임팩트에 맞춘다.
-export const HAMMER_IMPACT_MS = IMPACT_MS
-// 연출 전체 길이(ms) — Effect 'hammerStrike' 의 durationMs + useOneShot 수명. 단일 출처.
-export const HAMMER_STRIKE_MS = TOTAL_MS
+// 타임라인(망치 모션의 시각 도출)은 hammerTiming.ts(순수 모듈)가 소유한다 — 임팩트 앵커만 데이터에서
+// 오고, 윈드업·반동·정착·들어올림은 그 임팩트 기준 상대 오프셋이다. 컴포넌트는 그 결과(키프레임 times)만 쓴다.
 
 export type HammerStrikeEvent = { id: number }
 
-export function HammerStrike({ event }: { event: HammerStrikeEvent | null }) {
-  const active = useOneShot(event, HAMMER_STRIKE_MS)
+export function HammerStrike({
+  event,
+  impactMs,
+}: {
+  event: HammerStrikeEvent | null
+  impactMs: number // 망치가 검에 닿기까지(데이터 hammerImpactMs) — 떨림·불꽃·타격음의 공통 앵커
+}) {
+  const m = computeHammerMotion(impactMs / 1000)
+  const active = useOneShot(event, hammerStrikeMs(impactMs))
 
   // 좁은(세로) 화면이면 치켜든 위치의 x 를 안쪽으로 줄여 화면 밖에서 시작하지 않게 한다(위 주석 참고).
   const narrowRaise = useMediaQuery(NARROW_RAISE_QUERY)
@@ -117,22 +107,22 @@ export function HammerStrike({ event }: { event: HammerStrikeEvent | null }) {
               opacity: [0, 1, 1, 1, 1, 0],
             }}
             transition={{
-              duration: MOTION_SEC,
-              // 대기(0→HOLD_UNTIL) → 스냅(→IMPACT_AT, easeIn 가속) → 반동 → 정착 → 들어올림.
+              duration: m.motionSec,
+              // 대기(0→holdUntil) → 스냅(→impact, easeIn 가속) → 반동 → 정착 → 들어올림.
               times: [
                 0,
-                HOLD_UNTIL / MOTION_SEC,
-                IMPACT_AT / MOTION_SEC,
-                RECOIL_AT / MOTION_SEC,
-                SETTLE_AT / MOTION_SEC,
+                m.holdUntil / m.motionSec,
+                m.impactSec / m.motionSec,
+                m.recoilAt / m.motionSec,
+                m.settleAt / m.motionSec,
                 1,
               ],
               ease: ['easeInOut', 'easeIn', 'easeOut', 'easeOut', 'easeIn'],
               // opacity 는 위치 곡선과 분리한다 — 치켜든 동안에도 또렷이 보이도록 초반에 빠르게 켜고,
               // 마지막 들어올림 구간에서만 끈다.
               opacity: {
-                duration: MOTION_SEC,
-                times: [0, 0.12, 0.3, 0.5, SETTLE_AT / MOTION_SEC, 1],
+                duration: m.motionSec,
+                times: [0, 0.12, 0.3, 0.5, m.settleAt / m.motionSec, 1],
                 ease: 'easeOut',
               },
             }}

@@ -1,4 +1,3 @@
-import { SHAKE_SEC } from './shake'
 import type { TranslationKey } from '../i18n/locales/ko'
 import type { FloatingTextEntry } from '../data/types'
 
@@ -8,14 +7,16 @@ import type { FloatingTextEntry } from '../data/types'
 // (pickSpawn). rng 를 주입받아 결정적으로 테스트한다(commissionQueue.generateOne·enhancer 와 동일
 // 관례). 실제 렌더(모션·i18n 해석)는 FloatingTextEffect 가 맡는다.
 
-// ── 타이밍(단일 출처) ──────────────────────────────────────────────────────────
-// useOneShot 수명(FLOATING_TEXT_MS)은 delay + 애니메이션을 모두 덮어야 한다 — 수명이 짧으면
-// 애니메이션 도중 이벤트가 만료돼 끊긴다. 그래서 (delay + anim)*1000 + 여유로 잡는다.
-export const FLOAT_DELAY_SEC = SHAKE_SEC // 결과 분출("터진다") 박자에 맞춰 팝업(망치 임팩트 직후)
+// ── 타이밍 ──────────────────────────────────────────────────────────────────────
+// 등장 지연(팝업 시점)은 매 강화의 "버스트 시점"(burstAt = 임팩트 + 무작위 떨림)에 맞춰야 하므로 코드
+// 상수가 아니라 이벤트(FloatingTextEvent.delaySec)로 전달된다(타임라인 단일 출처). 여기선 "모양"인 애니메이션
+// 길이(체공·상승·페이드)만 코드로 둔다. useOneShot 수명(floatingTextMs)은 delay + 애니메이션을 모두 덮어야
+// 한다 — 수명이 짧으면 애니메이션 도중 이벤트가 만료돼 끊긴다. 그래서 (delay + anim)*1000 + 여유로 잡는다.
 export const FLOAT_ANIM_SEC = 1.0 // 팝업 → 체공 → 상승·페이드 길이
-export const FLOATING_TEXT_MS =
-  Math.round((FLOAT_DELAY_SEC + FLOAT_ANIM_SEC) * 1000) + 60
-// (이 모듈은 컴포넌트를 export 하지 않으므로 Math.round 한 export 도 react-refresh 규칙과 무관 — drops.ts 동일.)
+export function floatingTextMs(delaySec: number): number {
+  return Math.round((delaySec + FLOAT_ANIM_SEC) * 1000) + 60
+}
+// (이 모듈은 컴포넌트를 export 하지 않으므로 함수 export 도 react-refresh 규칙과 무관 — drops.ts 동일.)
 
 // ── 위치·움직임(검 박스 중심 0,0 기준 중상단 가상 사각형) ───────────────────────
 // x+ 오른쪽, y- 위(spriteOverlay 좌표 관례 = HammerStrike). 브라우저에서 눈으로 맞추는 px/도 값.

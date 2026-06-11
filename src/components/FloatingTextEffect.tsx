@@ -4,8 +4,7 @@ import { useT } from '../i18n'
 import type { TranslationKey } from '../i18n/locales/ko'
 import {
   FLOAT_ANIM_SEC,
-  FLOAT_DELAY_SEC,
-  FLOATING_TEXT_MS,
+  floatingTextMs,
   FT_WOBBLE_DEG,
   pickSpawn,
 } from './floatingText'
@@ -26,14 +25,21 @@ import { useOneShot } from './useOneShot'
 // 색은 토큰(--color-floating-text, 현재 흰색 — 추후 토큰만 바꿔 변경). 외곽선(text-shadow)은 두지
 // 않는다(사용자 결정) — 필요해지면 style 에 textShadow 를 더해 양피지·폭발 위 대비를 높일 수 있다.
 
-export type FloatingTextEvent = { id: number; textKey: TranslationKey }
+// delaySec: 팝업 지연(= 이번 강화의 burstAt). 결과가 망치 임팩트 후 떨림이 끝나는 순간 뜨도록 GameScreen 이
+// 타임라인에서 도출해 넘긴다(매 강화마다 다른 무작위 떨림 시간을 반영).
+export type FloatingTextEvent = {
+  id: number
+  textKey: TranslationKey
+  delaySec: number
+}
 
 export function FloatingTextEffect({
   event,
 }: {
   event: FloatingTextEvent | null
 }) {
-  const active = useOneShot(event, FLOATING_TEXT_MS)
+  // 수명은 지연 + 애니메이션을 덮어야 한다(지연이 길수록 길게) — 이벤트의 delaySec 으로 도출한다.
+  const active = useOneShot(event, event ? floatingTextMs(event.delaySec) : 0)
 
   return (
     <div
@@ -42,7 +48,11 @@ export function FloatingTextEffect({
     >
       <AnimatePresence>
         {active && (
-          <FloatingTextBurst key={active.id} textKey={active.textKey} />
+          <FloatingTextBurst
+            key={active.id}
+            textKey={active.textKey}
+            delaySec={active.delaySec}
+          />
         )}
       </AnimatePresence>
     </div>
@@ -53,7 +63,13 @@ export function FloatingTextEffect({
 // 1회 고정한다 — 인스턴스마다 위치·궤적·흔들림이 달라 매번 다르게 보인다(이후 새 결과가 와도 이
 // 인스턴스 값은 고정 — 교체 중 튀지 않음). useMemo 가 아니라 lazy useState 로 잡는다(useMemo 는 성능
 // 힌트라 재계산될 수 있어 안정성을 보장하지 않는다).
-function FloatingTextBurst({ textKey }: { textKey: TranslationKey }) {
+function FloatingTextBurst({
+  textKey,
+  delaySec,
+}: {
+  textKey: TranslationKey
+  delaySec: number
+}) {
   const t = useT()
   const [spawn] = useState(() => pickSpawn())
   const tilt = spawn.wobble * FT_WOBBLE_DEG // 흔들림 시작 각도(부호=방향)
@@ -80,13 +96,13 @@ function FloatingTextBurst({ textKey }: { textKey: TranslationKey }) {
         rotate: [tilt, -tilt * 0.65, tilt * 0.4, -tilt * 0.2, 0],
       }}
       transition={{
-        delay: FLOAT_DELAY_SEC,
+        delay: delaySec,
         duration: FLOAT_ANIM_SEC,
         times: [0, 0.18, 0.7, 1], // ~체공 후 페이드(쾌감·인지)
         ease: ['backOut', 'easeOut', 'easeIn'],
         // 흔들림(회전)은 위치 곡선과 분리한다 — 등장 직후(앞 ~절반)에 빠르게 몇 번 흔들고 0 으로 수렴.
         rotate: {
-          delay: FLOAT_DELAY_SEC,
+          delay: delaySec,
           duration: FLOAT_ANIM_SEC,
           times: [0, 0.12, 0.24, 0.36, 0.5],
           ease: 'easeOut',

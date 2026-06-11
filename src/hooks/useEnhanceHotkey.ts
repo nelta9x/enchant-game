@@ -5,7 +5,6 @@ import {
   isEnhanceHotkeyContext,
   isEnhanceHotkeyEvent,
 } from '../lib/hotkeys'
-import { SHAKE_SEC } from '../components/shake'
 
 // 데스크탑에서 스페이스바로 강화를 실행하는 전역 단축키 훅(요청: "데스크탑 환경에서 스페이스 = 강화").
 // - 데스크탑(정밀 포인터+호버) 환경에서만 리스너를 부착 — 터치 전용 기기는 제외.
@@ -13,8 +12,9 @@ import { SHAKE_SEC } from '../components/shake'
 // - preventDefault 로 스페이스 기본 동작(페이지 스크롤 + 포커스된 버튼 활성)을 막는다 — 포커스 위치와
 //   무관하게 정확히 강화만 실행된다(Enter 는 그대로 포커스된 컨트롤을 활성 → 접근성 보존).
 // - 꾹 누름 = 연사: 누른 동안 자체 타이머로 강화를 반복 시도한다(OS 키반복에 의존하지 않아 지연·환경차 없음).
-//   각 시도는 버튼과 동일 게이트(disabled = 강화 불가/연출 잠금)를 따르고, 직전 발사 후 최소 SHAKE_SEC 만큼
-//   간격을 둬(min-gap) 잠금이 짧거나 없는 결과(예: 방지)에서도 강화 잠금과 같은 박자로 흐른다.
+//   각 시도는 버튼과 동일 게이트(disabled = 강화 불가/연출 잠금)를 따른다. 실제 연사 박자는 강화 잠금
+//   (lockMs = 버스트 + 재강화 가드, 매회 떨림 길이에 따라 다름)이 정하고, 아래 min-gap 은 그 잠금이 React
+//   커밋보다 늦게 반영되는 짧은 틈에 같은 입력이 이중 발사되는 것만 막는 고정 안전 바닥이다.
 type UseEnhanceHotkeyOptions = {
   enabled: boolean
   disabled: boolean
@@ -22,12 +22,12 @@ type UseEnhanceHotkeyOptions = {
 }
 
 // 꾹 누름 동안 강화 가능 여부를 살피는 폴링 주기(ms) — 잠금이 풀리는 즉시 다음 발사를 잡아낼 만큼 촘촘하게.
-// (실제 연사 박자는 아래 min-gap = SHAKE_SEC 가 정한다. 이 값은 반응 해상도일 뿐.)
 const REPEAT_POLL_MS = 50
 
-// 연속 발사 사이 최소 간격(ms) — 강화 잠금(SHAKE_SEC)과 같은 박자. 폴링이 촘촘해도 이보다 빨리 쏘지 않아
-// 잠금이 없는 결과(방지)에서도 일정 속도를 유지하고, disabled 가 React 커밋보다 늦게 갱신돼도 이중 발사를 막는다.
-const REPEAT_MIN_GAP_MS = SHAKE_SEC * 1000
+// 연속 발사 사이 최소 간격(ms) — 이중 발사 가드 전용 고정 바닥. 실제 페이싱은 강화 잠금(연출 타임라인의
+// lockMs, 최소 떨림에서도 ~수백 ms)이 담당하므로 이 값은 그 잠금보다 충분히 짧게 둔다(잠금이 늘 우선).
+// disabled 가 커밋보다 늦게 갱신돼도 이보다 빨리는 두 번 쏘지 않는다.
+const REPEAT_MIN_GAP_MS = 350
 
 export function useEnhanceHotkey({
   enabled,

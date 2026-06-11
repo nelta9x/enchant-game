@@ -22,6 +22,8 @@ export type ProtectionWardProps = {
   onShop: () => void
   // 파괴보호장치로 살아남은 순간(protected) 결계가 폭발을 튕겨내는 흰빛 플레어 트리거(0 무시).
   blockKey: number
+  // 플레어 시작 지연(초) — 막아냄은 망치가 닿는 순간(impact) 일어나므로 그만큼 늦춰 떨림과 박자를 맞춘다.
+  flareDelaySec?: number
 }
 
 export function ProtectionWard({
@@ -29,19 +31,22 @@ export function ProtectionWard({
   onToggle,
   onShop,
   blockKey,
+  flareDelaySec = 0,
 }: ProtectionWardProps) {
   const t = useT()
 
-  // 실드-블록 플레어 — blockKey 가 바뀔 때마다 흰빛 결계 링이 한 번 확 퍼졌다 사라진다.
+  // 실드-블록 플레어 — blockKey 가 바뀔 때마다 흰빛 결계 링이 한 번 확 퍼졌다 사라진다(망치 임팩트에 맞춰).
   const flare = useAnimationControls()
   useEffect(() => {
     if (blockKey > 0) {
       flare.start({
         scale: [0.55, 1.5],
         opacity: [0.85, 0],
-        transition: { duration: 0.5, ease: 'easeOut' },
+        transition: { delay: flareDelaySec, duration: 0.5, ease: 'easeOut' },
       })
     }
+    // flareDelaySec 은 트리거(blockKey)가 바뀔 때의 최신값을 쓰면 충분하다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blockKey, flare])
 
   return (
@@ -99,7 +104,9 @@ function ProtectionSigil({
       style={{
         // 마법진 룬은 currentColor 로 그려진다 — 상태색(발동·충분=흰빛 / 부족·보호불가=회색)을 여기서 물들인다.
         color: lit ? '#ffffff' : 'var(--color-ink-soft)',
-        filter: armed ? 'drop-shadow(0 0 7px rgba(255,255,255,0.9))' : undefined,
+        filter: armed
+          ? 'drop-shadow(0 0 7px rgba(255,255,255,0.9))'
+          : undefined,
       }}
     >
       <SigilRunes />

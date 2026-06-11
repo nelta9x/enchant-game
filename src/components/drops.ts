@@ -20,22 +20,33 @@ export function dropTokenCount(total: number): number {
 }
 
 // ── 연출 타이밍(초) — 애니메이션 길이의 단일 출처. DropScatter 가 공유한다. ──
-// 호흡: 파괴 폭발(SHAKE_SEC=0.4s)이 끝날 즈음 재료가 검 아래로 "툭" 떨어져(backOut 바운스) 흩어진다 →
-// 잠시 머물다 → 마우스로 스치거나 일정 시간 후 자동으로 인벤토리로 빨려 들어간다.
-export const DROP_APPEAR_DELAY_SEC = 0.5 // 등장 지연 — 파괴 폭발이 드러난 뒤 떨어지도록(burst at 0.4s)
+// 호흡: 파괴 폭발(버스트)이 드러난 직후 재료가 검 아래로 "툭" 떨어져(backOut 바운스) 흩어진다 → 잠시
+// 머물다 → 마우스로 스치거나 일정 시간 후 자동으로 인벤토리로 빨려 들어간다.
+//
+// 등장 시점(appear)은 매 강화의 버스트 시점(burstAt = 임팩트 + 무작위 떨림)에 묶인다 — 떨림이 길수록 폭발도
+// 늦으므로 드롭도 그만큼 늦게 떨어져야 폭발 전에 재료가 먼저 보이는 일이 없다. 그래서 appear 는 코드 상수가
+// 아니라 호출 측(GameScreen)이 타임라인에서 도출해 넘긴다(아래 함수들이 appearSec 을 받아 나머지 시각을 도출).
+export const DROP_AFTER_BURST_SEC = 0.1 // 버스트가 드러난 뒤 재료가 떨어지기까지의 간격
 export const DROP_IN_SEC = 0.45 // 검 위치 → 바닥(rest)으로 떨어지는 시간(토큰 1개)
 export const DROP_IN_SPAN = 0.25 // 토큰들이 순차로 떨어지는 폭(stagger) → 우르르 쏟아지는 느낌
 export const DROP_LINGER_SEC = 2.6 // 바닥에 머무는 시간 — 이 뒤 미수집분은 자동 수집된다
 export const DROP_FLIGHT_SEC = 0.7 // 바닥 → 인벤토리로 빨려 드는 시간(토큰 1개)
 
+// 재료가 떨어지기 시작하는 시각(초, 파일 mount 기준) = 버스트 시점 + 약간의 간격.
+export function dropAppearSec(burstAtSec: number): number {
+  return burstAtSec + DROP_AFTER_BURST_SEC
+}
+
 // 모든 토큰이 떨어져 머문 뒤 자동 수집이 시작되는 시각(초, 파일 mount 기준).
-export const DROP_AUTO_AT_SEC =
-  DROP_APPEAR_DELAY_SEC + DROP_IN_SEC + DROP_IN_SPAN + DROP_LINGER_SEC
+export function dropAutoAtSec(appearSec: number): number {
+  return appearSec + DROP_IN_SEC + DROP_IN_SPAN + DROP_LINGER_SEC
+}
 
 // 연출 전체 수명(ms). Effect 'drop' 의 durationMs + useOneShot 백스톱이 쓴다. 자동 수집분이
 // 인벤토리에 다 도착하고도 여유가 남도록 잡는다(수집 중 토큰이 도중에 사라지지 않게).
-export const DROP_LIFETIME_MS =
-  Math.round((DROP_AUTO_AT_SEC + DROP_FLIGHT_SEC + 0.4) * 1000)
+export function dropLifetimeMs(appearSec: number): number {
+  return Math.round((dropAutoAtSec(appearSec) + DROP_FLIGHT_SEC + 0.4) * 1000)
+}
 
 // ── 흩뿌림 기하(px) ──
 const DROP_BASE_OFFSET = 92 // 검 박스 중심에서 아래로 — 스프라이트(약 144px) 하단 부근
@@ -93,6 +104,16 @@ export function makeDropTokens(
     const rise = 38 + (i % 4) * 12 // 38~74 — 수집 호 높이
     const drift = (i % 2 ? 1 : -1) * (6 + (i % 3) * 8) // ±6~22
     const spin = (i % 2 ? 1 : -1) * (1 + (i % 3) * 0.5) // ±1~2
-    return { itemId: p.itemId, count: p.count, dx, dy, size, inStagger, rise, drift, spin }
+    return {
+      itemId: p.itemId,
+      count: p.count,
+      dx,
+      dy,
+      size,
+      inStagger,
+      rise,
+      drift,
+      spin,
+    }
   })
 }

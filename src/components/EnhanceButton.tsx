@@ -25,7 +25,7 @@ import { ItemIcon } from './ItemIcon'
 // aria-keyshortcuts="Space"로 데스크탑 단축키를 알린다(ARIA 키 토큰이라 로케일 무관 — i18n 대상 아님.
 // 실제 처리는 useEnhanceHotkey).
 //  - charging: 강화 쿨다운(입력 잠금) 중인지. 쿨다운 오버레이 표시·걷힘 타이밍에 쓴다.
-//  - chargeMs: 쿨다운 길이(= config.enhanceDelayMs). 오버레이가 한 바퀴 걷히는 시간 기준.
+//  - chargeMs: 쿨다운 길이(= 직전 강화의 타임라인 lockMs = 떨림 끝 + 재강화 가드). 오버레이가 한 바퀴 걷히는 시간 기준.
 type EnhanceButtonProps = {
   disabled: boolean
   charging: boolean
@@ -50,7 +50,10 @@ export function EnhanceButton({
   // 마우스로 꾹 누르면 강화 → 쿨다운 → 강화 … 가 이어지도록 press-and-hold 연사(스페이스 단축키와 같은 박자).
   // 발사 게이트 disabled = !ready(불가·쿨다운). 터치/펜은 탭=1회, 키보드 Enter 는 합성 click 으로 1회
   // (스페이스는 전역 단축키 useEnhanceHotkey 가 전담). onEnhance 의 잠금 가드가 쿨다운 중 발사를 무효화한다.
-  const hold = useHoldRepeat<HTMLButtonElement>({ disabled: !ready, onFire: onEnhance })
+  const hold = useHoldRepeat<HTMLButtonElement>({
+    disabled: !ready,
+    onFire: onEnhance,
+  })
 
   // 쿨다운 오버레이(게임 스킬 아이콘의 "쿨타임 스윕") — 검은 원뿔(conic) 마스크가 버튼을 덮고, 시계방향으로
   // 투명 영역이 자라며 걷힌다. sweep: 0 = 가득 덮임(쿨다운 시작), 1 = 완전히 드러남(쿨다운 끝).

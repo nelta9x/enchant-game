@@ -3,9 +3,10 @@ import {
   dropTokenCount,
   makeDropTokens,
   MAX_DROP_TOKENS,
-  DROP_AUTO_AT_SEC,
+  dropAppearSec,
+  dropAutoAtSec,
   DROP_FLIGHT_SEC,
-  DROP_LIFETIME_MS,
+  dropLifetimeMs,
 } from './drops'
 
 describe('dropTokenCount — 총 드롭 수량 → 흩뿌릴 토큰 수(순수)', () => {
@@ -96,10 +97,28 @@ describe('makeDropTokens — 흩뿌림 specs(순수·결정적)', () => {
   })
 })
 
-describe('drop 타이밍 — 수명이 자동 수집·비행을 모두 담는다', () => {
-  it('전체 수명(ms)이 자동수집 시작 + 비행 시간보다 길다(수집 중 사라지지 않도록)', () => {
-    expect(DROP_LIFETIME_MS).toBeGreaterThan(
-      (DROP_AUTO_AT_SEC + DROP_FLIGHT_SEC) * 1000,
-    )
+describe('drop 타이밍 — 수명이 자동 수집·비행을 모두 담는다(등장 지연에 비례)', () => {
+  // 등장 지연(appearSec)은 매 강화의 버스트 시점에서 도출되므로(무작위), 특정 값이 아니라 관계만 단언한다.
+  it.each([0.5, 0.8, 1.1])(
+    '전체 수명(ms)이 자동수집 시작 + 비행 시간보다 길다(appearSec=%s)',
+    (appearSec) => {
+      expect(dropLifetimeMs(appearSec)).toBeGreaterThan(
+        (dropAutoAtSec(appearSec) + DROP_FLIGHT_SEC) * 1000,
+      )
+    },
+  )
+
+  it('등장(appear)은 버스트 시점보다 늦다(폭발이 드러난 뒤 떨어진다)', () => {
+    for (const burstAtSec of [0.56, 0.7, 0.86]) {
+      expect(dropAppearSec(burstAtSec)).toBeGreaterThan(burstAtSec)
+    }
+  })
+
+  it('버스트가 늦을수록 등장·자동수집·수명이 함께 뒤로 밀린다(단조)', () => {
+    const early = dropAppearSec(0.56)
+    const late = dropAppearSec(0.86)
+    expect(late).toBeGreaterThan(early)
+    expect(dropAutoAtSec(late)).toBeGreaterThan(dropAutoAtSec(early))
+    expect(dropLifetimeMs(late)).toBeGreaterThan(dropLifetimeMs(early))
   })
 })

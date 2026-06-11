@@ -10,11 +10,10 @@ import { AnimatePresence, motion } from 'motion/react'
 import { sound } from '../lib/sound'
 import { ItemIcon } from './ItemIcon'
 import {
-  DROP_APPEAR_DELAY_SEC,
-  DROP_AUTO_AT_SEC,
+  dropAutoAtSec,
   DROP_FLIGHT_SEC,
   DROP_IN_SEC,
-  DROP_LIFETIME_MS,
+  dropLifetimeMs,
   makeDropTokens,
   relativeCenter,
   type DropTokenSpec,
@@ -32,11 +31,13 @@ import { useOneShot } from './useOneShot'
 // 인지/접근성: 순수 시각 연출이라 aria-hidden. 실제 인벤토리 수량은 store 에서 이미 반영되었다.
 // 오버레이는 클릭을 막지 않도록 pointer-events-none, 개별 토큰만 호버를 받도록 pointer-events-auto.
 
+// appearDelaySec: 재료가 떨어지기 시작하는 시각(초) = 이번 강화의 버스트 시점 + 약간의 간격. 폭발이
+// 드러난 뒤 떨어지도록 GameScreen 이 타임라인에서 도출해 넘긴다(무작위 떨림 길이를 반영).
 export type DropEvent = {
   id: number
   drops: { itemId: string; count: number }[]
+  appearDelaySec: number
 }
-export { DROP_LIFETIME_MS }
 
 export function DropScatter({
   event,
@@ -51,7 +52,11 @@ export function DropScatter({
   // DropScatter 는 store 를 모른 채 "무엇이 수집됐는지"만 알린다(뷰-로직 분리).
   onCollect: (itemId: string, count: number) => void
 }) {
-  const active = useOneShot(event, DROP_LIFETIME_MS)
+  // 수명은 등장 지연이 길수록 길어진다(자동 수집까지 덮어야 함) — 이벤트의 appearDelaySec 으로 도출한다.
+  const active = useOneShot(
+    event,
+    event ? dropLifetimeMs(event.appearDelaySec) : 0,
+  )
 
   return (
     <div
@@ -63,6 +68,7 @@ export function DropScatter({
           <DropPile
             key={active.id}
             drops={active.drops}
+            appearDelaySec={active.appearDelaySec}
             sourceRef={sourceRef}
             targetRef={targetRef}
             onCollect={onCollect}
@@ -77,11 +83,13 @@ export function DropScatter({
 // 한 번 측정해 잡아둔다. 미수집 토큰은 DROP_AUTO_AT_SEC 뒤 일괄 자동 수집된다(바닥에 영구히 남지 않도록).
 function DropPile({
   drops,
+  appearDelaySec,
   sourceRef,
   targetRef,
   onCollect,
 }: {
   drops: { itemId: string; count: number }[]
+  appearDelaySec: number
   sourceRef: RefObject<HTMLDivElement | null>
   targetRef: RefObject<HTMLDivElement | null>
   onCollect: (itemId: string, count: number) => void
@@ -109,10 +117,14 @@ function DropPile({
   }, [sourceRef, targetRef])
 
   // 일정 시간(머묾) 뒤 미수집 토큰을 일괄 수집. 타이머 콜백에서만 set → set-state-in-effect 규칙 OK.
+  // 자동 수집 시각은 등장 지연(appearDelaySec)에서 도출한다(등장이 늦으면 자동 수집도 그만큼 늦게).
   useEffect(() => {
-    const tid = setTimeout(() => setAutoCollect(true), DROP_AUTO_AT_SEC * 1000)
+    const tid = setTimeout(
+      () => setAutoCollect(true),
+      dropAutoAtSec(appearDelaySec) * 1000,
+    )
     return () => clearTimeout(tid)
-  }, [])
+  }, [appearDelaySec])
 
   const tokens = useMemo(() => makeDropTokens(drops), [drops])
 
@@ -128,6 +140,7 @@ function DropPile({
             <DropToken
               key={i}
               spec={spec}
+              appearDelaySec={appearDelaySec}
               source={coords.source}
               target={coords.target}
               autoCollect={autoCollect}
@@ -148,12 +161,14 @@ function DropPile({
 // 빨려드는 동안은 pointer-events-none — 커서가 쫓아와도 재트리거되지 않는다.
 function DropToken({
   spec,
+  appearDelaySec,
   source,
   target,
   autoCollect,
   onCollected,
 }: {
   spec: DropTokenSpec
+  appearDelaySec: number
   source: Point
   target: Point
   autoCollect: boolean
@@ -206,7 +221,7 @@ function DropToken({
               ease: ['easeOut', 'easeIn'],
             }
           : {
-              delay: DROP_APPEAR_DELAY_SEC + spec.inStagger,
+              delay: appearDelaySec + spec.inStagger,
               duration: DROP_IN_SEC,
               ease: 'backOut',
             }

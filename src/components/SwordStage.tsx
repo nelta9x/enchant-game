@@ -4,7 +4,7 @@ import { useI18nStore, useT } from '../i18n'
 import type { SwordData } from '../data/types'
 import { formatAmount, formatGold } from '../lib/format'
 import { swordSpriteUrl } from '../lib/sprites'
-import { SHAKE_KEYFRAMES, SHAKE_TRANSITION } from './shake'
+import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
 import { SuccessRateSigil } from './SuccessRateSigil'
 import { Coin } from './Coin'
@@ -33,6 +33,10 @@ type SwordStageProps = {
   // 파괴보호장치로 살아남았을 때 "떨림만" 재생하는 트리거. 값이 바뀔 때마다 실제 검 스프라이트가
   // 한 번 덜덜 떤다(파괴 잔상과 같은 공유 SHAKE). 파괴 시에는 올리지 않는다(이중 떨림 방지).
   shakeKey?: number
+  // 방지 떨림의 시작 지연(망치 임팩트까지 대기)·길이(이번 강화의 무작위 떨림 시간), 초 단위. 망치가
+  // 닿는 순간부터 떨도록 GameScreen 이 타임라인에서 도출해 넘긴다(성공/파괴 잔상 떨림과 같은 박자).
+  shakeImpactSec?: number
+  shakeDurationSec?: number
   // 검 스프라이트 박스에 대한 ref — 판매 코인 연출이 "코인이 뿜어져 나올 출발점"을 측정하는 데 쓴다.
   swordBoxRef?: Ref<HTMLDivElement>
   // 판매가 강조(pop) 트리거. shakeKey 와 같은 idiom — 값이 바뀔 때마다 가격 표시가 한 번 통 튄다.
@@ -53,6 +57,8 @@ export function SwordStage({
   spriteOverlay,
   entranceDelay = 0,
   shakeKey = 0,
+  shakeImpactSec = 0,
+  shakeDurationSec = 0.4,
   swordBoxRef,
   pricePopKey = 0,
 }: SwordStageProps) {
@@ -69,8 +75,15 @@ export function SwordStage({
   const shakeControls = useAnimationControls()
   useEffect(() => {
     if (shakeKey > 0) {
-      shakeControls.start({ ...SHAKE_KEYFRAMES, transition: SHAKE_TRANSITION })
+      // 망치가 닿는 순간(shakeImpactSec)부터 무작위 길이(shakeDurationSec)만큼 떤다 — 성공/파괴 잔상의
+      // 떨림과 동일한 박자(makeShakeTransition). 윈드업 동안은 delay 로 가만히 있는다.
+      shakeControls.start({
+        ...SHAKE_KEYFRAMES,
+        transition: makeShakeTransition(shakeDurationSec, shakeImpactSec),
+      })
     }
+    // shakeImpactSec/shakeDurationSec 은 트리거(shakeKey)가 바뀔 때의 최신값을 쓰면 충분하다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shakeKey, shakeControls])
 
   // 판매가 강조(pop) — 강화 성공으로 가격이 오를 때 pricePopKey 가 바뀌며 한 번 "커졌다 원래대로" 튄다
