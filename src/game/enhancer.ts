@@ -48,7 +48,7 @@ export class Enhancer {
 
     if (useProtection) {
       const pt = sword.protectionTickets
-      // 'disabled'(이지버그 단계)거나 0('-' = 해당 단계 방지 불가)이면 방지 사용 불가.
+      // 'disabled'거나 0('-' = 해당 단계 방지 불가)이면 방지 사용 불가.
       if (pt === 'disabled' || pt === 0)
         return `Protection is not available at this stage (level ${sword.level})`
       if (itemCount(supply.items, PROTECTION_TICKET_ID) < pt)

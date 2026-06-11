@@ -1,10 +1,7 @@
-import type { SwordData } from '../data/types'
-
 // 도메인 어휘에서 '검(Sword)'은 단계 정의 그 자체다 — 한 단계가 곧 하나의 검 종류이고,
 // 검에는 인스턴스별 상태가 없다(원작과 동일). 정식 데이터 타입은 데이터 레이어의
 // SwordData이며, 런타임에서 보유/현재 검은 검의 id로 식별하고 정의는
-// DataManager.getSwordById로 해석한다(원칙 2). 여기서는 도메인 별칭으로만 노출한다.
-export type Sword = SwordData
+// DataManager.getSwordById로 해석한다(원칙 2).
 
 // 인벤토리 한 칸(아이템 + 수량). 모든 종류의 아이템을 itemId로 식별해 담는다.
 // number 키 Record는 직렬화/순회 시 키가 문자열로 바뀌는 함정이 있어 배열로 모델링한다.

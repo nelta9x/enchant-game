@@ -29,7 +29,6 @@ export const ko = {
   'protection.unavailable': '보호 불가',
 
   // 검 스테이지 스탯
-  'stat.protection': '파괴보호장치',
   'stat.successRate': '강화 성공률',
   'sword.none': '검 없음',
   'sword.maxLevel': '최종 단계',
@@ -42,7 +41,6 @@ export const ko = {
 
   // 거래 제안(Commission — 내부 코드명은 commission 유지, 표시명만 "거래 제안")
   'commission.title': '거래 제안',
-  'commission.reward': '보상',
   'commission.fulfill': '거래 수락',
   'commission.arrived': '새 거래 제안!',
 

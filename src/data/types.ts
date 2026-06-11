@@ -159,8 +159,7 @@ export type CommissionConfig = {
 
 // 검의 특수 플래그(언어 중립 태그). 표시가 필요하면 i18n에서 해석한다.
 //  - storable(보관필요): 고단계 강화 재료로도 쓰일 수 있는 검
-//  - easyBug(이지버그): Easy 모드 버그성 특수 단계
-export type SwordNote = 'storable' | 'easyBug'
+export type SwordNote = 'storable'
 
 // 검 정의 데이터(언어 중립).
 // 표시명은 코드에 박지 않고 nameKey(i18n 키)로 두어 표시 시점에 t()로 해석한다.

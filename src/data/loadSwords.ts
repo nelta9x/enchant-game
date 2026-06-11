@@ -12,7 +12,7 @@ import type { Drop, Material, SwordData, SwordNote } from './types'
 // parseSwords / assertNameKeysResolve 는 순수 함수로 분리해 테스트 가능하게 두고,
 // loadSwords 가 번들된 데이터와 i18n 소스를 묶는 진입점이다.
 
-const SWORD_NOTES: readonly SwordNote[] = ['storable', 'easyBug']
+const SWORD_NOTES: readonly SwordNote[] = ['storable']
 
 // 스프라이트 폴백 적용 전의 중간 표현(sprite 가 아직 null 일 수 있음).
 type ParsedSword = Omit<SwordData, 'sprite'> & { sprite: string | null }

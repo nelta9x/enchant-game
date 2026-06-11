@@ -30,7 +30,6 @@ export const en: Record<TranslationKey, string> = {
   'protection.unavailable': 'No Protection',
 
   // 검 스테이지 스탯
-  'stat.protection': 'Protection',
   'stat.successRate': 'Enchant Success Rate',
   'sword.none': 'No Sword',
   'sword.maxLevel': 'Max Level',
@@ -43,7 +42,6 @@ export const en: Record<TranslationKey, string> = {
 
   // 거래 제안(Commission — 내부 코드명은 commission 유지, 표시명만 "거래 제안")
   'commission.title': 'Trade Offers',
-  'commission.reward': 'Reward',
   'commission.fulfill': 'Accept',
   'commission.arrived': 'New trade offers!',
 
