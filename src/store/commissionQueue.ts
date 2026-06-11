@@ -20,6 +20,7 @@
 //  - 절대 타임스탬프만 쓰고 카운트다운 감산은 하지 않는다 — 탭 throttle·드리프트에 강하고 now 주입으로 결정적.
 
 import type { CommissionItemEntry, Material } from '../data/types'
+import { weightedIndex } from '../lib/weightedPick'
 
 // 거래 비용은 골드 또는 아이템뿐이다('free' 는 강화 비용 전용 — 거래엔 쓰지 않는다).
 export type CommissionCost = Exclude<Material, { kind: 'free' }>
@@ -151,23 +152,13 @@ export function commissionPool(
   return pool
 }
 
-// 가중치 선택 1회 — total*rng() 를 누적 구간에 떨어뜨려 항목 하나를 고른다. rng 1회 소비. 빈 풀이면 null.
+// 가중치 선택 1회(weightedIndex 공유 구현). rng 1회 소비. 빈 풀이면 null(rng 소비 없음).
 function selectEntry(
   pool: readonly PoolEntry[],
   rng: () => number,
 ): PoolEntry | null {
-  if (pool.length === 0) return null
-  const total = pool.reduce((s, e) => s + e.weight, 0)
-  let r = rng() * total
-  let chosen = pool[pool.length - 1] // 부동소수 오차로 루프가 안 잡으면 마지막으로 폴백.
-  for (const e of pool) {
-    if (r < e.weight) {
-      chosen = e
-      break
-    }
-    r -= e.weight
-  }
-  return chosen
+  const idx = weightedIndex(pool, (e) => e.weight, rng)
+  return idx < 0 ? null : pool[idx]
 }
 
 // 세션 공통 만료 시각 1회 뽑기 — now + [durationMinMs, durationMaxMs] 무작위. rng 1회 소비.
@@ -231,7 +222,8 @@ export function generateOne(
 }
 
 // 비복원 가중 추출 — 풀에서 서로 다른 항목을 최대 count 개 고른다(세션 내 중복 제거의 핵심).
-// 매 픽마다 남은 항목들의 가중치로 하나를 골라 빼낸다. rng 는 픽 수(min(count, 풀 길이))만큼 소비한다.
+// 매 픽마다 남은 항목들의 가중치로 하나를 골라(weightedIndex 공유 구현) 빼낸다.
+// rng 는 픽 수(min(count, 풀 길이))만큼 소비한다.
 // "서로 다른 제안" = 서로 다른 풀 항목(같은 itemId 라도 비용/보상 조합이 다르면 다른 항목 = 다른 선택지).
 export function pickDistinctEntries(
   pool: readonly PoolEntry[],
@@ -242,16 +234,7 @@ export function pickDistinctEntries(
   const chosen: PoolEntry[] = []
   const n = Math.min(count, remaining.length)
   for (let k = 0; k < n; k += 1) {
-    const total = remaining.reduce((s, e) => s + e.weight, 0)
-    let r = rng() * total
-    let idx = remaining.length - 1 // 부동소수 폴백.
-    for (let i = 0; i < remaining.length; i += 1) {
-      if (r < remaining[i].weight) {
-        idx = i
-        break
-      }
-      r -= remaining[i].weight
-    }
+    const idx = weightedIndex(remaining, (e) => e.weight, rng)
     chosen.push(remaining[idx])
     remaining.splice(idx, 1)
   }

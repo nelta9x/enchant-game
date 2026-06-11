@@ -1,5 +1,6 @@
 import type { TranslationKey } from '../i18n/locales/ko'
 import type { FloatingTextEntry } from '../data/types'
+import { weightedIndex } from '../lib/weightedPick'
 
 // 강화 결과 플로팅 텍스트의 순수 코어(뷰-로직 분리) — "어떤 문구를, 어디에" 띄울지 결정하는 결정적 로직.
 // 데이터(floatingText.json → DataManager.getFloatingTexts)에서 받은 후보 목록에서 가중치로 한 줄을
@@ -25,24 +26,15 @@ export const FT_BOX = { cy: -44, halfW: 72, halfH: 30 } // x∈[-72,72], y∈[-7
 export const FT_DRIFT_PX = 30 // 상승하며 좌/우로 흘러가는 최대 px(임의 방향) — 궤적 임의성
 export const FT_WOBBLE_DEG = 12 // 등장 흔들림(회전) 진폭(도). 감쇠하며 0 으로 수렴
 
-// 후보 중 weight 비례로 한 줄 선택(commissionQueue.generateOne 누적 패턴 미러). 빈 배열/합≤0 → null
-// (미표시). 합이 1이 아니어도 정규화된다(total 로 스케일한 r 을 누적 구간에 떨어뜨림). rng 주입 → 결정적.
+// 후보 중 weight 비례로 한 줄 선택(weightedIndex 공유 구현). 빈 배열/합≤0 → null(미표시, rng 소비 없음).
+// 합이 1이 아니어도 정규화된다(total 로 스케일한 r 을 누적 구간에 떨어뜨림). rng 주입 → 결정적.
 export function pickFloatingText(
   entries: readonly FloatingTextEntry[],
   rng: () => number = Math.random,
 ): TranslationKey | null {
   const total = entries.reduce((sum, e) => sum + e.weight, 0)
   if (entries.length === 0 || total <= 0) return null
-  let r = rng() * total
-  let chosen = entries[entries.length - 1] // 부동소수 오차 폴백(마지막)
-  for (const e of entries) {
-    if (r < e.weight) {
-      chosen = e
-      break
-    }
-    r -= e.weight
-  }
-  return chosen.text
+  return entries[weightedIndex(entries, (e) => e.weight, rng)].text
 }
 
 // 한 번의 등장 파라미터 — 시작점(박스 내) + 상승 중 좌/우 드리프트 + 흔들림 방향. 마운트당 1회 뽑아
