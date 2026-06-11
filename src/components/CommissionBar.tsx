@@ -4,6 +4,7 @@ import { dataManager } from '../data/DataManager'
 import { useT } from '../i18n'
 import { itemDisplayName } from '../lib/items'
 import { formatAmount } from '../lib/format'
+import { cssColorToken } from '../lib/cssToken'
 import { useCommissionHotkey } from '../hooks/useCommissionHotkey'
 import { useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
@@ -281,7 +282,7 @@ function KeyHint({ slot, active }: { slot: number; active: boolean }) {
 // scaleX 1→0 을 선형 애니메이션한다(매 프레임 재렌더·rAF·Date.now 폴링 없이 컴포지터가 처리 — 카드 타이머가
 // 쓰던 것과 동일 철학, 순수 렌더 유지). 새 세션이 시작될 때만 key 가 바뀌어 처음부터 다시 줄어든다.
 // 시간이 줄수록 황금→적색으로 물들어 임박을 알린다(motion 은 CSS var 키프레임 보간을 못 하므로 진행색은
-// index.css 의 --color-gold/--color-danger 와 동기된 hex 값을 그대로 쓴다 — 토큰을 바꾸면 여기도 맞춘다).
+// 토큰을 런타임에 1회 해석한 실제 값(cssColorToken)을 쓴다 — index.css 단일 출처 유지, hex 사본 없음).
 function SessionTimerBar({
   createdAt,
   expiresAt,
@@ -290,6 +291,8 @@ function SessionTimerBar({
   expiresAt: number
 }) {
   const totalSec = Math.max(0, expiresAt - createdAt) / 1000
+  const gold = cssColorToken('--color-gold')
+  const danger = cssColorToken('--color-danger')
 
   return (
     <span
@@ -302,7 +305,7 @@ function SessionTimerBar({
         animate={{
           scaleX: 0,
           // 줄어드는 내내 황금색을 유지하다 끝부분(60%~)에서 적색으로 — 임박 경고.
-          backgroundColor: ['#f1c14b', '#f1c14b', '#d8654f'],
+          backgroundColor: [gold, gold, danger],
         }}
         transition={{
           duration: totalSec,

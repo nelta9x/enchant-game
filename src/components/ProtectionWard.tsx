@@ -103,7 +103,7 @@ function ProtectionSigil({
       className="relative h-16 w-16"
       style={{
         // 마법진 룬은 currentColor 로 그려진다 — 상태색(발동·충분=흰빛 / 부족·보호불가=회색)을 여기서 물들인다.
-        color: lit ? '#ffffff' : 'var(--color-ink-soft)',
+        color: lit ? 'white' : 'var(--color-ink-soft)',
         filter: armed
           ? 'drop-shadow(0 0 7px rgba(255,255,255,0.9))'
           : undefined,
@@ -123,7 +123,7 @@ function ProtectionSigil({
         <span
           className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[11px] leading-none tabular-nums"
           style={{
-            color: lit ? '#ffffff' : 'var(--color-ink-soft)',
+            color: lit ? 'white' : 'var(--color-ink-soft)',
             textShadow: '0 1px 2px rgba(0,0,0,0.55)',
           }}
         >
