@@ -1,6 +1,7 @@
 import floatingTextRaw from './sources/floatingText.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
 import type { FloatingTextData, FloatingTextEntry } from './types'
+import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(floatingText.json)을 검증해 FloatingTextData 로 만드는 로더(loadItems 패턴 미러링).
 //
@@ -12,13 +13,7 @@ import type { FloatingTextData, FloatingTextEntry } from './types'
 // parseFloatingText / assertFloatingTextKeysResolve 는 순수 함수로 분리해 테스트 가능하게 두고,
 // loadFloatingText 가 번들 데이터와 i18n 소스를 묶는 진입점이다.
 
-function fail(msg: string): never {
-  throw new Error(`Floating text data validation failed: ${msg}`)
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
+const fail: (msg: string) => never = makeFail('Floating text data')
 
 function parseEntry(raw: unknown, eventKey: string): FloatingTextEntry {
   if (!isRecord(raw)) fail(`[${eventKey}] entry is not an object`)

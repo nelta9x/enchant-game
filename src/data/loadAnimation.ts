@@ -1,5 +1,6 @@
 import animationRaw from './sources/animation.json'
 import type { AnimationConfig, ShakeBand } from './types'
+import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(animation.json)을 검증해 AnimationConfig 로 만드는 로더(loadConfig 패턴 미러링).
 //
@@ -16,13 +17,7 @@ import type { AnimationConfig, ShakeBand } from './types'
 //
 // parseAnimationConfig 는 순수 함수로 분리해 테스트 가능하게 두고, loadAnimation 이 번들 데이터의 진입점이다.
 
-function fail(msg: string): never {
-  throw new Error(`Animation config validation failed: ${msg}`)
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
+const fail: (msg: string) => never = makeFail('Animation config')
 
 // 정수 >= 0 필드 1개를 검증해 반환한다(여러 타이밍 필드가 같은 제약이라 한 곳으로 모은다).
 function intNonNeg(raw: Record<string, unknown>, key: string): number {

@@ -1,6 +1,7 @@
 import itemsRaw from './sources/items.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
 import type { ItemData } from './types'
+import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(items.json)을 검증해 ItemData[]로 만드는 로더(loadSwords/loadShop 패턴 미러링).
 //
@@ -12,13 +13,7 @@ import type { ItemData } from './types'
 // parseItems / assertItemNameKeysResolve 는 순수 함수로 분리해 테스트 가능하게 두고,
 // loadItems 가 번들 데이터와 i18n 소스를 묶는 진입점이다.
 
-function fail(msg: string): never {
-  throw new Error(`Item data validation failed: ${msg}`)
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
+const fail: (msg: string) => never = makeFail('Item data')
 
 function parseItem(raw: unknown): ItemData {
   if (!isRecord(raw)) fail('item is not an object')

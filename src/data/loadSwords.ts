@@ -1,6 +1,7 @@
 import swordsRaw from './sources/swords.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
 import type { Drop, Material, SwordData, SwordNote } from './types'
+import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(swords.json)을 검증해 SwordData[]로 만드는 로더.
 //
@@ -17,18 +18,10 @@ const SWORD_NOTES: readonly SwordNote[] = ['storable']
 // 스프라이트 폴백 적용 전의 중간 표현(sprite 가 아직 null 일 수 있음).
 type ParsedSword = Omit<SwordData, 'sprite'> & { sprite: string | null }
 
-function fail(msg: string): never {
-  throw new Error(`Sword data validation failed: ${msg}`)
-}
+const fail: (msg: string) => never = makeFail('Sword data')
 
 // Material(가격/비용) 검증 전용 실패 — 검 enchantCost·상점 price 가 공유하므로 중립 접두사를 쓴다.
-function failMaterial(msg: string): never {
-  throw new Error(`Material validation failed: ${msg}`)
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
+const failMaterial: (msg: string) => never = makeFail('Material')
 
 // 임의 입력을 Material(gold / item / free)로 검증한다. ctx 는 에러 문맥 라벨.
 // 검 enchantCost 와 상점 price 가 공유하는 언어 중립 가격 모델 파서다.

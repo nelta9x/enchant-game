@@ -4,6 +4,7 @@ import type {
   CommissionItemEntry,
   GoldBucket,
 } from './types'
+import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(commission.json)을 검증해 CommissionConfig 로 만드는 로더(loadShop 패턴 미러링).
 //
@@ -24,13 +25,7 @@ import type {
 //
 // parseCommissionConfig 는 순수 함수로 분리해 테스트 가능하게 두고, loadCommission 이 번들 데이터의 진입점이다.
 
-function fail(msg: string): never {
-  throw new Error(`Commission config validation failed: ${msg}`)
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
+const fail: (msg: string) => never = makeFail('Commission config')
 
 // 유한 숫자 필드 추출(누락·비숫자·NaN·Infinity 거부).
 function num(raw: Record<string, unknown>, key: string): number {

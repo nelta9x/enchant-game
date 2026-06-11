@@ -1,6 +1,7 @@
 import shopRaw from './sources/shop.json'
 import type { ShopItem } from './types'
 import { parseMaterial } from './loadSwords'
+import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(shop.json)을 검증해 ShopItem[]로 만드는 로더(loadSwords 패턴 미러링).
 //
@@ -13,13 +14,7 @@ import { parseMaterial } from './loadSwords'
 //
 // parseShop 은 순수 함수로 분리해 테스트 가능하게 두고, loadShop 이 번들 데이터의 진입점이다.
 
-function fail(msg: string): never {
-  throw new Error(`Shop data validation failed: ${msg}`)
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
+const fail: (msg: string) => never = makeFail('Shop data')
 
 function parseShopItem(raw: unknown): ShopItem {
   if (!isRecord(raw)) fail('shop item is not an object')
