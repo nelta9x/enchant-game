@@ -100,18 +100,6 @@ function parseBucket(
     if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0)
       fail(`${iw}.weight must be a finite number > 0 (got ${String(weight)})`)
 
-    // 항목 전용 시간 제한(선택) — 둘 다 있거나 둘 다 없음(하나만 있으면 iint 가 누락 쪽에서 실패).
-    let durationMinMs: number | undefined
-    let durationMaxMs: number | undefined
-    if (it.durationMinMs !== undefined || it.durationMaxMs !== undefined) {
-      durationMinMs = iint('durationMinMs', 1)
-      durationMaxMs = iint('durationMaxMs', 1)
-      if (durationMinMs > durationMaxMs)
-        fail(`${iw}.durationMinMs must be <= durationMaxMs`)
-    }
-    const durOverride =
-      durationMinMs !== undefined ? { durationMinMs, durationMaxMs } : {}
-
     // 보상 종류 — 누락 시 'gold'(기존 의뢰는 incentive/additive 만 두면 된다).
     const rewardKind = it.rewardKind === undefined ? 'gold' : it.rewardKind
     if (rewardKind !== 'gold' && rewardKind !== 'item')
@@ -156,7 +144,6 @@ function parseBucket(
       const rewardItemCount = iint('rewardItemCount', 1)
       return {
         weight,
-        ...durOverride,
         ...costFields,
         rewardKind,
         rewardItemId,
@@ -178,7 +165,6 @@ function parseBucket(
 
     return {
       weight,
-      ...durOverride,
       ...costFields,
       rewardKind,
       incentiveMin,
@@ -229,6 +215,9 @@ export function parseCommissionConfig(
   // 있는 만큼만 출제하므로(min), 여기서는 1 이상만 강제한다(버킷별 항목 수와의 관계는 강제하지 않는다).
   const maxCommissions = intAtLeast(raw, 'maxCommissions', 1)
   const tickIntervalMs = intAtLeast(raw, 'tickIntervalMs', 1)
+  // 제안 활성화 도달 레벨(maxLevelReached 기준). 정수 >= 0(0 = 처음부터 활성). 다른 글로벌 필드와 같이
+  // 필수+검증으로 둔다 — 누락/오타가 조용히 0(항상 활성)으로 새지 않고 로드 시점에 즉시 실패하게.
+  const unlockAtLevel = intAtLeast(raw, 'unlockAtLevel', 0)
 
   // buckets: 비어있지 않은 배열. 각 버킷은 parseBucket 으로 검증.
   const rawBuckets = raw.buckets
@@ -253,7 +242,7 @@ export function parseCommissionConfig(
   if (buckets[buckets.length - 1].maxGold !== null)
     fail('the last bucket maxGold must be null (spans to infinity)')
 
-  return { maxCommissions, tickIntervalMs, buckets }
+  return { maxCommissions, tickIntervalMs, unlockAtLevel, buckets }
 }
 
 // 게임 시작 시 호출되는 로드 진입점. 번들된 데이터 파일을 검증해 CommissionConfig 로 만든다.

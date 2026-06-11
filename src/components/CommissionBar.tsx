@@ -68,6 +68,12 @@ export function CommissionBar({
     (_, i) => active[i] ?? null,
   )
 
+  // 제안 잠금 게이트(스토어와 동일 기준: 도달 강화 레벨 maxLevelReached >= unlockAtLevel). 잠금 중엔
+  // 스토어가 active 를 비워 두지만(출제 안 함), 빈 바 영역까지 통째로 숨겨 초반 내내 "제안" 리전이
+  // 노출되지 않게 한다. 단조라 한 번 해제되면 다시 잠기지 않는다.
+  const maxLevelReached = useGameStore((s) => s.maxLevelReached)
+  const locked = maxLevelReached < config.unlockAtLevel
+
   // 키보드(1·2·3) 납품 시 코인 연출의 출발점이 될 카드 DOM 을 슬롯 인덱스로 찾기 위한 컨테이너(클릭 경로는 currentTarget 사용).
   const slotsRef = useRef<HTMLDivElement>(null)
   const onSlot = useCallback(
@@ -87,6 +93,15 @@ export function CommissionBar({
   )
   useCommissionHotkey({ enabled: hotkeysEnabled, onSlot })
 
+  // 잠금 중이면 바 영역을 통째로 렌더하지 않는다(훅은 위에서 모두 호출한 뒤 — 훅 순서 불변).
+  if (locked) return null
+
+  // 통합 세션 타이머: 세션의 모든 제안이 같은 만료를 공유하므로 아무 제안(active[0])에서 createdAt/expiresAt 를
+  // 읽어 카드 묶음 아래 단일 바로 표현한다. 세션이 비면(쿨다운) null → 바를 렌더하지 않는다. active 의 id 는
+  // 단조 증가하고 complete/만료가 세션을 통째로 비우므로, 한 세션이 떠 있는 동안 active[0].id 는 안정적이다
+  // (세션 단위 key) — 새 세션이 시작될 때만 바뀌어 바가 처음부터 다시 줄어든다.
+  const session = active[0] ?? null
+
   return (
     <div
       className="mt-3 flex flex-col gap-1.5"
@@ -95,26 +110,36 @@ export function CommissionBar({
     >
       {/* 거래 제안 카드는 게임 레이아웃이 허용하는 폭을 모두 쓴다 — 상단바(TopControls)·메인 그리드와
           동일한 62rem 밴드(lg+)를 mx-auto 로 가운데 정렬해 좌우 끝이 인벤토리/강화 패널과 맞물리게 한다.
-          <lg(세로형)에선 컨테이너 폭을 그대로 꽉 채운다. 도착 연출 오버레이(OfferArrivalFx)는 absolute
-          inset-0 이라 이 컨테이너 폭을 자동으로 따라가 카드 영역에 정확히 정렬된다. 62rem 은 그리드
-          컬럼 합(16+28+16 + gap)과 동기화할 것 — 컬럼/갭을 바꾸면 이 값도 함께 고친다. */}
-      <div className="relative mx-auto w-full lg:max-w-[62rem]">
-        <OfferArrivalFx />
-        <div ref={slotsRef} className="flex gap-2">
-        {slots.map((c, i) =>
-          c ? (
-            <CommissionCard
-              key={c.id}
-              slotIndex={i}
-              commission={c}
-              fulfillable={canFulfill(c.cost)}
-              onFulfill={onFulfill}
-            />
-          ) : (
-            <EmptySlot key={`empty-${i}`} />
-          ),
-        )}
+          <lg(세로형)에선 컨테이너 폭을 그대로 꽉 채운다. 통합 타이머 바는 카드 행 아래에 같은 밴드 폭으로
+          이어 붙인다(flex-col). 도착 연출 오버레이(OfferArrivalFx)는 카드 행 컨테이너(relative)에만 absolute
+          inset-0 으로 깔려 카드 영역에만 정렬되고 타이머 바는 덮지 않는다. 62rem 은 그리드 컬럼 합
+          (16+28+16 + gap)과 동기화할 것 — 컬럼/갭을 바꾸면 이 값도 함께 고친다. */}
+      <div className="mx-auto flex w-full flex-col gap-1.5 lg:max-w-[62rem]">
+        <div className="relative">
+          <OfferArrivalFx />
+          <div ref={slotsRef} className="flex gap-2">
+            {slots.map((c, i) =>
+              c ? (
+                <CommissionCard
+                  key={c.id}
+                  slotIndex={i}
+                  commission={c}
+                  fulfillable={canFulfill(c.cost)}
+                  onFulfill={onFulfill}
+                />
+              ) : (
+                <EmptySlot key={`empty-${i}`} />
+              ),
+            )}
+          </div>
         </div>
+        {session && (
+          <SessionTimerBar
+            key={session.id}
+            createdAt={session.createdAt}
+            expiresAt={session.expiresAt}
+          />
+        )}
       </div>
     </div>
   )
@@ -232,10 +257,6 @@ function CommissionCard({
           ) : null}
         </span>
       </span>
-      <TimerBar
-        createdAt={commission.createdAt}
-        expiresAt={commission.expiresAt}
-      />
     </motion.button>
   )
 }
@@ -254,11 +275,14 @@ function KeyHint({ slot, active }: { slot: number; active: boolean }) {
   )
 }
 
-// 남은 시간 막대 — 카드 하단을 따라 줄어든다. 카드는 c.id 로 마운트되고(완료/만료 시 언마운트),
-// 생성(createdAt) 직후 한 tick(≤250ms) 안에 마운트되므로, 전체 길이(expiresAt-createdAt)를 기준으로
-// scaleX 1→0 을 선형 애니메이션한다(매 프레임 재렌더·rAF·Date.now 없이 컴포지터가 처리 —
-// CoinFlight/GoldDisplay 와 동일 철학). 시간이 줄수록 황금→적색으로 물들어 임박을 알린다.
-function TimerBar({
+// 통합 세션 타이머 바 — 세션의 모든 제안이 공유하는 만료까지 남은 시간을 카드 묶음 "아래" 단일 바로 표현한다
+// (카드별 바가 아니라 세션 1개 바 = 통합 지속시간). 바는 세션 id 로 key 되어 마운트/언마운트되고(완료·만료 시
+// 언마운트), 생성(createdAt) 직후 같은 렌더 커밋에서 마운트되므로 전체 길이(expiresAt-createdAt)를 기준으로
+// scaleX 1→0 을 선형 애니메이션한다(매 프레임 재렌더·rAF·Date.now 폴링 없이 컴포지터가 처리 — 카드 타이머가
+// 쓰던 것과 동일 철학, 순수 렌더 유지). 새 세션이 시작될 때만 key 가 바뀌어 처음부터 다시 줄어든다.
+// 시간이 줄수록 황금→적색으로 물들어 임박을 알린다(motion 은 CSS var 키프레임 보간을 못 하므로 진행색은
+// index.css 의 --color-gold/--color-danger 와 동기된 hex 값을 그대로 쓴다 — 토큰을 바꾸면 여기도 맞춘다).
+function SessionTimerBar({
   createdAt,
   expiresAt,
 }: {
@@ -268,14 +292,17 @@ function TimerBar({
   const totalSec = Math.max(0, expiresAt - createdAt) / 1000
 
   return (
-    <span className="absolute inset-x-0 bottom-0 h-1 bg-black/25" aria-hidden>
+    <span
+      className="relative block h-1.5 w-full overflow-hidden rounded-full bg-black/25"
+      aria-hidden
+    >
       <motion.span
         className="block h-full origin-left rounded-full"
         initial={{ scaleX: 1, backgroundColor: 'var(--color-gold)' }}
         animate={{
           scaleX: 0,
           // 줄어드는 내내 황금색을 유지하다 끝부분(60%~)에서 적색으로 — 임박 경고.
-          backgroundColor: ['#f1c14b', '#f1c14b', '#e8584f'],
+          backgroundColor: ['#f1c14b', '#f1c14b', '#d8654f'],
         }}
         transition={{
           duration: totalSec,

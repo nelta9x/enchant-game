@@ -100,10 +100,6 @@ export type AnimationConfig = {
 // (costKind/rewardKind 누락 시 로더가 각각 'item'/'gold' 로 정규화 — 기존 골드 의뢰는 itemId+incentive/additive 만 두면 된다.)
 export type CommissionItemEntry = {
   weight: number
-  // 선택: 이 항목 전용 시간 제한(둘 다 있거나 둘 다 없음). 없으면 버킷 기본 duration 을 쓴다.
-  // 물물교환처럼 특정 의뢰만 슬롯 점유를 짧게 두고 싶을 때 사용(버킷 전체 duration 은 그대로).
-  durationMinMs?: number
-  durationMaxMs?: number
 } & (
   | { costKind?: 'item'; itemId: string; requiredCount: number }
   | { costKind: 'gold'; costAmount: number }
@@ -128,8 +124,8 @@ export type CommissionItemEntry = {
 //  - minGold: 담당 골드 구간 하한(포함). 검증 전용 — 셀렉터는 maxGold 만 본다.
 //  - maxGold: 상한(미포함). null = ∞(마지막 버킷).
 //  - items: 이 버킷에서 출제될 아이템 목록(itemId + weight + 아이템별 incentive/additive). 비어있지 않음
-//  - durationMin/MaxMs: 제안 1건의 시간 제한 범위(생성 시 이 구간에서 무작위). 세션 내 각 제안은
-//    독립 만료한다(min==max 로 두면 세션이 통째로 같이 만료된다).
+//  - durationMin/MaxMs: 세션 1개의 시간 제한 범위(세션 시작 시 이 구간에서 한 번 무작위). 세션의 모든 제안이
+//    이 하나의 만료 시각을 공유해 통째로 같이 만료된다(통합 지속시간 — 카드별이 아니라 세션 1개 바로 표현).
 //  - spawnIntervalMin/MaxMs: 세션과 세션 사이 쿨다운 범위(이 구간에서 무작위). 세션이 끝나면(선택 또는
 //    전부 만료) 이 간격만큼 비운 뒤 다음 세션이 시작된다.
 export type GoldBucket = {
@@ -149,10 +145,15 @@ export type GoldBucket = {
 //    이만큼 한 번에 출제하고, 풀의 서로 다른 항목 수가 이보다 적으면 있는 만큼만 낸다(min). 플레이어가 그중
 //    하나를 선택(납품)하면 나머지가 사라지며 세션이 끝나고, spawnInterval 쿨다운 뒤 다음 세션이 시작된다.
 //  - tickIntervalMs: 셸(commissionStore)이 시간을 전진시키는 주기(만료/세션 시작 감지 해상도)
+//  - unlockAtLevel: 제안 기능이 활성화되는 최소 "도달 강화 레벨"(gameStore.maxLevelReached 기준, 단조 high-water-mark).
+//    플레이어가 이 레벨에 한 번이라도 도달하기 전에는 제안이 전혀 출제되지 않는다(초반엔 재화가 없어 활용 불가 — 의도된 잠금).
+//    maxLevelReached 는 파괴·판매로 내려가지 않으므로(달성=영구) 한 번 해제되면 다시 잠기지 않는다. 0 = 처음부터 활성.
+//    데이터 파일(commission.json)에서 조절한다(코드 상수 아님).
 //  - buckets: 보유 골드 구간별 정의([0,∞) 를 덮는 연속 버킷 — buckets[0] 이 골드 0 구간).
 export type CommissionConfig = {
   maxCommissions: number
   tickIntervalMs: number
+  unlockAtLevel: number
   buckets: GoldBucket[]
 }
 

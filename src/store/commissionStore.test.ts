@@ -29,7 +29,9 @@ beforeAll(() => {
 beforeEach(() => {
   vi.useFakeTimers()
   // 기본은 버킷 A([0, 500000)) 구간. 개별 테스트가 필요하면 gold 를 덮어 다른 버킷을 고른다.
-  useGameStore.setState({ gold: 1000 })
+  // maxLevelReached 를 0 으로 리셋해 잠금 게이트 테스트의 출발 바닥을 고정한다(전역 store 공유 → 이전 테스트
+  // 잔존값 방지). 본 파일의 CONFIG/BARTER 픽스처는 unlockAtLevel:0 이라 나머지 테스트는 값과 무관하게 활성.
+  useGameStore.setState({ gold: 1000, maxLevelReached: 0 })
 })
 afterEach(() => vi.useRealTimers())
 
@@ -64,6 +66,8 @@ function bucket(
 const CONFIG: CommissionConfig = {
   maxCommissions: 3,
   tickIntervalMs: 250,
+  // unlockAtLevel:0 = 항상 활성(레거시 동작 유지). 잠금 게이트는 별도 describe 에서 nonzero 로 검증한다.
+  unlockAtLevel: 0,
   buckets: [
     bucket(0, 500_000, [
       { itemId: 'sword_3', weight: 1 },
@@ -247,6 +251,7 @@ describe('commissionStore — 제안 세션 모델', () => {
   const BARTER: CommissionConfig = {
     maxCommissions: 1,
     tickIntervalMs: 250,
+    unlockAtLevel: 0,
     buckets: [
       {
         minGold: 0,
@@ -304,6 +309,67 @@ describe('commissionStore — 제안 세션 모델', () => {
     expect(
       useGameStore.getState().items.find((i) => i.itemId === 'sword_12'),
     ).toBeUndefined() // 미지급
+    store.getState().stop()
+  })
+})
+
+// 제안 활성화 잠금(unlockAtLevel) — 도달 강화 레벨(maxLevelReached)이 임계 미만이면 제안이 전혀 출제되지 않고,
+// 임계에 도달한 순간(다음 tick)부터 첫 세션이 부트스트랩된다. maxLevelReached 는 단조라 한 번 해제되면 유지된다.
+describe('commissionStore — 제안 활성화 잠금(unlockAtLevel)', () => {
+  // CONFIG(버킷 A) 그대로 + 활성화 임계만 10 으로. 잠금/해제는 maxLevelReached 로 제어한다.
+  const GATED: CommissionConfig = { ...CONFIG, unlockAtLevel: 10 }
+
+  it('도달 레벨이 임계 미만이면 start 가 제안을 출제하지 않는다', () => {
+    useGameStore.setState({ maxLevelReached: 9 }) // 임계(10) 미만
+    const store = createCommissionStore({ rng: () => 0.5, config: GATED })
+    store.getState().start()
+    expect(store.getState().active).toHaveLength(0)
+    expect(store.getState().nextSpawnAt).toBeNull() // 초기 빈 상태 그대로
+    store.getState().stop()
+  })
+
+  it('잠금 중에는 tick 이 여러 번 흘러도 계속 비어 있다', () => {
+    useGameStore.setState({ maxLevelReached: 0 })
+    const store = createCommissionStore({ rng: () => 0.5, config: GATED })
+    store.getState().start()
+    vi.advanceTimersByTime(250 * 5) // tick 5회
+    expect(store.getState().active).toHaveLength(0)
+    store.getState().stop()
+  })
+
+  it('도달 레벨이 임계에 닿으면 다음 tick 에서 첫 세션을 부트스트랩한다', () => {
+    useGameStore.setState({ maxLevelReached: 0 })
+    const store = createCommissionStore({ rng: () => 0.5, config: GATED })
+    store.getState().start()
+    expect(store.getState().active).toHaveLength(0) // 아직 잠금
+    // 임계 도달 → 다음 tick 에서 해제·부트스트랩.
+    useGameStore.setState({ maxLevelReached: 10 })
+    vi.advanceTimersByTime(250)
+    expect(store.getState().active).toHaveLength(3) // 서로 다른 제안 3개 한 번에
+    store.getState().stop()
+  })
+
+  it('start 시점에 이미 임계 이상이면 즉시 첫 세션을 출제한다', () => {
+    useGameStore.setState({ maxLevelReached: 12 }) // 임계 초과
+    const store = createCommissionStore({ rng: () => 0.5, config: GATED })
+    store.getState().start()
+    expect(store.getState().active).toHaveLength(3)
+    store.getState().stop()
+  })
+
+  it('잠금 중 start→stop→start(StrictMode 이중 마운트) 후 해제되면 정상 부트스트랩한다', () => {
+    useGameStore.setState({ maxLevelReached: 0 }) // 잠금
+    const store = createCommissionStore({ rng: () => 0.5, config: GATED })
+    // 마운트→언마운트→재마운트(App effect 의 start/stop/start 와 동일). 래치(bootstrapped)가
+    // stop 에서 리셋되어 재start 후에도 잠금 상태가 유지되어야 한다(빈 상태).
+    store.getState().start()
+    store.getState().stop()
+    store.getState().start()
+    expect(store.getState().active).toHaveLength(0)
+    // 이후 임계 도달 → 다음 tick 에서 1회 부트스트랩(중복 출제 없음).
+    useGameStore.setState({ maxLevelReached: 10 })
+    vi.advanceTimersByTime(250)
+    expect(store.getState().active).toHaveLength(3)
     store.getState().stop()
   })
 })

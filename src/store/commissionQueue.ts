@@ -12,9 +12,10 @@
 //  - nextSpawnAt: 다음 세션이 시작될 절대 시각. null = 세션이 떠 있는 동안(타이머 정지).
 //  - 불변식(매 tick 후): nextSpawnAt === null  ⟺  active.length > 0.
 //    즉 세션이 떠 있으면 타이머가 멈추고(null), 비어 있으면(세션 간 쿨다운) 다음 세션 시각을 보유한다.
-//  - 세션은 "한 번에" 출제되고 도중에 보충하지 않는다(트리클 아님). 각 제안은 독립 만료 시각(expiresAt)을 갖고,
-//    만료된 것은 active 에서 빠진다(버킷 duration min==max 면 세션이 통째로 같이 만료된다).
-//  - 세션 종료 = (a) 플레이어가 하나를 선택(complete → 나머지까지 전부 제거) 또는 (b) 모두 만료. 종료 후
+//  - 세션은 "한 번에" 출제되고 도중에 보충하지 않는다(트리클 아님). 세션의 모든 제안은 하나의 통합 만료 시각
+//    (expiresAt)을 공유한다 — 세션 시작 시 버킷 duration 에서 한 번 뽑아 전체 제안에 동일하게 적용한다.
+//    따라서 세션은 통째로 같이 만료된다(부분 만료 없음). 카운트다운 UI 도 카드별이 아니라 세션 1개 바로 표현한다.
+//  - 세션 종료 = (a) 플레이어가 하나를 선택(complete → 나머지까지 전부 제거) 또는 (b) 통째로 만료. 종료 후
 //    active 가 비면 spawnInterval 쿨다운을 세고, 쿨다운이 지나면 다음 세션이 시작된다.
 //  - 절대 타임스탬프만 쓰고 카운트다운 감산은 하지 않는다 — 탭 throttle·드리프트에 강하고 now 주입으로 결정적.
 
@@ -37,12 +38,10 @@ export type Commission = {
 
 // 출제 풀 1항목 — 셸이 버킷 items[] 의 비용(cost)을 해석하고 (골드 보상이면) basePrice 를 붙여 만든다.
 // 비용/보상 산정값이 아이템별이라 PoolEntry 가 그 값을 들고 다닌다(코어는 DataManager 비의존 유지).
+// 시간 제한은 항목별이 아니라 세션 공통(BucketSettings.duration)이다 — 세션의 모든 제안이 같은 만료를 공유한다.
 export type PoolEntry = {
   weight: number
   cost: CommissionCost // 해석된 비용(골드 또는 아이템) — 항목별 고정
-  // 선택: 이 항목 전용 시간 제한(없으면 BucketSettings 의 duration 사용).
-  durationMinMs?: number
-  durationMaxMs?: number
 } & (
   | {
       rewardKind: 'gold'
@@ -117,11 +116,6 @@ export function commissionPool(
 ): PoolEntry[] {
   const pool: PoolEntry[] = []
   for (const e of entries) {
-    // 아이템별 duration 오버라이드(있으면)를 그대로 옮긴다.
-    const dur =
-      e.durationMinMs !== undefined
-        ? { durationMinMs: e.durationMinMs, durationMaxMs: e.durationMaxMs }
-        : {}
     // 비용 해석: 골드 비용(골드로 구매) 또는 아이템 납품.
     const cost: CommissionCost =
       e.costKind === 'gold'
@@ -132,7 +126,6 @@ export function commissionPool(
       pool.push({
         weight: e.weight,
         cost,
-        ...dur,
         rewardKind: 'item',
         rewardItemId: e.rewardItemId,
         rewardItemCount: e.rewardItemCount,
@@ -147,7 +140,6 @@ export function commissionPool(
     pool.push({
       weight: e.weight,
       cost,
-      ...dur,
       rewardKind: 'gold',
       basePrice,
       incentiveMin: e.incentiveMin,
@@ -178,16 +170,29 @@ function selectEntry(
   return chosen
 }
 
-// 주어진 항목으로 제안 1건의 내용(id 제외 — 발급은 호출자가 한다)을 만든다. 선택은 하지 않는다(이미 고른 항목).
-// rng 소비 순서(결정성):
-//   - 골드 보상: 1) incentive  2) additive  3) duration  (총 3회)
-//   - 아이템 보상: 1) duration  (incentive/additive 안 뽑음 — 보상이 고정)
+// 세션 공통 만료 시각 1회 뽑기 — now + [durationMinMs, durationMaxMs] 무작위. rng 1회 소비.
+// spawnSession 은 세션당 한 번 호출해 모든 제안에 같은 값을 적용하고(통합 만료), generateOne 은 단건에 적용한다.
+function rollExpiry(
+  now: number,
+  rng: () => number,
+  settings: BucketSettings,
+): number {
+  return (
+    now +
+    (settings.durationMinMs +
+      rng() * (settings.durationMaxMs - settings.durationMinMs))
+  )
+}
+
+// 주어진 항목으로 제안 1건의 내용(id 제외 — 발급은 호출자가 한다)을 만든다. 선택·만료 뽑기는 하지 않는다
+// (항목은 이미 고른 것, expiresAt 는 세션 공통이라 호출자가 rollExpiry 로 한 번 뽑아 주입한다).
+// rng 소비(결정성): 골드 보상이면 1) incentive  2) additive (총 2회), 아이템 보상이면 0회(보상 고정).
 // 골드 보상 = round((basePrice + additive) * incentive), 아이템 보상 = 고정 아이템. 발급 시점에 freeze.
 function makeOffer(
   entry: PoolEntry,
   now: number,
   rng: () => number,
-  settings: BucketSettings,
+  expiresAt: number,
 ): Omit<Commission, 'id'> {
   let reward: Material
   if (entry.rewardKind === 'gold') {
@@ -207,16 +212,12 @@ function makeOffer(
       count: entry.rewardItemCount,
     }
   }
-  // 시간 제한 → 절대 만료 시각(골드는 3번째, 아이템은 1번째 rng). 항목 전용 duration 이 있으면 그것을 쓴다.
-  const durationMinMs = entry.durationMinMs ?? settings.durationMinMs
-  const durationMaxMs = entry.durationMaxMs ?? settings.durationMaxMs
-  const expiresAt =
-    now + (durationMinMs + rng() * (durationMaxMs - durationMinMs))
   return { cost: entry.cost, reward, createdAt: now, expiresAt }
 }
 
-// 제안 1건의 내용 생성(id 제외) — 가중치 선택 + 내용. 풀이 비면 null. (단건 생성 진입점 — 테스트·내부용.)
-// rng 소비: 1) 가중치 선택  2~) makeOffer(보상/만료). selectEntry → makeOffer 순서를 고정한다(결정성).
+// 제안 1건의 내용 생성(id 제외) — 가중치 선택 + 만료 + 내용. 풀이 비면 null. (단건 생성 진입점 — 테스트·내부용.)
+// rng 소비 순서(결정성): 1) selectEntry(가중치 선택)  2) rollExpiry(만료)  3~) makeOffer(보상).
+// spawnSession 과 동일한 "선택 → 만료 → 보상" 순서를 따른다(세션은 만료를 한 번만, 여기는 단건이라 1건에).
 export function generateOne(
   pool: readonly PoolEntry[],
   now: number,
@@ -225,7 +226,8 @@ export function generateOne(
 ): Omit<Commission, 'id'> | null {
   const chosen = selectEntry(pool, rng)
   if (chosen === null) return null
-  return makeOffer(chosen, now, rng, settings)
+  const expiresAt = rollExpiry(now, rng, settings)
+  return makeOffer(chosen, now, rng, expiresAt)
 }
 
 // 비복원 가중 추출 — 풀에서 서로 다른 항목을 최대 count 개 고른다(세션 내 중복 제거의 핵심).
@@ -257,8 +259,10 @@ export function pickDistinctEntries(
 }
 
 // 한 세션 출제: 서로 다른 항목 min(sessionSize, 풀 길이) 개를 골라 각각 제안 1건으로 만든다.
-// rng 소비 순서(결정성): 1) pickDistinctEntries 가 픽 수만큼(선택)  2) 고른 순서대로 makeOffer(보상/만료).
-// 즉 "선택을 먼저 전부, 그다음 항목별 내용". 풀이 비면 offers 는 빈 배열.
+// 세션의 모든 제안은 하나의 통합 만료 시각(expiresAt)을 공유한다 — rollExpiry 를 세션당 한 번만 호출해
+// 전체에 같은 값을 적용한다(통합 지속시간 바). rng 소비 순서(결정성):
+//   1) pickDistinctEntries 가 픽 수만큼(선택)  2) rollExpiry(세션 공통 만료, 1회)  3) 고른 순서대로 makeOffer(보상).
+// 즉 "선택을 먼저 전부 → 만료 1회 → 항목별 보상". 풀이 비면(픽 0개) 만료를 뽑지 않고 빈 세션을 반환한다.
 export function spawnSession(
   now: number,
   rng: () => number,
@@ -268,10 +272,14 @@ export function spawnSession(
   startId: number,
 ): { offers: Commission[]; nextId: number } {
   const entries = pickDistinctEntries(pool, rng, sessionSize)
+  // 빈 풀(픽 0개)이면 만료 rng 를 소비하지 않고 즉시 빈 세션 — 호출자(tick/bootstrap)의 재시도 경로와 결정성 유지.
+  if (entries.length === 0) return { offers: [], nextId: startId }
+  // 세션 공통 만료를 한 번만 뽑아 모든 제안에 동일하게 적용한다(통합 지속시간).
+  const expiresAt = rollExpiry(now, rng, settings)
   const offers: Commission[] = []
   let nextId = startId
   for (const e of entries) {
-    offers.push({ ...makeOffer(e, now, rng, settings), id: nextId })
+    offers.push({ ...makeOffer(e, now, rng, expiresAt), id: nextId })
     nextId += 1
   }
   return { offers, nextId }
