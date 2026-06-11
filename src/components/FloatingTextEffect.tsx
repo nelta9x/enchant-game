@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { useT } from '../i18n'
 import type { TranslationKey } from '../i18n/locales/ko'
 import {
@@ -8,7 +8,7 @@ import {
   FT_WOBBLE_DEG,
   pickSpawn,
 } from './floatingText'
-import { useOneShot } from './useOneShot'
+import { OneShotOverlay } from './OneShotOverlay'
 
 // 강화 결과 플로팅 텍스트(프레젠테이션 전용) — 강화 결과마다 검 중상단 가상 사각형 안의 임의 위치에서
 // 짧은 문구("아이구! 손이 미끄러졌네." 등)가 흔들리며 팝업 → 상승(좌/우 드리프트)·페이드한다. 게임
@@ -38,24 +38,21 @@ export function FloatingTextEffect({
 }: {
   event: FloatingTextEvent | null
 }) {
-  // 수명은 지연 + 애니메이션을 덮어야 한다(지연이 길수록 길게) — 이벤트의 delaySec 으로 도출한다.
-  const active = useOneShot(event, event ? floatingTextMs(event.delaySec) : 0)
-
   return (
-    <div
-      className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center overflow-visible"
-      aria-hidden
+    <OneShotOverlay
+      event={event}
+      // 수명은 지연 + 애니메이션을 덮어야 한다(지연이 길수록 길게) — 이벤트의 delaySec 으로 도출한다.
+      lifetimeMs={event ? floatingTextMs(event.delaySec) : 0}
+      className="z-50 flex items-center justify-center"
     >
-      <AnimatePresence>
-        {active && (
-          <FloatingTextBurst
-            key={active.id}
-            textKey={active.textKey}
-            delaySec={active.delaySec}
-          />
-        )}
-      </AnimatePresence>
-    </div>
+      {(active) => (
+        <FloatingTextBurst
+          key={active.id}
+          textKey={active.textKey}
+          delaySec={active.delaySec}
+        />
+      )}
+    </OneShotOverlay>
   )
 }
 

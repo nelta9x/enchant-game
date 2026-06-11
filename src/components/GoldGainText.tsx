@@ -1,9 +1,9 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { AnimatePresence, motion, type Transition } from 'motion/react'
+import { useRef, type RefObject } from 'react'
+import { motion, type Transition } from 'motion/react'
 import { formatGoldGain } from '../lib/format'
 import { GOLD_GAIN_MS, goldTextSize, hasGoldGlow } from './goldGain'
-import { relativeCenter, type Point } from './coins'
-import { useOneShot } from './useOneShot'
+import { OneShotOverlay } from './OneShotOverlay'
+import { useRelativeCenter } from './useRelativeCenter'
 
 // 골드 획득 플로팅 텍스트(프레젠테이션 전용). 게임 로직과 분리돼 'goldGain' 이벤트(재생 id + 획득 금액)
 // 에만 반응한다. 장착 무기(검 박스) 위치에서 살짝 위로 "+금액"이 떠올라 살짝 커졌다 페이드아웃한다.
@@ -28,28 +28,21 @@ export function GoldGainText({
   event: GoldGainEvent | null
   anchorRef: RefObject<HTMLDivElement | null>
 }) {
-  const active = useOneShot(event, GOLD_GAIN_MS)
-
   return (
-    <div
-      className="pointer-events-none absolute inset-0 overflow-visible"
-      aria-hidden
-    >
-      <AnimatePresence>
-        {active && (
-          <GoldGainBurst
-            key={active.id}
-            amount={active.amount}
-            anchorRef={anchorRef}
-          />
-        )}
-      </AnimatePresence>
-    </div>
+    <OneShotOverlay event={event} lifetimeMs={GOLD_GAIN_MS}>
+      {(active) => (
+        <GoldGainBurst
+          key={active.id}
+          amount={active.amount}
+          anchorRef={anchorRef}
+        />
+      )}
+    </OneShotOverlay>
   )
 }
 
 // 한 번의 떠오름. key=event.id 로 마운트되며, 마운트 시점에 검 박스 중심을 "자신의 rect" 기준으로
-// 1회 측정해 잡아둔다(이후 새 획득이 와도 이 인스턴스의 좌표는 고정 — 교체 중 튀지 않음).
+// 1회 측정해 잡아둔다(useRelativeCenter — 이후 새 획득이 와도 이 인스턴스의 좌표는 고정 — 교체 중 튀지 않음).
 function GoldGainBurst({
   amount,
   anchorRef,
@@ -58,16 +51,8 @@ function GoldGainBurst({
   anchorRef: RefObject<HTMLDivElement | null>
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
-  const [origin, setOrigin] = useState<Point | null>(null)
-
-  // 측정은 paint 전(useLayoutEffect)에 1회. 좌표 확정 전엔 그리지 않아(origin 가드) 원점 플래시가 없다.
-  useLayoutEffect(() => {
-    const root = rootRef.current
-    const anchor = anchorRef.current
-    if (!root || !anchor) return
-    const o = root.getBoundingClientRect()
-    setOrigin(relativeCenter(anchor.getBoundingClientRect(), o))
-  }, [anchorRef])
+  // 좌표 확정 전엔 그리지 않아(null 가드) 원점 플래시가 없다.
+  const origin = useRelativeCenter(rootRef, anchorRef)
 
   const size = goldTextSize(amount)
   const glow = hasGoldGlow(amount) // 100만+ 큰 획득은 텍스트 뒤 금색 광채를 함께 띄운다

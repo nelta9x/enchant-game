@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { itemSpriteUrl } from '../lib/sprites'
 import {
@@ -6,7 +6,7 @@ import {
   hammerStrikeMs,
   type HammerShape,
 } from './hammerTiming'
-import { useOneShot } from './useOneShot'
+import { OneShotOverlay } from './OneShotOverlay'
 
 // 강화 "내려치기" 연출(프레젠테이션 전용) — 강화 시도마다(성공·파괴·방지 무관) 호라드릭 망치가
 // 오른쪽 위에 치켜들렸다가 빠르게 검으로 내리꽂고, 그 자리에서 바로 사라진다(회수 없음). 게임 로직과 분리되어 'hammerStrike' 이벤트(재생 id)에만 반응한다 — 결과가 무엇이었는지는
@@ -60,79 +60,72 @@ export function HammerStrike({
   shape: HammerShape // 모션 모양(윈드업·정지·페이드아웃) — GameScreen 이 데이터에서 조립해 넘긴다
 }) {
   const m = computeHammerMotion(impactMs / 1000, shape)
-  const active = useOneShot(event, hammerStrikeMs(impactMs, shape))
 
   // 좁은(세로) 화면이면 치켜든 위치의 x 를 안쪽으로 줄여 화면 밖에서 시작하지 않게 한다(위 주석 참고).
   const narrowRaise = useMediaQuery(NARROW_RAISE_QUERY)
   const raiseX = (v: number) => (narrowRaise ? v * NARROW_RAISE_X_SCALE : v)
 
   return (
-    <div
-      className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-visible"
-      aria-hidden
+    <OneShotOverlay
+      event={event}
+      lifetimeMs={hammerStrikeMs(impactMs, shape)}
+      className="flex items-center justify-center"
     >
-      <AnimatePresence>
-        {active && (
-          <motion.img
-            key={active.id}
-            src={HAMMER_SPRITE}
-            alt=""
-            draggable={false}
-            className="h-24 w-24 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)] sm:h-28 sm:w-28"
-            style={{ imageRendering: 'pixelated' }}
-            initial={{
-              x: raiseX(START.x),
-              y: START.y,
-              rotate: BASE_ROTATE + WINDUP_TILT,
-              scale: 0.9,
-              opacity: 0,
-            }}
-            animate={{
-              // 치켜듦(START)→윈드업(HOLD) 대기 → 빠른 스냅으로 내리꽂아 따라넘김(-FOLLOW_TILT)·확대로
-              // 강타(IMPACT) → 그 자리에서 페이드아웃(회수 없음).
-              x: [raiseX(START.x), raiseX(HOLD.x), IMPACT.x, IMPACT.x],
-              y: [START.y, HOLD.y, IMPACT.y, IMPACT.y],
-              rotate: [
-                BASE_ROTATE + WINDUP_TILT,
-                BASE_ROTATE + WINDUP_TILT + 8,
-                BASE_ROTATE - FOLLOW_TILT,
-                BASE_ROTATE - FOLLOW_TILT,
-              ],
-              scale: [0.9, 0.95, 1.08, 1.08],
-              opacity: [0, 1, 1, 1, 0],
-            }}
-            transition={{
+      {(active) => (
+        <motion.img
+          key={active.id}
+          src={HAMMER_SPRITE}
+          alt=""
+          draggable={false}
+          className="h-24 w-24 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)] sm:h-28 sm:w-28"
+          style={{ imageRendering: 'pixelated' }}
+          initial={{
+            x: raiseX(START.x),
+            y: START.y,
+            rotate: BASE_ROTATE + WINDUP_TILT,
+            scale: 0.9,
+            opacity: 0,
+          }}
+          animate={{
+            // 치켜듦(START)→윈드업(HOLD) 대기 → 빠른 스냅으로 내리꽂아 따라넘김(-FOLLOW_TILT)·확대로
+            // 강타(IMPACT) → 그 자리에서 페이드아웃(회수 없음).
+            x: [raiseX(START.x), raiseX(HOLD.x), IMPACT.x, IMPACT.x],
+            y: [START.y, HOLD.y, IMPACT.y, IMPACT.y],
+            rotate: [
+              BASE_ROTATE + WINDUP_TILT,
+              BASE_ROTATE + WINDUP_TILT + 8,
+              BASE_ROTATE - FOLLOW_TILT,
+              BASE_ROTATE - FOLLOW_TILT,
+            ],
+            scale: [0.9, 0.95, 1.08, 1.08],
+            opacity: [0, 1, 1, 1, 0],
+          }}
+          transition={{
+            duration: m.motionSec,
+            // 대기(0→holdUntil) → 스냅(→impact, easeIn 가속) → 제자리 페이드아웃.
+            times: [0, m.holdUntil / m.motionSec, m.impactSec / m.motionSec, 1],
+            ease: ['easeInOut', 'easeIn', 'linear'],
+            // opacity 는 위치 곡선과 분리한다 — 치켜든 동안에도 또렷이 보이도록 초반에 빠르게 켜고,
+            // 정지 구간 동안 유지했다가 페이드아웃. 페이드인 지점(0.12)은 임팩트보다 늦으면 times 가
+            // 비단조가 돼(motion 거부) — DEV 튜닝으로 임팩트를 짧게/정지·페이드를 길게 끌면 발생하므로
+            // 임팩트 비율로 클램프한다(위치 times 는 holdUntil≤impact≤motion 이라 이미 안전, opacity 만 보정).
+            opacity: {
               duration: m.motionSec,
-              // 대기(0→holdUntil) → 스냅(→impact, easeIn 가속) → 제자리 페이드아웃.
               times: [
                 0,
-                m.holdUntil / m.motionSec,
+                Math.min(0.12, m.impactSec / m.motionSec),
                 m.impactSec / m.motionSec,
+                m.holdAfterEnd / m.motionSec,
                 1,
               ],
-              ease: ['easeInOut', 'easeIn', 'linear'],
-              // opacity 는 위치 곡선과 분리한다 — 치켜든 동안에도 또렷이 보이도록 초반에 빠르게 켜고,
-              // 정지 구간 동안 유지했다가 페이드아웃. 페이드인 지점(0.12)은 임팩트보다 늦으면 times 가
-              // 비단조가 돼(motion 거부) — DEV 튜닝으로 임팩트를 짧게/정지·페이드를 길게 끌면 발생하므로
-              // 임팩트 비율로 클램프한다(위치 times 는 holdUntil≤impact≤motion 이라 이미 안전, opacity 만 보정).
-              opacity: {
-                duration: m.motionSec,
-                times: [
-                  0,
-                  Math.min(0.12, m.impactSec / m.motionSec),
-                  m.impactSec / m.motionSec,
-                  m.holdAfterEnd / m.motionSec,
-                  1,
-                ],
-                ease: 'easeOut',
-              },
-            }}
-            // 연출 중 다시 강화하면(망치 위에 망치) 옛 망치를 즉시 지우고 새 타격을 처음부터 튼다 —
-            // exit 페이드를 두지 않아 AnimatePresence 가 키 교체 시 옛 노드를 곧장 제거한다(교차 페이드
-            // 겹침 없는 하드 컷). 자연 종료 시엔 이미 마지막 키프레임이 opacity 0 이라 사라짐에 차이 없다.
-          />
-        )}
-      </AnimatePresence>
-    </div>
+              ease: 'easeOut',
+            },
+          }}
+          // 연출 중 다시 강화하면(망치 위에 망치) 옛 망치를 즉시 지우고 새 타격을 처음부터 튼다 —
+          // exit 페이드를 두지 않아 AnimatePresence 가 키 교체 시 옛 노드를 곧장 제거한다(교차 페이드
+          // 겹침 없는 하드 컷). 자연 종료 시엔 이미 마지막 키프레임이 opacity 0 이라 사라짐에 차이 없다.
+        />
+      )}
+    </OneShotOverlay>
   )
 }

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react'
 import { dataManager } from '../data/DataManager'
 import { useActionHotkeys } from '../hooks/useActionHotkeys'
 import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
@@ -25,10 +32,7 @@ import { DropScatter, type DropEvent } from './DropScatter'
 import { dropAppearSec, dropLifetimeMs } from './drops'
 import { ItemFlight, ITEM_FLIGHT_MS, type ItemFlightEvent } from './ItemFlight'
 import { HammerStrike, type HammerStrikeEvent } from './HammerStrike'
-import {
-  hammerStrikeMs,
-  type HammerShape,
-} from './hammerTiming'
+import { hammerStrikeMs, type HammerShape } from './hammerTiming'
 import { HitSparkCanvas } from './HitSparkCanvas'
 import { ParticleEmitProvider, ParticlePool } from './ParticlePool'
 import {
@@ -81,6 +85,31 @@ function toBurstEvents(running: Effect[], kind: string): ShakeBurstEvent[] {
           },
         ]
       : [],
+  )
+}
+
+// 클릭 순간 캡처한 카드 rect 를 고정해 두는 보이지 않는 비행 출발 anchor(영점 크기·클릭 통과).
+// 의뢰 완료의 코인·아이템 보상 연출이 공유한다 — 카드가 active 에서 빠져 사라진 뒤에도
+// 출발 좌표가 유효하다(언마운트 타이밍에 의존하지 않음).
+function FlightAnchor({
+  rect,
+  anchorRef,
+}: {
+  rect: DOMRect
+  anchorRef: RefObject<HTMLDivElement | null>
+}) {
+  return (
+    <div
+      ref={anchorRef}
+      aria-hidden
+      className="pointer-events-none fixed"
+      style={{
+        left: rect.left + rect.width / 2,
+        top: rect.top + rect.height / 2,
+        width: 0,
+        height: 0,
+      }}
+    />
   )
 }
 
@@ -763,19 +792,11 @@ export function GameScreen() {
           targetRef={inventoryRef}
         />
 
-        {/* 의뢰 완료 코인 연출 — 출발점은 클릭한 의뢰 카드(아래 fixed anchor 로 좌표 고정), 도착점은 골드창.
-            anchor 는 보이지 않는 영점 크기 요소로, 카드가 사라진 뒤에도 측정한 출발 좌표를 유지한다. */}
+        {/* 의뢰 완료 코인 연출 — 출발점은 클릭한 의뢰 카드(FlightAnchor 로 좌표 고정), 도착점은 골드창. */}
         {commissionCoin && (
-          <div
-            ref={commissionAnchorRef}
-            aria-hidden
-            className="pointer-events-none fixed"
-            style={{
-              left: commissionCoin.rect.left + commissionCoin.rect.width / 2,
-              top: commissionCoin.rect.top + commissionCoin.rect.height / 2,
-              width: 0,
-              height: 0,
-            }}
+          <FlightAnchor
+            rect={commissionCoin.rect}
+            anchorRef={commissionAnchorRef}
           />
         )}
         <CoinFlight
@@ -788,19 +809,12 @@ export function GameScreen() {
           targetRef={goldRef}
         />
 
-        {/* 의뢰 아이템 보상 연출 — 출발점은 클릭한 의뢰 카드(fixed anchor 로 고정), 도착점은 인벤토리.
+        {/* 의뢰 아이템 보상 연출 — 출발점은 클릭한 의뢰 카드(FlightAnchor 로 고정), 도착점은 인벤토리.
             보상 아이템 아이콘이 카드에서 가방으로 빨려 든다(코인 비행과 동형, 작은 크기로 이륙). */}
         {commissionItem && (
-          <div
-            ref={commissionItemAnchorRef}
-            aria-hidden
-            className="pointer-events-none fixed"
-            style={{
-              left: commissionItem.rect.left + commissionItem.rect.width / 2,
-              top: commissionItem.rect.top + commissionItem.rect.height / 2,
-              width: 0,
-              height: 0,
-            }}
+          <FlightAnchor
+            rect={commissionItem.rect}
+            anchorRef={commissionItemAnchorRef}
           />
         )}
         <ItemFlight

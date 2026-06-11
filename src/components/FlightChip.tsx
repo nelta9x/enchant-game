@@ -66,3 +66,26 @@ export function FlightChip({
     </motion.div>
   )
 }
+
+// 비행 출발 순간의 황금 분출 섬광(요소 1개, 가볍다) — 코인 다발(CoinFlight)과 아이콘 1장(ItemFlight)이
+// 같은 번쩍임을 쓰도록 칩과 함께 이 모듈에 둔다(두 곳에 재구현하면 크기·곡선이 어긋난다).
+export function LaunchFlare({ at }: { at: Point }) {
+  return (
+    <motion.span
+      className="absolute rounded-full"
+      style={{
+        left: at.x,
+        top: at.y,
+        width: 150,
+        height: 150,
+        marginLeft: -75,
+        marginTop: -75,
+        background:
+          'radial-gradient(circle, color-mix(in srgb, var(--color-gold-glow) 80%, transparent), transparent 70%)',
+      }}
+      initial={{ scale: 0.3, opacity: 0 }}
+      animate={{ scale: 1.25, opacity: [0, 0.9, 0] }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+    />
+  )
+}

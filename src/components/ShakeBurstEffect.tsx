@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { makeParticles } from './particles'
 import { useParticleEmit } from './particleEmit'
-import { useOneShot } from './useOneShot'
+import { OneShotOverlay } from './OneShotOverlay'
 
 // "떨림 후 분출" 연출의 공유 안무(프레젠테이션 전용). 파괴(적색·검 소멸)와 성공(금색·상위 검 등장)이
 // 색만 달리해 같은 시퀀스를 쓴다 — 게임 로직과 분리되어 이벤트(재생 id + 잔상 스프라이트 + 파티클 수 +
@@ -41,10 +41,6 @@ export function ShakeBurstEffect({
   edgeVar: string // 가장자리 색(예: 'var(--color-danger)' / 'var(--color-gold)')
 }) {
   const emit = useParticleEmit()
-  // useOneShot 수명은 잔상 팝업(burstAt + ~0.22s)까지 덮으면 된다 — 파티클은 풀(항상 마운트)이 그리므로
-  // 이 컴포넌트 수명과 무관하다. 효과의 실제 수명(durationMs)은 Effect 시스템이 소유하고 이는 백스톱이다.
-  const lifetime = event ? event.impactMs + event.shakeMs + 400 : 0
-  const active = useOneShot(event, lifetime)
 
   // burstAt 에 파티클을 풀로 1회 emit 한다. 같은 id 인스턴스는 부모(GameScreen)의 key=id 로 안정적이라
   // 마운트 1회 스케줄로 충분하다. id 에만 의존해 무관한 running 변경(이벤트 객체 정체성 churn)으로 두 번
@@ -66,49 +62,49 @@ export function ShakeBurstEffect({
   }, [burstId, burstAtMs, coreVar, edgeVar, emit])
 
   return (
-    <div
-      className="pointer-events-none absolute inset-0 overflow-visible"
-      aria-hidden
+    <OneShotOverlay
+      event={event}
+      // 수명은 잔상 팝업(burstAt + ~0.22s)까지 덮으면 된다 — 파티클은 풀(항상 마운트)이 그리므로
+      // 이 컴포넌트 수명과 무관하다. 효과의 실제 수명(durationMs)은 Effect 시스템이 소유하고 이는 백스톱이다.
+      lifetimeMs={event ? event.impactMs + event.shakeMs + 400 : 0}
     >
-      <AnimatePresence>
-        {active && (
+      {(active) => (
+        <motion.div
+          key={active.id}
+          className="absolute inset-0 flex items-center justify-center"
+          // 연출 도중 새 시도로 교체되면 끊기지 않게 부드럽게 사라진다.
+          exit={{ opacity: 0, transition: { duration: 0.15 } }}
+        >
+          {/* 떨림 레이어 — 망치가 닿는 순간(impact)부터 무작위 길이(shakeMs)만큼 떤다. delay 로 윈드업
+              동안은 가만히 있는다(방지 시 실제 검과 동일한 공유 SHAKE 모양). */}
           <motion.div
-            key={active.id}
-            className="absolute inset-0 flex items-center justify-center"
-            // 연출 도중 새 시도로 교체되면 끊기지 않게 부드럽게 사라진다.
-            exit={{ opacity: 0, transition: { duration: 0.15 } }}
+            className="flex items-center justify-center"
+            animate={SHAKE_KEYFRAMES}
+            transition={makeShakeTransition(
+              active.shakeMs / 1000,
+              active.impactMs / 1000,
+            )}
           >
-            {/* 떨림 레이어 — 망치가 닿는 순간(impact)부터 무작위 길이(shakeMs)만큼 떤다. delay 로 윈드업
-                동안은 가만히 있는다(방지 시 실제 검과 동일한 공유 SHAKE 모양). */}
-            <motion.div
-              className="flex items-center justify-center"
-              animate={SHAKE_KEYFRAMES}
-              transition={makeShakeTransition(
-                active.shakeMs / 1000,
-                active.impactMs / 1000,
-              )}
-            >
-              {/* 잔상 — 실제 스프라이트(SwordStage <img>)와 클래스·그림자까지 같게 그려, burstAt 에 팝업 후
-                  소멸한다(동일해야 소멸→새 검 노출이 튀지 않는다). 떨림 끝까지 opacity 1 로 가만히 있는다. */}
-              <motion.img
-                src={active.spriteUrl}
-                alt=""
-                draggable={false}
-                className="h-36 w-36 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] sm:h-40 sm:w-40"
-                style={{ imageRendering: 'pixelated' }}
-                initial={{ scale: 1, opacity: 1 }}
-                animate={{ scale: [1, 1.18, 0.5], opacity: [1, 1, 0] }}
-                transition={{
-                  delay: (active.impactMs + active.shakeMs) / 1000, // 떨림 끝(burstAt)까지 가만, 이후 팝업+소멸
-                  duration: 0.22,
-                  times: [0, 0.45, 1],
-                  ease: 'easeOut',
-                }}
-              />
-            </motion.div>
+            {/* 잔상 — 실제 스프라이트(SwordStage <img>)와 클래스·그림자까지 같게 그려, burstAt 에 팝업 후
+                소멸한다(동일해야 소멸→새 검 노출이 튀지 않는다). 떨림 끝까지 opacity 1 로 가만히 있는다. */}
+            <motion.img
+              src={active.spriteUrl}
+              alt=""
+              draggable={false}
+              className="h-36 w-36 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] sm:h-40 sm:w-40"
+              style={{ imageRendering: 'pixelated' }}
+              initial={{ scale: 1, opacity: 1 }}
+              animate={{ scale: [1, 1.18, 0.5], opacity: [1, 1, 0] }}
+              transition={{
+                delay: (active.impactMs + active.shakeMs) / 1000, // 떨림 끝(burstAt)까지 가만, 이후 팝업+소멸
+                duration: 0.22,
+                times: [0, 0.45, 1],
+                ease: 'easeOut',
+              }}
+            />
           </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+        </motion.div>
+      )}
+    </OneShotOverlay>
   )
 }

@@ -1,12 +1,5 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { motion } from 'motion/react'
 import { sound } from '../lib/sound'
 import { ItemIcon } from './ItemIcon'
 import {
@@ -15,11 +8,11 @@ import {
   DROP_IN_SEC,
   dropLifetimeMs,
   makeDropTokens,
-  relativeCenter,
   type DropTokenSpec,
   type Point,
 } from './drops'
-import { useOneShot } from './useOneShot'
+import { OneShotOverlay } from './OneShotOverlay'
+import { useRelativeCenter } from './useRelativeCenter'
 
 // 파괴 드롭 수집 연출(프레젠테이션 전용). 게임 로직과 분리되어 'drop' 이벤트(재생 id + 드롭 스택)
 // 에만 반응한다. 검(sourceRef) 아래로 재료가 흩어져 떨어진 뒤, 마우스로 스칠 때마다(또는 일정
@@ -52,30 +45,23 @@ export function DropScatter({
   // DropScatter 는 store 를 모른 채 "무엇이 수집됐는지"만 알린다(뷰-로직 분리).
   onCollect: (itemId: string, count: number) => void
 }) {
-  // 수명은 등장 지연이 길수록 길어진다(자동 수집까지 덮어야 함) — 이벤트의 appearDelaySec 으로 도출한다.
-  const active = useOneShot(
-    event,
-    event ? dropLifetimeMs(event.appearDelaySec) : 0,
-  )
-
   return (
-    <div
-      className="pointer-events-none absolute inset-0 overflow-visible"
-      aria-hidden
+    <OneShotOverlay
+      event={event}
+      // 수명은 등장 지연이 길수록 길어진다(자동 수집까지 덮어야 함) — 이벤트의 appearDelaySec 으로 도출한다.
+      lifetimeMs={event ? dropLifetimeMs(event.appearDelaySec) : 0}
     >
-      <AnimatePresence>
-        {active && (
-          <DropPile
-            key={active.id}
-            drops={active.drops}
-            appearDelaySec={active.appearDelaySec}
-            sourceRef={sourceRef}
-            targetRef={targetRef}
-            onCollect={onCollect}
-          />
-        )}
-      </AnimatePresence>
-    </div>
+      {(active) => (
+        <DropPile
+          key={active.id}
+          drops={active.drops}
+          appearDelaySec={active.appearDelaySec}
+          sourceRef={sourceRef}
+          targetRef={targetRef}
+          onCollect={onCollect}
+        />
+      )}
+    </OneShotOverlay>
   )
 }
 
@@ -95,26 +81,13 @@ function DropPile({
   onCollect: (itemId: string, count: number) => void
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
-  const [coords, setCoords] = useState<{ source: Point; target: Point } | null>(
-    null,
-  )
+  // 좌표 확정 전엔 토큰을 그리지 않는다(null 가드 — useRelativeCenter).
+  const source = useRelativeCenter(rootRef, sourceRef)
+  const target = useRelativeCenter(rootRef, targetRef)
   // 미수집분 일괄 자동 수집 신호(바닥에 영구히 머물지 않도록). 마우스로 스친 토큰은 개별 수집된다.
   const [autoCollect, setAutoCollect] = useState(false)
   // 수집 완료(인벤토리 도착)된 토큰 인덱스 — 보이지 않는 인터랙티브 노드를 정리한다.
   const [done, setDone] = useState<ReadonlySet<number>>(() => new Set())
-
-  // 측정은 paint 전(useLayoutEffect)에 1회. 좌표 확정 전엔 토큰을 그리지 않는다(coords 가드).
-  useLayoutEffect(() => {
-    const root = rootRef.current
-    const src = sourceRef.current
-    const tgt = targetRef.current
-    if (!root || !src || !tgt) return
-    const origin = root.getBoundingClientRect()
-    setCoords({
-      source: relativeCenter(src.getBoundingClientRect(), origin),
-      target: relativeCenter(tgt.getBoundingClientRect(), origin),
-    })
-  }, [sourceRef, targetRef])
 
   // 일정 시간(머묾) 뒤 미수집 토큰을 일괄 수집. 타이머 콜백에서만 set → set-state-in-effect 규칙 OK.
   // 자동 수집 시각은 등장 지연(appearDelaySec)에서 도출한다(등장이 늦으면 자동 수집도 그만큼 늦게).
@@ -134,15 +107,16 @@ function DropPile({
       className="absolute inset-0 overflow-visible"
       exit={{ opacity: 0, transition: { duration: 0.2 } }}
     >
-      {coords &&
+      {source &&
+        target &&
         tokens.map((spec, i) =>
           done.has(i) ? null : (
             <DropToken
               key={i}
               spec={spec}
               appearDelaySec={appearDelaySec}
-              source={coords.source}
-              target={coords.target}
+              source={source}
+              target={target}
               autoCollect={autoCollect}
               onCollected={() => {
                 // 인벤토리 도착 시 실제 수집 반영(이 토큰이 대표하는 수량만큼) + 노드 정리.
