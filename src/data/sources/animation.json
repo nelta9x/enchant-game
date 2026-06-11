@@ -1,8 +1,8 @@
 {
-  "hammerImpactMs": 360,
-  "hammerWindupMs": 140,
-  "hammerHoldAfterMs": 100,
-  "hammerFadeoutMs": 120,
+  "hammerImpactMs": 325,
+  "hammerWindupMs": 60,
+  "hammerHoldAfterMs": 370,
+  "hammerFadeoutMs": 100,
   "reEnhanceGuardMs": 100,
   "shakeBands": [
     { "maxLevel": 10, "minMs": 100, "maxMs": 100 },
