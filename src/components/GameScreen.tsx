@@ -50,8 +50,7 @@ import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import { InventoryPanel } from './InventoryPanel'
 import { particleCount } from './particles'
 import { protectionState, isProtectionActive } from './protection'
-import { SellButton } from './SellButton'
-import { StoreButton } from './StoreButton'
+import { ActionButton } from './ActionButton'
 import { ShopModal } from './ShopModal'
 import { GameClearModal } from './GameClearModal'
 import { SuccessEffect, type SuccessEvent } from './SuccessEffect'
@@ -771,8 +770,12 @@ export function GameScreen() {
                 onEnhance={handleEnhance}
                 enchantCost={sword?.enchantCost ?? null}
               />
-              <SellButton disabled={!canSell} onSell={handleSell} />
-              <StoreButton disabled={!canStore} onStore={handleStore} />
+              <ActionButton disabled={!canSell} onClick={handleSell}>
+                {t('action.sell')}
+              </ActionButton>
+              <ActionButton disabled={!canStore} onClick={handleStore}>
+                {t('action.store')}
+              </ActionButton>
             </div>
           </div>
         </div>
