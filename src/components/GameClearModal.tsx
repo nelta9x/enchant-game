@@ -1,65 +1,18 @@
-import {
-  useEffect,
-  useRef,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { dataManager } from '../data/DataManager'
 import { useT } from '../i18n'
 import { swordSpriteUrl } from '../lib/sprites'
+import { useModalDialog } from './useModalDialog'
 
 // 게임 클리어(승리) 모달. 최종 검(엑스칼리버)을 완성하면 GameScreen 이 띄운다.
-// 상점 모달(ShopModal)과 동일한 오버레이·포커스·ESC·트랩 규약을 따른다(닫기만 — 게임 상태는 그대로 둔다).
+// 오버레이·포커스·ESC·트랩 규약은 상점 모달과 같다(공통 크롬 useModalDialog — 닫기만, 게임 상태는 그대로 둔다).
 type GameClearModalProps = { open: boolean; onClose: () => void }
 
 export function GameClearModal({ open, onClose }: GameClearModalProps) {
   const t = useT()
-  // 최종 검 스프라이트(데이터에서 해석 — id 하드코딩 대신 최고 단계 검을 쓴다).
-  const finalSword = dataManager.getSwordById('sword_30')
-  const closeRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  // onClose 를 ref로 고정해 ESC 리스너가 매 렌더 재등록되지 않게 한다(ShopModal 패턴).
-  const onCloseRef = useRef(onClose)
-  useEffect(() => {
-    onCloseRef.current = onClose
-  }, [onClose])
-
-  // 열릴 때 닫기 버튼에 포커스, 닫힐 때 직전 포커스 복원.
-  useEffect(() => {
-    if (!open) return
-    const prev = document.activeElement as HTMLElement | null
-    closeRef.current?.focus()
-    return () => prev?.focus?.()
-  }, [open])
-
-  // 열려 있는 동안 ESC로 닫는다.
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open])
-
-  // 포커스 트랩 — 모달이 열린 동안 Tab 포커스를 패널 안에 가둔다.
-  const trapTab = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Tab' || !panelRef.current) return
-    const focusables = panelRef.current.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    )
-    if (focusables.length === 0) return
-    const first = focusables[0]
-    const last = focusables[focusables.length - 1]
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault()
-      last.focus()
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault()
-      first.focus()
-    }
-  }
+  // 최종 검 = 최고 단계 검(데이터에서 해석 — id 하드코딩 없이 검 단계를 늘려도 자동 동작).
+  const finalSword = dataManager.getSwordByLevel(dataManager.getMaxSwordLevel())
+  const { panelRef, closeRef, trapTab } = useModalDialog({ open, onClose })
 
   return (
     <AnimatePresence>
@@ -99,7 +52,7 @@ export function GameClearModal({ open, onClose }: GameClearModalProps) {
                 {finalSword && (
                   <motion.img
                     src={swordSpriteUrl(finalSword.sprite)}
-                    alt={t('sword.30.name')}
+                    alt={t(finalSword.nameKey)}
                     className="relative h-28 w-28 object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
                     style={{ imageRendering: 'pixelated' }}
                     draggable={false}

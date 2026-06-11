@@ -1,8 +1,3 @@
-import {
-  useEffect,
-  useRef,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { dataManager } from '../data/DataManager'
 import type { Material, ShopItem } from '../data/types'
@@ -12,8 +7,10 @@ import { countOf, itemDisplayName } from '../lib/items'
 import { useGameStore } from '../store/gameStore'
 import { Coin } from './Coin'
 import { ItemIcon } from './ItemIcon'
+import { useModalDialog } from './useModalDialog'
 
 // 상점 팝업(모달). 상점 버튼으로 열고, ESC·백드롭·닫기 버튼으로 닫는다.
+// 포커스 관리·ESC·포커스 트랩은 공통 크롬(useModalDialog)이 담당한다(GameClearModal 과 공유).
 // 판매 목록은 DataManager.getShopItems()를 그대로 순회해 렌더한다 — 새 아이템은
 // shop.json 항목 + (검이 아니면) lib/items 표시명 매핑 + i18n 키를 추가하면 된다
 // (무결성은 DataManager 시드 테스트가 강제, 고유 아이콘이 필요하면 ShopThumb도 손본다).
@@ -28,51 +25,7 @@ export function ShopModal({ open, onClose }: ShopModalProps) {
   const canBuyFn = useGameStore((s) => s.canBuy)
 
   const shopItems = dataManager.getShopItems()
-  const panelRef = useRef<HTMLDivElement>(null)
-  const closeRef = useRef<HTMLButtonElement>(null)
-
-  // onClose 를 ref로 고정해 ESC 리스너가 onClose 정체성에 의존(매 렌더 재등록)하지 않게 한다.
-  const onCloseRef = useRef(onClose)
-  useEffect(() => {
-    onCloseRef.current = onClose
-  }, [onClose])
-
-  // 열릴 때 닫기 버튼에 포커스를 두고, 닫힐 때 직전 포커스 요소로 복원한다.
-  useEffect(() => {
-    if (!open) return
-    const prev = document.activeElement as HTMLElement | null
-    closeRef.current?.focus()
-    return () => prev?.focus?.()
-  }, [open])
-
-  // 열려 있는 동안 ESC로 닫는다(리스너는 open 토글 시에만 재등록).
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open])
-
-  // 포커스 트랩 — 모달이 열린 동안 Tab 포커스를 패널 안에 가둔다(aria-modal 보강,
-  // 배경의 언어 토글 등으로 포커스가 새는 것을 막는다). 닫힐 때 복원은 위 효과가 담당.
-  const trapTab = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Tab' || !panelRef.current) return
-    const focusables = panelRef.current.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    )
-    if (focusables.length === 0) return
-    const first = focusables[0]
-    const last = focusables[focusables.length - 1]
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault()
-      last.focus()
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault()
-      first.focus()
-    }
-  }
+  const { panelRef, closeRef, trapTab } = useModalDialog({ open, onClose })
 
   return (
     <AnimatePresence>
