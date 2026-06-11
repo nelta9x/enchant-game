@@ -57,7 +57,7 @@ export function HammerStrike({
 }: {
   event: HammerStrikeEvent | null
   impactMs: number // 망치가 검에 닿기까지(데이터 hammerImpactMs) — 떨림·불꽃·타격음의 공통 앵커
-  shape?: HammerShape // 모션 모양(윈드업·정지·페이드아웃) — 미지정 시 hammerTiming 기본값
+  shape: HammerShape // 모션 모양(윈드업·정지·페이드아웃) — GameScreen 이 데이터에서 조립해 넘긴다
 }) {
   const m = computeHammerMotion(impactMs / 1000, shape)
   const active = useOneShot(event, hammerStrikeMs(impactMs, shape))

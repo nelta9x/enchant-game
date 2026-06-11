@@ -4,23 +4,16 @@
 //
 // 임팩트 시각(impactSec)과 모션의 "모양"(윈드업 스냅·정지·페이드아웃 길이)은 모두 데이터
 // (animation.json: hammerImpactMs / hammerWindupMs / hammerHoldAfterMs / hammerFadeoutMs)에서 온다 —
-// GameScreen 이 데이터를 HammerShape 로 조립해 흘려보낸다(DEV 튜닝 패널은 그 위에 라이브로 덮어쓴다).
-// DEFAULT_HAMMER_SHAPE 는 shape 를 넘기지 않는 호출(테스트 등)을 위한 폴백 기본값일 뿐이다. 데이터는
+// GameScreen 이 데이터를 HammerShape 로 조립해 흘려보낸다(임팩트는 ms, 모양은 초 단위). 데이터는
 // import 시점에 로드돼 있지 않으므로(모듈 평가 < dataManager.load) 모듈 상수가 아니라 런타임 호출로 둔다.
 
 const TAIL_MS = 60 // 모션 종료 후 효과가 running 에서 빠질 때까지 여유(ShakeBurst 의 +60 관례)
 
-// 망치 모션의 "모양"(임팩트 기준 상대 길이, 초). 기본값은 눈으로 맞춘 코드 상수 — DEV 튜닝 패널이 덮어쓴다.
+// 망치 모션의 "모양"(임팩트 기준 상대 길이, 초). 호출부가 데이터에서 조립해 항상 넘긴다.
 export type HammerShape = {
   windupSec: number // holdUntil→impact: 빠르게 내리꽂는 스냅 길이
   holdAfterSec: number // impact 직후 자세를 유지하는 정지 시간
   fadeoutSec: number // 정지 후 제자리에서 사라지는 페이드아웃 길이
-}
-
-export const DEFAULT_HAMMER_SHAPE: HammerShape = {
-  windupSec: 0.14,
-  holdAfterSec: 0.1,
-  fadeoutSec: 0.12,
 }
 
 export type HammerMotion = {
@@ -36,7 +29,7 @@ export type HammerMotion = {
 // (holdUntil=0) 임팩트로 바로 내리꽂게 한다(연출은 단조롭지만 깨지지 않는다).
 export function computeHammerMotion(
   impactSec: number,
-  shape: HammerShape = DEFAULT_HAMMER_SHAPE,
+  shape: HammerShape,
 ): HammerMotion {
   return {
     impactSec,
@@ -47,10 +40,7 @@ export function computeHammerMotion(
 }
 
 // 연출 전체 길이(ms) — Effect 'hammerStrike' 의 durationMs + useOneShot 수명. GameScreen 이 impactMs·모양으로 부른다.
-export function hammerStrikeMs(
-  impactMs: number,
-  shape: HammerShape = DEFAULT_HAMMER_SHAPE,
-): number {
+export function hammerStrikeMs(impactMs: number, shape: HammerShape): number {
   return (
     Math.round(computeHammerMotion(impactMs / 1000, shape).motionSec * 1000) +
     TAIL_MS

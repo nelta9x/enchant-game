@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { dataManager } from '../data/DataManager'
-import type { AnimationConfig } from '../data/types'
 import { useActionHotkeys } from '../hooks/useActionHotkeys'
 import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useT, type TranslationKey } from '../i18n'
@@ -30,7 +29,6 @@ import {
   hammerStrikeMs,
   type HammerShape,
 } from './hammerTiming'
-import { HammerTuningPanel, type HammerTuning } from './HammerTuningPanel'
 import { HitSparkCanvas } from './HitSparkCanvas'
 import { ParticleEmitProvider, ParticlePool } from './ParticlePool'
 import {
@@ -118,38 +116,15 @@ export function GameScreen() {
       ? dataManager.getSwordById(currentSwordId)
       : undefined
 
-  // 강화 연출 타이밍(망치 임팩트·떨림 범위·재강화 가드) — 데이터에서 1회 읽어 매 강화의 타임라인과
-  // 임팩트 의존 props(망치·Hit 불꽃·보호 플레어)에 쓴다. load 이후라 안전(컴포넌트는 적재 후 렌더).
-  //
-  // DEV 타이밍 튜닝(단일 출처): 데이터 기본값으로 초기화한 useState 를 들고, DEV 패널이 라이브로 덮어쓴다.
-  // 프로덕션(패널 미렌더)에선 값이 데이터 기본 그대로라 동작 동일. anim(effectiveAnim) 과 hammerShape 를
-  // 여기 한 곳에서 만들어 모든 소비처(타임라인·플레어·불꽃·망치·잠금·방지 떨림)에 흘려 crossover 불일치 차단.
-  // 데이터(animation.json) — 망치 타이밍 기본값 + 떨림 레벨 밴드. 밴드는 패널이 만지지 않고 데이터 그대로 흐른다.
-  const dataAnim = useMemo(() => dataManager.getAnimation(), [])
-  const tuningDefaults = useMemo<HammerTuning>(
-    () => ({
-      impactMs: dataAnim.hammerImpactMs,
-      windupMs: dataAnim.hammerWindupMs,
-      holdAfterMs: dataAnim.hammerHoldAfterMs,
-      fadeoutMs: dataAnim.hammerFadeoutMs,
-      guardMs: dataAnim.reEnhanceGuardMs,
-    }),
-    [dataAnim],
-  )
-  const [tuning, setTuning] = useState<HammerTuning>(tuningDefaults)
-  // 망치 타이밍(impact/guard)은 패널에서, 떨림 밴드는 데이터에서. 매 강화는 검 레벨로 밴드를 골라 떨림을 뽑는다.
-  const anim: AnimationConfig = {
-    hammerImpactMs: tuning.impactMs,
-    hammerWindupMs: tuning.windupMs,
-    hammerHoldAfterMs: tuning.holdAfterMs,
-    hammerFadeoutMs: tuning.fadeoutMs,
-    reEnhanceGuardMs: tuning.guardMs,
-    shakeBands: dataAnim.shakeBands,
-  }
+  // 강화 연출 타이밍(망치 임팩트·모양·떨림 밴드·재강화 가드) — 데이터(animation.json)에서 1회 읽어 매 강화의
+  // 타임라인과 임팩트 의존 props(망치·Hit 불꽃·보호 플레어)에 쓴다. load 이후라 안전(컴포넌트는 적재 후 렌더).
+  // anim 과 hammerShape 를 여기 한 곳에서 만들어 모든 소비처(타임라인·플레어·불꽃·망치·잠금·방지 떨림)에
+  // 흘려 crossover 불일치를 차단한다. hammerShape 는 데이터의 망치 모양 필드에서 파생한다.
+  const anim = useMemo(() => dataManager.getAnimation(), [])
   const hammerShape: HammerShape = {
-    windupSec: tuning.windupMs / 1000,
-    holdAfterSec: tuning.holdAfterMs / 1000,
-    fadeoutSec: tuning.fadeoutMs / 1000,
+    windupSec: anim.hammerWindupMs / 1000,
+    holdAfterSec: anim.hammerHoldAfterMs / 1000,
+    fadeoutSec: anim.hammerFadeoutMs / 1000,
   }
 
   // 보호 결계 상태(보호불가/부족/대기/발동) — 흩어진 조건 대신 순수 코어 한 곳에서 계산한다.
@@ -627,14 +602,6 @@ export function GameScreen() {
   // <lg(세로형)에선 베젤 프레임을 유지한다.
   return (
     <div className="flex min-h-svh items-center justify-center overflow-x-hidden overflow-y-auto bg-bezel p-3 sm:p-6 lg:p-0">
-      {/* DEV 전용 망치 타이밍 튜닝 패널 — import.meta.env.DEV 정적 분기라 프로덕션 빌드에선 통째로 제거된다. */}
-      {import.meta.env.DEV && (
-        <HammerTuningPanel
-          value={tuning}
-          defaults={tuningDefaults}
-          onChange={setTuning}
-        />
-      )}
       {/* lg+(데스크탑): 레이아웃은 고정 비율(좌 16rem · 가운데 28rem · 우 16rem)이며, 화면이 커지면
           루트 font-size 가 커져(아래 index.css clamp) rem 기반 UI 전체가 통째로 균일하게 스케일된다
           (가운데만 비어 보이던 1fr 제거 → 빈 공간이 비례적으로 늘지 않음). 컬럼 트랙은 justify-center 로
