@@ -47,7 +47,9 @@ function parseShakeBand(raw: unknown, idx: number): ShakeBand {
       : (() => {
           const v = raw.maxLevel
           if (typeof v !== 'number' || !Number.isInteger(v) || v < 1)
-            fail(`${where}.maxLevel must be an integer >= 1 or null (got ${String(v)})`)
+            fail(
+              `${where}.maxLevel must be an integer >= 1 or null (got ${String(v)})`,
+            )
           return v
         })()
 
@@ -72,7 +74,9 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
   // shakeBands: 비어있지 않은 배열. 각 밴드는 parseShakeBand 로 검증.
   const rawBands = raw.shakeBands
   if (!Array.isArray(rawBands) || rawBands.length === 0)
-    fail('shakeBands must be a non-empty array (lowest level band = shakeBands[0])')
+    fail(
+      'shakeBands must be a non-empty array (lowest level band = shakeBands[0])',
+    )
   const shakeBands = rawBands.map((b, i) => parseShakeBand(b, i))
 
   // 커버리지 불변: 검 레벨 [1, ∞) 를 빈틈·겹침 없이 덮어야 한다(셀렉터가 maxLevel 만으로 담당 밴드를 고르는 전제).
@@ -82,7 +86,9 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
   for (let i = 0; i < shakeBands.length - 1; i += 1) {
     const cur = shakeBands[i].maxLevel
     if (cur === null)
-      fail(`shakeBands[${i}].maxLevel must not be null (only the last band spans to infinity)`)
+      fail(
+        `shakeBands[${i}].maxLevel must not be null (only the last band spans to infinity)`,
+      )
     const next = shakeBands[i + 1].maxLevel
     if (next !== null && next <= cur)
       fail(

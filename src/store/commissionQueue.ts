@@ -89,7 +89,14 @@ export function bootstrapCommissionQueue(
   settings: BucketSettings,
   sessionSize: number,
 ): CommissionQueueState {
-  const { offers, nextId } = spawnSession(now, rng, pool, settings, sessionSize, 1)
+  const { offers, nextId } = spawnSession(
+    now,
+    rng,
+    pool,
+    settings,
+    sessionSize,
+    1,
+  )
   if (offers.length > 0) return { active: offers, nextSpawnAt: null, nextId }
   // 풀이 비면(방어) 즉시 재시도 예정만 둔다 — emptyCommissionQueue 와 동일.
   return { active: [], nextSpawnAt: now, nextId: 1 }
@@ -316,7 +323,11 @@ export function tick(
     const spawned = spawnSession(now, rng, pool, settings, sessionSize, nextId)
     if (spawned.offers.length > 0) {
       return {
-        state: { active: spawned.offers, nextSpawnAt: null, nextId: spawned.nextId },
+        state: {
+          active: spawned.offers,
+          nextSpawnAt: null,
+          nextId: spawned.nextId,
+        },
         expired,
       }
     }

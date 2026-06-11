@@ -323,7 +323,10 @@ function SessionTimerBar({
 // 그리고 box-border 높이에 카드 테두리(border 1px)가 더하는 만큼을 투명 테두리로 똑같이 채운다.
 function EmptySlot() {
   return (
-    <div className="flex flex-1 border border-transparent px-3 py-4" aria-hidden>
+    <div
+      className="flex flex-1 border border-transparent px-3 py-4"
+      aria-hidden
+    >
       <span className="h-12 w-0 shrink-0" aria-hidden />
     </div>
   )

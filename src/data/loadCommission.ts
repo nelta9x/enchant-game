@@ -1,9 +1,5 @@
 import commissionRaw from './sources/commission.json'
-import type {
-  CommissionConfig,
-  CommissionItemEntry,
-  GoldBucket,
-} from './types'
+import type { CommissionConfig, CommissionItemEntry, GoldBucket } from './types'
 import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(commission.json)을 검증해 CommissionConfig 로 만드는 로더(loadShop 패턴 미러링).
@@ -122,7 +118,9 @@ function parseBucket(
               fail(`${iw}.itemId must be a non-empty string`)
             // load-bearing 무결성: 판매 가능 검 또는 카탈로그 아이템만 납품 가능(sword_1 등 비판매·미지 id 차단).
             if (!knownItemIds.has(itemId))
-              fail(`${iw}.itemId is not a sellable sword or catalog item: ${itemId}`)
+              fail(
+                `${iw}.itemId is not a sellable sword or catalog item: ${itemId}`,
+              )
             const requiredCount =
               it.requiredCount === undefined ? 1 : iint('requiredCount', 1)
             return { costKind: 'item', itemId, requiredCount }
@@ -135,7 +133,9 @@ function parseBucket(
         fail(`${iw}.rewardItemId must be a non-empty string`)
       // 지급 아이템도 출제 집합(판매 가능 검 ∪ 카탈로그 ∪ 상점 지급 아이템)에 있어야 한다.
       if (!knownItemIds.has(rewardItemId))
-        fail(`${iw}.rewardItemId is not a sellable sword or catalog item: ${rewardItemId}`)
+        fail(
+          `${iw}.rewardItemId is not a sellable sword or catalog item: ${rewardItemId}`,
+        )
       const rewardItemCount = iint('rewardItemCount', 1)
       return {
         weight,
@@ -228,7 +228,9 @@ export function parseCommissionConfig(
   for (let i = 1; i < buckets.length; i += 1) {
     const prevMax = buckets[i - 1].maxGold
     if (prevMax === null)
-      fail(`buckets[${i - 1}].maxGold must not be null (only the last bucket spans to infinity)`)
+      fail(
+        `buckets[${i - 1}].maxGold must not be null (only the last bucket spans to infinity)`,
+      )
     if (buckets[i].minGold !== prevMax)
       fail(
         `buckets[${i}].minGold must equal buckets[${i - 1}].maxGold (contiguous, no gap/overlap)`,
