@@ -9,7 +9,7 @@
 
 export { relativeCenter, type Point, type Rect } from './coins'
 
-// 화면에 흩뿌리는 토큰 수 상한. 드롭 수량은 최대 20까지 가므로(검 데이터) 상한을 둔다 —
+// 화면에 흩뿌리는 토큰 수 상한. 실제 드롭 수량은 검 데이터에 따라 크게 늘 수 있으므로(수백 개도 가능) 상한을 둔다 —
 // 이 이상은 토큰을 더 그리지 않고 대표로만 보여 준다(실제 획득 수량과는 무관, 연출).
 export const MAX_DROP_TOKENS = 8
 
