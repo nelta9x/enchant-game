@@ -93,9 +93,12 @@ export function CommissionBar({
       role="region"
       aria-label={t('commission.title')}
     >
-      {/* 거래 제안 카드는 바 전체 폭을 채우지 않고 가운데에 좁게 둔다(현재 슬롯 1개 기준).
-          도착 연출 오버레이(OfferArrivalFx)도 이 컨테이너 안에 둬서 카드 폭에 정확히 정렬되게 한다. */}
-      <div className="relative mx-auto w-full max-w-md">
+      {/* 거래 제안 카드는 게임 레이아웃이 허용하는 폭을 모두 쓴다 — 상단바(TopControls)·메인 그리드와
+          동일한 62rem 밴드(lg+)를 mx-auto 로 가운데 정렬해 좌우 끝이 인벤토리/강화 패널과 맞물리게 한다.
+          <lg(세로형)에선 컨테이너 폭을 그대로 꽉 채운다. 도착 연출 오버레이(OfferArrivalFx)는 absolute
+          inset-0 이라 이 컨테이너 폭을 자동으로 따라가 카드 영역에 정확히 정렬된다. 62rem 은 그리드
+          컬럼 합(16+28+16 + gap)과 동기화할 것 — 컬럼/갭을 바꾸면 이 값도 함께 고친다. */}
+      <div className="relative mx-auto w-full lg:max-w-[62rem]">
         <OfferArrivalFx />
         <div ref={slotsRef} className="flex gap-2">
         {slots.map((c, i) =>
