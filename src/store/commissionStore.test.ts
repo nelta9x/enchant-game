@@ -63,7 +63,6 @@ function bucket(
 // 보유 골드 구간이 [0,∞) 를 연속으로 덮는다(로더 불변 미러).
 const CONFIG: CommissionConfig = {
   maxCommissions: 3,
-  initialSpawnCount: 2,
   tickIntervalMs: 250,
   buckets: [
     bucket(0, 500_000, [
@@ -80,18 +79,35 @@ const CONFIG: CommissionConfig = {
   ],
 }
 
-describe('commissionStore — 단일 스폰 타이머', () => {
-  it('start 는 initialSpawnCount(2) 개를 즉시 등장, 이후 간격마다 1개씩 채워 꽉 차면 멈춘다', () => {
+describe('commissionStore — 제안 세션 모델', () => {
+  it('start 는 첫 세션(서로 다른 제안 maxCommissions 개)을 즉시 한 번에 출제하고 타이머를 멈춘다', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
-    expect(store.getState().active).toHaveLength(2) // 시작 시 2개
-    // 버킷 A(검 단계 3,4,5)에서만 출제.
-    for (const c of store.getState().active) {
-      expect(['sword_3', 'sword_4', 'sword_5']).toContain(costItemId(c.cost))
-    }
+    expect(store.getState().active).toHaveLength(3) // 세션 3개 한 번에
+    // 버킷 A(검 단계 3,4,5)에서만 출제 + 세션 내 중복 없음.
+    const ids = store.getState().active.map((c) => costItemId(c.cost))
+    for (const id of ids) expect(['sword_3', 'sword_4', 'sword_5']).toContain(id)
+    expect(new Set(ids).size).toBe(3) // 서로 다른 제안
+    expect(store.getState().nextSpawnAt).toBeNull() // 세션이 떠 있음 → 정지
+    // 세션이 떠 있는 동안은 시간이 흘러도 보충하지 않는다(트리클 아님).
     vi.advanceTimersByTime(10_000)
-    expect(store.getState().active).toHaveLength(3) // 3번째 등장 → 꽉 참
-    expect(store.getState().nextSpawnAt).toBeNull() // 꽉 차서 정지
+    expect(store.getState().active).toHaveLength(3)
+    store.getState().stop()
+  })
+
+  it('제안 하나를 선택(fulfill)하면 나머지 제안까지 모두 사라지고 세션이 끝난다', () => {
+    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
+    store.getState().start()
+    expect(store.getState().active).toHaveLength(3)
+    const target = store.getState().active[0]
+    // 고른 제안의 납품 재료만 보유시킨다.
+    useGameStore.setState({
+      currentSwordId: null,
+      items: [{ itemId: costItemId(target.cost), count: 1 }],
+      gold: 0,
+    })
+    expect(store.getState().fulfill(target.id)).toBe(true)
+    expect(store.getState().active).toHaveLength(0) // 세션 전체 종료(나머지도 사라짐)
     store.getState().stop()
   })
 
@@ -184,7 +200,7 @@ describe('commissionStore — 단일 스폰 타이머', () => {
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
     expect(useGameStore.getState().gold).toBe(goldOf(target.reward))
-    expect(store.getState().active.some((c) => c.id === target.id)).toBe(false)
+    expect(store.getState().active).toHaveLength(0) // 세션 전체 종료
     store.getState().stop()
   })
 
@@ -230,7 +246,6 @@ describe('commissionStore — 단일 스폰 타이머', () => {
   // 물물교환 의뢰 전용 설정: 형광물질 2개 납품 → sword_12 1개 지급(아이템 보상).
   const BARTER: CommissionConfig = {
     maxCommissions: 1,
-    initialSpawnCount: 1,
     tickIntervalMs: 250,
     buckets: [
       {

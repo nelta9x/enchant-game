@@ -46,7 +46,6 @@ function bucket(over: Record<string, unknown> = {}): Record<string, unknown> {
 function cfg(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     maxCommissions: 3,
-    initialSpawnCount: 2,
     tickIntervalMs: 250,
     buckets: [bucket()],
     ...over,
@@ -75,7 +74,6 @@ describe('parseCommissionConfig — 구조 검증', () => {
     }
     expect(parse()).toEqual({
       maxCommissions: 3,
-      initialSpawnCount: 2,
       tickIntervalMs: 250,
       buckets: [
         {
@@ -102,7 +100,7 @@ describe('parseCommissionConfig — 구조 검증', () => {
   it('글로벌 필드 누락/비숫자/비유한 값은 throw', () => {
     expect(() => parse({ maxCommissions: 'x' })).toThrow()
     expect(() => parse({ tickIntervalMs: Infinity })).toThrow()
-    expect(() => parse({ initialSpawnCount: undefined })).toThrow()
+    expect(() => parse({ maxCommissions: undefined })).toThrow()
   })
 
   it('정수여야 하는 글로벌 필드에 소수가 오면 throw', () => {
@@ -118,18 +116,6 @@ describe('parseCommissionConfig — 글로벌 의미 검증', () => {
 
   it('tickIntervalMs <= 0 이면 throw', () => {
     expect(() => parse({ tickIntervalMs: 0 })).toThrow()
-  })
-
-  it('initialSpawnCount > maxCommissions 이면 throw', () => {
-    expect(() => parse({ initialSpawnCount: 4 })).toThrow()
-  })
-
-  it('initialSpawnCount 는 0 을 허용한다', () => {
-    expect(parse({ initialSpawnCount: 0 }).initialSpawnCount).toBe(0)
-  })
-
-  it('initialSpawnCount 가 음수면 throw', () => {
-    expect(() => parse({ initialSpawnCount: -1 })).toThrow()
   })
 })
 

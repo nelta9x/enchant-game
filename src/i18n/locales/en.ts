@@ -45,7 +45,7 @@ export const en: Record<TranslationKey, string> = {
   'commission.title': 'Trade Offers',
   'commission.reward': 'Reward',
   'commission.fulfill': 'Accept',
-  'commission.arrived': 'New trade offer!',
+  'commission.arrived': 'New trade offers!',
 
   // 강화 결과 토스트
   'toast.success': 'Enchanted',

@@ -217,7 +217,7 @@ function parseBucket(
 }
 
 // 순수 검증기: 임의 입력(unknown)을 검증된 CommissionConfig 로 변환한다.
-// 글로벌 시스템 파라미터(maxCommissions/initialSpawnCount/tickIntervalMs) + 골드 버킷 정의(buckets[])를 검증한다.
+// 글로벌 시스템 파라미터(maxCommissions=세션 크기 / tickIntervalMs) + 골드 버킷 정의(buckets[])를 검증한다.
 // knownItemIds: 출제 가능 itemId 집합(판매 가능 검 ∪ 아이템 카탈로그) — 버킷 itemId 무결성 검증에 쓴다.
 export function parseCommissionConfig(
   raw: unknown,
@@ -225,12 +225,10 @@ export function parseCommissionConfig(
 ): CommissionConfig {
   if (!isRecord(raw)) fail('config root must be an object')
 
+  // maxCommissions = 한 세션에 한 번에 출제되는 제안 수(세션 크기). 풀의 서로 다른 항목 수가 이보다 적으면
+  // 있는 만큼만 출제하므로(min), 여기서는 1 이상만 강제한다(버킷별 항목 수와의 관계는 강제하지 않는다).
   const maxCommissions = intAtLeast(raw, 'maxCommissions', 1)
-  const initialSpawnCount = intAtLeast(raw, 'initialSpawnCount', 0)
   const tickIntervalMs = intAtLeast(raw, 'tickIntervalMs', 1)
-
-  if (initialSpawnCount > maxCommissions)
-    fail('initialSpawnCount must be <= maxCommissions')
 
   // buckets: 비어있지 않은 배열. 각 버킷은 parseBucket 으로 검증.
   const rawBuckets = raw.buckets
@@ -255,7 +253,7 @@ export function parseCommissionConfig(
   if (buckets[buckets.length - 1].maxGold !== null)
     fail('the last bucket maxGold must be null (spans to infinity)')
 
-  return { maxCommissions, initialSpawnCount, tickIntervalMs, buckets }
+  return { maxCommissions, tickIntervalMs, buckets }
 }
 
 // 게임 시작 시 호출되는 로드 진입점. 번들된 데이터 파일을 검증해 CommissionConfig 로 만든다.

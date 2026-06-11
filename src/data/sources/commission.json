@@ -1,6 +1,5 @@
 {
-  "maxCommissions": 1,
-  "initialSpawnCount": 1,
+  "maxCommissions": 3,
   "tickIntervalMs": 1000,
   "buckets": [
     {

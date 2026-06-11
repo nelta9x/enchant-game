@@ -31,12 +31,14 @@ function settingsOf(bucket: GoldBucket): BucketSettings {
 // (DataManager.ensureLoaded), 모듈 평가 시점에 즉시 도는 zustand 초기화에서는 읽지 않는다 — 초기 상태는
 // config 없는 빈 큐로 두고, start()(App useEffect → load 이후)에서 bootstrapCommissionQueue 로 재초기화한다.
 //
-// 출제 풀은 "보유 골드"가 고른다: 매 tick 현재 골드로 담당 버킷(currentBucket)을 골라 그 items[]·타이머로
-// 의뢰를 생성한다. 골드가 바뀌어 버킷이 달라지면 다음 스폰부터 반영된다(이미 발급된 의뢰는 freeze 유지).
+// 출제 풀은 "보유 골드"가 고른다: 매 tick 현재 골드로 담당 버킷(currentBucket)을 골라 그 items[] 을 제안 풀로
+// 삼는다. 세션이 시작될 때 spawnSession 이 그 풀에서 서로 다른 항목 maxCommissions 개를 골라 한 번에 출제한다.
+// 골드가 바뀌어 버킷이 달라지면 다음 세션부터 반영된다(이미 발급된 제안은 freeze 유지).
 //
 // 완료는 두 store 에 걸친 트랜잭션이다: PlayerState 변경(검 소모+골드)은 gameStore 가 소유하고,
-// 의뢰 생명주기(active 에서 제거 + 재생성 예약)는 여기가 소유한다 — gameStore 가 완료를 수락(true)할
-// 때만 complete 를 적용해 두 store 의 일관성을 보장한다.
+// 제안 생명주기(선택 시 세션 전체 제거 + 다음 세션 예약)는 여기가 소유한다 — gameStore 가 완료를 수락(true)할
+// 때만 complete 를 적용해 두 store 의 일관성을 보장한다. complete 는 고른 제안만이 아니라 그 세션의 모든 제안을
+// 비운다(하나를 고르면 세션이 끝난다) — 나머지 제안은 비용 없이 사라지고 다음 tick 이 쿨다운을 세서 재시작한다.
 
 type CommissionActions = {
   // 주기 tick 시작(App 마운트 시 1회). 이미 돌고 있으면 무시. config 로 큐를 초기화한 뒤 첫 tick 을 돈다.
@@ -95,8 +97,8 @@ export function createCommissionStore(opts: CreateOpts = {}) {
       if (timer !== null) return
       const config = getConfig()
       const bucket = currentBucket(config)
-      // 부트스트랩으로 initialSpawnCount 개를 즉시 채운다. 이어지는 _tick 은 자리가 차 있으면 무발화
-      //  (initialSpawnCount>0 → nextSpawnAt 이 간격 뒤라 추가 스폰 없음), 0 이면 첫 1개를 즉시 등장시킨다.
+      // 부트스트랩으로 시작 즉시 첫 세션(제안 maxCommissions 개)을 채운다. 이어지는 _tick 은 세션이 떠 있으면
+      // 무발화(active>0 → nextSpawnAt=null 유지)다. 빈 바를 한 쿨다운 내내 두지 않으려는 선택.
       set(
         bootstrapCommissionQueue(
           now(),
@@ -104,7 +106,6 @@ export function createCommissionStore(opts: CreateOpts = {}) {
           buildPool(bucket),
           settingsOf(bucket),
           config.maxCommissions,
-          config.initialSpawnCount,
         ),
       )
       get()._tick()

@@ -99,8 +99,10 @@ export type CommissionItemEntry = {
 //  - minGold: 담당 골드 구간 하한(포함). 검증 전용 — 셀렉터는 maxGold 만 본다.
 //  - maxGold: 상한(미포함). null = ∞(마지막 버킷).
 //  - items: 이 버킷에서 출제될 아이템 목록(itemId + weight + 아이템별 incentive/additive). 비어있지 않음
-//  - durationMin/MaxMs: 의뢰 시간 제한 범위(생성 시 이 구간에서 무작위)
-//  - spawnIntervalMin/MaxMs: 의뢰 1개가 등장하는 간격 범위(이 구간에서 무작위)
+//  - durationMin/MaxMs: 제안 1건의 시간 제한 범위(생성 시 이 구간에서 무작위). 세션 내 각 제안은
+//    독립 만료한다(min==max 로 두면 세션이 통째로 같이 만료된다).
+//  - spawnIntervalMin/MaxMs: 세션과 세션 사이 쿨다운 범위(이 구간에서 무작위). 세션이 끝나면(선택 또는
+//    전부 만료) 이 간격만큼 비운 뒤 다음 세션이 시작된다.
 export type GoldBucket = {
   minGold: number
   maxGold: number | null
@@ -113,14 +115,14 @@ export type GoldBucket = {
 
 // 의뢰(Commission) 시스템 튜닝 설정(언어 중립). 코드 상수가 아니라 데이터 파일(commission.json)에 두고
 // DataManager 가 로드 시 검증한다. 순수 reducer(commissionQueue)는 이 값을 인자로 주입받아 쓴다.
-// 시스템 파라미터(아래 3개)는 버킷과 무관한 글로벌이고, 나머지 튜닝값은 전부 buckets[] 안에 골드 구간별로 둔다.
-//  - maxCommissions: 동시 유지 의뢰 수(꽉 차면 스폰 타이머가 멈춘다)
-//  - initialSpawnCount: 시작 시 즉시 등장시킬 의뢰 수(0~maxCommissions). 나머지는 spawnInterval 간격으로 채운다.
-//  - tickIntervalMs: 셸(commissionStore)이 시간을 전진시키는 주기(만료/스폰 감지 해상도)
+// 시스템 파라미터(아래 2개)는 버킷과 무관한 글로벌이고, 나머지 튜닝값은 전부 buckets[] 안에 골드 구간별로 둔다.
+//  - maxCommissions: 한 "제안 세션"에 한 번에 출제되는 제안 수(=세션 크기). 세션 발생 시 서로 다른 제안을
+//    이만큼 한 번에 출제하고, 풀의 서로 다른 항목 수가 이보다 적으면 있는 만큼만 낸다(min). 플레이어가 그중
+//    하나를 선택(납품)하면 나머지가 사라지며 세션이 끝나고, spawnInterval 쿨다운 뒤 다음 세션이 시작된다.
+//  - tickIntervalMs: 셸(commissionStore)이 시간을 전진시키는 주기(만료/세션 시작 감지 해상도)
 //  - buckets: 보유 골드 구간별 정의([0,∞) 를 덮는 연속 버킷 — buckets[0] 이 골드 0 구간).
 export type CommissionConfig = {
   maxCommissions: number
-  initialSpawnCount: number
   tickIntervalMs: number
   buckets: GoldBucket[]
 }
