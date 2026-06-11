@@ -1,88 +1,59 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import {
   ENHANCE_HOTKEY_CODE,
   isDesktopPointer,
   isEnhanceHotkeyContext,
   isEnhanceHotkeyEvent,
 } from '../lib/hotkeys'
+import { useRepeatEngine } from './useRepeatEngine'
 
 // 데스크탑에서 스페이스바로 강화를 실행하는 전역 단축키 훅(요청: "데스크탑 환경에서 스페이스 = 강화").
 // - 데스크탑(정밀 포인터+호버) 환경에서만 리스너를 부착 — 터치 전용 기기는 제외.
 // - enabled=false(예: 상점 열림)면 부착하지 않아 모달 내부의 네이티브 스페이스 동작을 보존한다.
 // - preventDefault 로 스페이스 기본 동작(페이지 스크롤 + 포커스된 버튼 활성)을 막는다 — 포커스 위치와
 //   무관하게 정확히 강화만 실행된다(Enter 는 그대로 포커스된 컨트롤을 활성 → 접근성 보존).
-// - 꾹 누름 = 연사: 누른 동안 자체 타이머로 강화를 반복 시도한다(OS 키반복에 의존하지 않아 지연·환경차 없음).
-//   각 시도는 버튼과 동일 게이트(disabled = 강화 불가/연출 잠금)를 따른다. 실제 연사 박자는 강화 잠금
-//   (lockMs = 버스트 + 재강화 가드, 매회 떨림 길이에 따라 다름)이 정하고, 아래 min-gap 은 그 잠금이 React
-//   커밋보다 늦게 반영되는 짧은 틈에 같은 입력이 이중 발사되는 것만 막는 고정 안전 바닥이다.
+// - 꾹 누름 = 연사: 누른 동안 강화를 반복 시도한다(OS 키반복에 의존하지 않아 지연·환경차 없음).
+//   발사 게이트·폴링·min-gap 박자는 공유 연사 엔진(useRepeatEngine)이 소유한다 — 마우스
+//   press-and-hold(useHoldRepeat)와 같은 박자로 흐른다. 이 훅은 키 이벤트를 엔진에 배선만 한다.
 type UseEnhanceHotkeyOptions = {
   enabled: boolean
   disabled: boolean
   onEnhance: () => void
 }
 
-// 꾹 누름 동안 강화 가능 여부를 살피는 폴링 주기(ms) — 잠금이 풀리는 즉시 다음 발사를 잡아낼 만큼 촘촘하게.
-const REPEAT_POLL_MS = 50
-
-// 연속 발사 사이 최소 간격(ms) — 이중 발사 가드 전용 고정 바닥. 실제 페이싱은 강화 잠금(연출 타임라인의
-// lockMs, 최소 떨림에서도 ~수백 ms)이 담당하므로 이 값은 그 잠금보다 충분히 짧게 둔다(잠금이 늘 우선).
-// disabled 가 커밋보다 늦게 갱신돼도 이보다 빨리는 두 번 쏘지 않는다.
-const REPEAT_MIN_GAP_MS = 350
-
 export function useEnhanceHotkey({
   enabled,
   disabled,
   onEnhance,
 }: UseEnhanceHotkeyOptions) {
-  // 최신 disabled/onEnhance 를 ref 로 고정 — 0.4s 잠금 토글마다 리스너·연사 타이머를 재부착하지 않는다.
-  // 리스너는 발생 시점에 ref.current 를 읽으므로 렌더 후 effect 로 갱신해도 안전하다(useActionHotkeys 와 동일).
-  const stateRef = useRef({ disabled, onEnhance })
-  useEffect(() => {
-    stateRef.current = { disabled, onEnhance }
-  })
+  // 발사 정책(disabled 게이트·min-gap)은 공유 엔진이 소유. 엔진 핸들은 정체성이 안정적이라
+  // 아래 effect deps 에 넣어도 잠금 토글마다 리스너가 재부착되지 않는다.
+  const engine = useRepeatEngine({ disabled, onFire: onEnhance })
 
   useEffect(() => {
     if (!enabled || !isDesktopPointer()) return
-    let timer: ReturnType<typeof setInterval> | null = null
-    let lastFireAt = -Infinity // 직전 발사 시각(performance.now). min-gap 판정용.
-
-    // 잠금/불가가 아니고 직전 발사 후 최소 간격이 지났으면 강화 1회(버튼과 동일 게이트). 아니면 다음 폴에 재시도.
-    const tryEnhance = () => {
-      if (stateRef.current.disabled) return
-      const now = performance.now()
-      if (now - lastFireAt < REPEAT_MIN_GAP_MS) return
-      lastFireAt = now
-      stateRef.current.onEnhance()
-    }
-    const stopRepeat = () => {
-      if (timer !== null) {
-        clearInterval(timer)
-        timer = null
-      }
-    }
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isEnhanceHotkeyContext(e)) return
       e.preventDefault() // 스크롤·포커스된 버튼의 스페이스 활성 차단(꾹 누름 반복 포함).
-      if (!isEnhanceHotkeyEvent(e)) return // OS 키반복은 무시 — 연사는 아래 타이머가 구동.
-      if (timer !== null) return // 이미 홀드 중(중복 keydown 방어).
-      tryEnhance() // 첫 눌림 즉시 1회.
-      timer = setInterval(tryEnhance, REPEAT_POLL_MS) // 이후 잠금 풀릴 때마다 연사.
+      if (!isEnhanceHotkeyEvent(e)) return // OS 키반복은 무시 — 연사는 엔진 타이머가 구동.
+      if (!engine.startHold()) return // 이미 홀드 중(중복 keydown 방어).
+      engine.fireOnce() // 첫 눌림 즉시 1회(이후는 폴링이 잠금 풀릴 때마다 연사).
     }
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === ENHANCE_HOTKEY_CODE) stopRepeat()
+      if (e.code === ENHANCE_HOTKEY_CODE) engine.stopHold()
     }
     // 포커스 이탈(Alt+Tab 등으로 keyup 누락 가능) 시 연사를 멈춰 폭주를 막는다.
-    const onBlur = () => stopRepeat()
+    const onBlur = () => engine.stopHold()
 
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
     window.addEventListener('blur', onBlur)
     return () => {
-      stopRepeat()
+      engine.stopHold()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
     }
-  }, [enabled])
+  }, [enabled, engine])
 }
