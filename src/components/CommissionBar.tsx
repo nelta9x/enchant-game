@@ -68,6 +68,12 @@ export function CommissionBar({
     (_, i) => active[i] ?? null,
   )
 
+  // 제안 잠금 게이트(스토어와 동일 기준: 도달 강화 레벨 maxLevelReached >= unlockAtLevel). 잠금 중엔
+  // 스토어가 active 를 비워 두지만(출제 안 함), 빈 바 영역까지 통째로 숨겨 초반 내내 "제안" 리전이
+  // 노출되지 않게 한다. 단조라 한 번 해제되면 다시 잠기지 않는다.
+  const maxLevelReached = useGameStore((s) => s.maxLevelReached)
+  const locked = maxLevelReached < config.unlockAtLevel
+
   // 키보드(1·2·3) 납품 시 코인 연출의 출발점이 될 카드 DOM 을 슬롯 인덱스로 찾기 위한 컨테이너(클릭 경로는 currentTarget 사용).
   const slotsRef = useRef<HTMLDivElement>(null)
   const onSlot = useCallback(
@@ -86,6 +92,9 @@ export function CommissionBar({
     [active, canFulfill, onFulfill],
   )
   useCommissionHotkey({ enabled: hotkeysEnabled, onSlot })
+
+  // 잠금 중이면 바 영역을 통째로 렌더하지 않는다(훅은 위에서 모두 호출한 뒤 — 훅 순서 불변).
+  if (locked) return null
 
   return (
     <div

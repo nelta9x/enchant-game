@@ -130,10 +130,15 @@ export type GoldBucket = {
 //    이만큼 한 번에 출제하고, 풀의 서로 다른 항목 수가 이보다 적으면 있는 만큼만 낸다(min). 플레이어가 그중
 //    하나를 선택(납품)하면 나머지가 사라지며 세션이 끝나고, spawnInterval 쿨다운 뒤 다음 세션이 시작된다.
 //  - tickIntervalMs: 셸(commissionStore)이 시간을 전진시키는 주기(만료/세션 시작 감지 해상도)
+//  - unlockAtLevel: 제안 기능이 활성화되는 최소 "도달 강화 레벨"(gameStore.maxLevelReached 기준, 단조 high-water-mark).
+//    플레이어가 이 레벨에 한 번이라도 도달하기 전에는 제안이 전혀 출제되지 않는다(초반엔 재화가 없어 활용 불가 — 의도된 잠금).
+//    maxLevelReached 는 파괴·판매로 내려가지 않으므로(달성=영구) 한 번 해제되면 다시 잠기지 않는다. 0 = 처음부터 활성.
+//    데이터 파일(commission.json)에서 조절한다(코드 상수 아님).
 //  - buckets: 보유 골드 구간별 정의([0,∞) 를 덮는 연속 버킷 — buckets[0] 이 골드 0 구간).
 export type CommissionConfig = {
   maxCommissions: number
   tickIntervalMs: number
+  unlockAtLevel: number
   buckets: GoldBucket[]
 }
 

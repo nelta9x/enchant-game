@@ -71,6 +71,14 @@ export function createCommissionStore(opts: CreateOpts = {}) {
     opts.config ?? dataManager.getCommissionConfig()
   // setInterval 핸들은 store 상태가 아니라 클로저에 둔다(직렬화/구독 대상 아님).
   let timer: ReturnType<typeof setInterval> | null = null
+  // 잠금 해제 후 "첫 세션을 채웠는지" 일방향 래치(타이머와 같은 클로저 상태). maxLevelReached 는 단조라
+  // 잠금→해제는 한 번뿐이므로 해제 시 한 번만 부트스트랩하고 이후엔 일반 tick 으로 굴린다. start/stop 에서 리셋.
+  let bootstrapped = false
+
+  // 제안 활성화 게이트: 도달 강화 레벨(maxLevelReached, 단조)이 설정 임계(unlockAtLevel) 이상이면 활성.
+  // gold 와 마찬가지로 gameStore 에서 매 tick 새로 읽는다(달성 즉시 다음 tick 에 반영).
+  const isUnlocked = (config: CommissionConfig): boolean =>
+    useGameStore.getState().maxLevelReached >= config.unlockAtLevel
 
   // 현재 보유 골드가 담당하는 버킷을 읽는다. 매 tick 새로 읽어 골드 변동이 다음 스폰부터 반영된다.
   // 로더가 보장(정렬·연속·첫 minGold=0·마지막 maxGold=null)하므로 "maxGold 가 null 이거나 gold < maxGold 인
@@ -96,19 +104,23 @@ export function createCommissionStore(opts: CreateOpts = {}) {
     start: () => {
       if (timer !== null) return
       const config = getConfig()
-      const bucket = currentBucket(config)
-      // 부트스트랩으로 시작 즉시 첫 세션(제안 maxCommissions 개)을 채운다. 이어지는 _tick 은 세션이 떠 있으면
-      // 무발화(active>0 → nextSpawnAt=null 유지)다. 빈 바를 한 쿨다운 내내 두지 않으려는 선택.
-      set(
-        bootstrapCommissionQueue(
-          now(),
-          rng,
-          buildPool(bucket),
-          settingsOf(bucket),
-          config.maxCommissions,
-        ),
-      )
-      get()._tick()
+      bootstrapped = false
+      // 시작 시점에 이미 해제됐으면(예: 도달 레벨이 임계 이상) 즉시 첫 세션을 채운다 — 빈 바를 한 쿨다운
+      // 내내 두지 않으려는 선택. 아직 잠겨 있으면 초기 빈 상태(active:[]) 그대로 두고 타이머만 켠다.
+      // 그러면 해제되는 첫 _tick 이 부트스트랩한다(아래). 어느 쪽이든 잠금 중엔 set 을 하지 않아 리렌더 0.
+      if (isUnlocked(config)) {
+        const bucket = currentBucket(config)
+        set(
+          bootstrapCommissionQueue(
+            now(),
+            rng,
+            buildPool(bucket),
+            settingsOf(bucket),
+            config.maxCommissions,
+          ),
+        )
+        bootstrapped = true
+      }
       timer = setInterval(() => get()._tick(), config.tickIntervalMs)
     },
 
@@ -117,12 +129,30 @@ export function createCommissionStore(opts: CreateOpts = {}) {
         clearInterval(timer)
         timer = null
       }
+      bootstrapped = false
       set({ active: [], nextSpawnAt: null, nextId: 1 })
     },
 
     _tick: () => {
       const config = getConfig()
+      // 잠금 중이면 아무것도 하지 않는다 — 초기 빈 상태(active:[], nextSpawnAt:null)를 그대로 두므로
+      // set 호출이 없어 구독자 리렌더가 발생하지 않는다(잠금 구간이 길어도 비용 0). 풀 조립도 건너뛴다.
+      if (!isUnlocked(config)) return
       const bucket = currentBucket(config)
+      if (!bootstrapped) {
+        // 해제 직후 첫 tick — start 가 잠금 상태로 켜졌던 경로의 진입점. 즉시 첫 세션을 채운다(start 부트스트랩과 동일).
+        set(
+          bootstrapCommissionQueue(
+            now(),
+            rng,
+            buildPool(bucket),
+            settingsOf(bucket),
+            config.maxCommissions,
+          ),
+        )
+        bootstrapped = true
+        return
+      }
       const { state } = tick(
         get(),
         now(),
