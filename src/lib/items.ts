@@ -1,12 +1,15 @@
 import { dataManager } from '../data/DataManager'
 import { PROTECTION_TICKET_ID } from '../game/enhancer'
 import type { TranslationKey } from '../i18n'
-import type { ItemStack } from '../game/types'
 
 // 파괴보호장치 itemId 의 정식 출처는 엔진(enhancer)이다. 엔진은 DataManager 비의존이라
 // 상수를 거기 두고, 뷰·아이템 어휘 계층은 엔진을 직접 import 하지 않고 이 허브를
 // 통해 같은 상수를 참조한다(재노출).
 export { PROTECTION_TICKET_ID }
+
+// 보유 수량 조회(countOf)의 정식 출처는 게임 도메인(game/inventory — 엔진과 공유)이다.
+// PROTECTION_TICKET_ID 와 같은 이유로 이 허브를 통해 재노출한다.
+export { countOf } from '../game/inventory'
 
 // 파괴보호장치 표시명 키 — carve-out. 상점 전용 아이템이라 의뢰 카탈로그(items.json)에 없고
 // basePrice 가 의미 없어 카탈로그에 넣지 않는다. 재료(철조각 등)는 items.json 카탈로그로 이관됐다.
@@ -24,11 +27,6 @@ const ITEM_SPRITES: Record<string, string> = {
 // 검(SwordData.sprite)은 호출 측이 따로 처리하므로 여기선 카탈로그(items.json) → 잔존 맵(파괴보호장치) 순으로 본다.
 export function itemSpriteName(itemId: string): string | undefined {
   return dataManager.getItemById(itemId)?.sprite ?? ITEM_SPRITES[itemId]
-}
-
-// 인벤토리에서 특정 itemId 보유 수량 조회(없으면 0).
-export function countOf(items: readonly ItemStack[], itemId: string): number {
-  return items.find((i) => i.itemId === itemId)?.count ?? 0
 }
 
 // itemId → 표시명. 검(getSwordById)은 검 이름으로, 재료(getItemById)는 카탈로그 nameKey로,

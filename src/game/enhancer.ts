@@ -1,4 +1,5 @@
 import type { SwordData } from '../data/types'
+import { countOf } from './inventory'
 import type { ConsumedMaterials, EnhanceResult, ItemStack } from './types'
 
 // 파괴보호장치 아이템 itemId 규약(게임 도메인 items 인벤토리와 동일).
@@ -10,10 +11,6 @@ export type EnhanceInput = {
   sword: SwordData
   supply: { gold: number; items: readonly ItemStack[] }
   useProtection?: boolean
-}
-
-function itemCount(items: readonly ItemStack[], itemId: string): number {
-  return items.find((i) => i.itemId === itemId)?.count ?? 0
 }
 
 // 강화 확률 엔진.
@@ -40,19 +37,16 @@ export class Enhancer {
     const cost = sword.enchantCost
     if (cost.kind === 'gold' && supply.gold < cost.amount)
       return `Insufficient gold: need ${cost.amount}, have ${supply.gold}`
-    if (
-      cost.kind === 'item' &&
-      itemCount(supply.items, cost.itemId) < cost.count
-    )
-      return `Insufficient material: need ${cost.count} x ${cost.itemId}, have ${itemCount(supply.items, cost.itemId)}`
+    if (cost.kind === 'item' && countOf(supply.items, cost.itemId) < cost.count)
+      return `Insufficient material: need ${cost.count} x ${cost.itemId}, have ${countOf(supply.items, cost.itemId)}`
 
     if (useProtection) {
       const pt = sword.protectionTickets
       // 'disabled'거나 0('-' = 해당 단계 방지 불가)이면 방지 사용 불가.
       if (pt === 'disabled' || pt === 0)
         return `Protection is not available at this stage (level ${sword.level})`
-      if (itemCount(supply.items, PROTECTION_TICKET_ID) < pt)
-        return `Insufficient protection tickets: need ${pt}, have ${itemCount(supply.items, PROTECTION_TICKET_ID)}`
+      if (countOf(supply.items, PROTECTION_TICKET_ID) < pt)
+        return `Insufficient protection tickets: need ${pt}, have ${countOf(supply.items, PROTECTION_TICKET_ID)}`
     }
 
     return null
