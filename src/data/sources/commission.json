@@ -1,6 +1,7 @@
 {
   "maxCommissions": 3,
   "tickIntervalMs": 1000,
+  "unlockAtLevel": 10,
   "buckets": [
     {
       "minGold": 0,

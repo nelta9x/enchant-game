@@ -47,6 +47,7 @@ function cfg(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     maxCommissions: 3,
     tickIntervalMs: 250,
+    unlockAtLevel: 10,
     buckets: [bucket()],
     ...over,
   }
@@ -75,6 +76,7 @@ describe('parseCommissionConfig — 구조 검증', () => {
     expect(parse()).toEqual({
       maxCommissions: 3,
       tickIntervalMs: 250,
+      unlockAtLevel: 10,
       buckets: [
         {
           minGold: 0,
@@ -107,6 +109,13 @@ describe('parseCommissionConfig — 구조 검증', () => {
     expect(() => parse({ maxCommissions: 2.5 })).toThrow()
     expect(() => parse({ tickIntervalMs: 12.5 })).toThrow()
   })
+
+  it('unlockAtLevel 은 필수다 — 누락/비숫자/비유한/소수면 throw', () => {
+    expect(() => parse({ unlockAtLevel: undefined })).toThrow()
+    expect(() => parse({ unlockAtLevel: 'x' })).toThrow()
+    expect(() => parse({ unlockAtLevel: Infinity })).toThrow()
+    expect(() => parse({ unlockAtLevel: 1.5 })).toThrow()
+  })
 })
 
 describe('parseCommissionConfig — 글로벌 의미 검증', () => {
@@ -116,6 +125,12 @@ describe('parseCommissionConfig — 글로벌 의미 검증', () => {
 
   it('tickIntervalMs <= 0 이면 throw', () => {
     expect(() => parse({ tickIntervalMs: 0 })).toThrow()
+  })
+
+  it('unlockAtLevel < 0 이면 throw, 0 은 허용(처음부터 활성)', () => {
+    expect(() => parse({ unlockAtLevel: -1 })).toThrow()
+    expect(parse({ unlockAtLevel: 0 }).unlockAtLevel).toBe(0)
+    expect(parse({ unlockAtLevel: 10 }).unlockAtLevel).toBe(10)
   })
 })
 
