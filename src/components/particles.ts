@@ -34,37 +34,3 @@ export function makeParticles(count: number): Particle[] {
     }
   })
 }
-
-// ── Hit 불꽃 스파크(망치가 검에 닿는 순간 1회) ───────────────────────────────────
-// 성공/실패 버스트(사방으로 균등하게 퍼지는 방사형)와 "다른 느낌"이어야 한다(요구사항) — 충돌점에서
-// 위쪽으로 튀어 오르는 불티 부채꼴이다. 방사형 대신 위쪽(−y) 중심의 좁은 부채꼴 + 작은 크기 + 짧은
-// 비행으로, 풀의 'hit' 모션이 중력 낙하·깜빡임(flicker)을 더해 모루에 쇠를 칠 때 튀는 불꽃처럼 보이게 한다.
-
-// 한 번의 임팩트에 튀는 불티 수(단계와 무관 — 임팩트는 항상 같은 한 번의 타격이다).
-export const HIT_SPARK_COUNT = 14
-// 불티 비행 시간(초) — 버스트(PARTICLE_DUR)보다 짧고 빠르게 사그라든다.
-export const HIT_SPARK_DUR = 0.5
-
-const HIT_FAN_DEG = 150 // 위쪽을 중심으로 한 부채꼴 폭(클수록 옆으로도 튄다)
-const HIT_DIST_MIN = 46 // 가장 가까운 불티의 도달 거리(px)
-const HIT_DIST_STEP = 22 // 거리 링 간격(인덱스로 순환 → 멀리 튀는 불티도 섞인다)
-
-// 충돌점에서 위쪽으로 튀어 오르는 불티 좌표를 결정적으로 생성한다(makeParticles 와 동일 원칙 — 인덱스 기반).
-// (x, y) 는 불티가 솟구치는 "정점" 방향이고, 실제 중력 낙하는 풀의 'hit' 모션이 그 아래로 더한다.
-export function makeHitSparks(count: number): Particle[] {
-  const n = Math.max(0, count)
-  const fanRad = (HIT_FAN_DEG * Math.PI) / 180
-  return Array.from({ length: n }, (_, i) => {
-    const t = n > 1 ? i / (n - 1) : 0.5 // 0..1 로 부채꼴을 고르게 채움
-    // −90°(똑바로 위) 중심으로 좌우 fan/2 만큼 펼치고, 교번 지터로 줄세움을 흩는다.
-    const angle = -Math.PI / 2 + (t - 0.5) * fanRad + (i % 2 ? 0.14 : -0.16)
-    const dist = HIT_DIST_MIN + (i % 4) * HIT_DIST_STEP // 46 / 68 / 90 / 112 px
-    const size = 3 + (i % 3) * 1.5 // 3 / 4.5 / 6 px — 버스트보다 작게(불티)
-    return {
-      x: Math.cos(angle) * dist,
-      y: Math.sin(angle) * dist, // 위쪽이라 음수
-      size,
-      stagger: (i % 4) * 0.012,
-    }
-  })
-}

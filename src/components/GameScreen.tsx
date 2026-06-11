@@ -26,7 +26,7 @@ import { dropAppearSec, dropLifetimeMs } from './drops'
 import { ItemFlight, ITEM_FLIGHT_MS, type ItemFlightEvent } from './ItemFlight'
 import { HammerStrike, type HammerStrikeEvent } from './HammerStrike'
 import { hammerStrikeMs } from './hammerTiming'
-import { HitSparkEffect } from './HitSparkEffect'
+import { HitSparkCanvas } from './HitSparkCanvas'
 import { ParticleEmitProvider, ParticlePool } from './ParticlePool'
 import { computeEnhanceTimeline, rollShakeMs } from './enhanceTimeline'
 import { EnhanceButton } from './EnhanceButton'
@@ -350,7 +350,7 @@ export function GameScreen() {
     sound.playSfx('enhance', { delayMs: tl.impactMs })
 
     // 망치 내려치기 연출 — 결과와 무관하게 강화 시도마다 검 위로 호라드릭 망치가 내리꽂힌다(잠금X·병렬).
-    // 이 이벤트가 HitSparkEffect 의 불꽃 트리거도 겸한다(임팩트 = 닿는 순간). 잠금은 아래 enhanceLock 전담.
+    // 이 이벤트가 HitSparkCanvas 의 불꽃 트리거도 겸한다(임팩트 = 닿는 순간). 잠금은 아래 enhanceLock 전담.
     enqueueEffect({
       kind: 'hammerStrike',
       exclusive: false,
@@ -654,14 +654,18 @@ export function GameScreen() {
                     {successEvents.map((ev) => (
                       <SuccessEffect key={ev.id} event={ev} />
                     ))}
-                    {/* 망치는 결과 연출 위(전면)에 그려 내려치는 순간이 가려지지 않게 한다. impactMs 로 닿는
-                        시점을 데이터에서 받는다(떨림·불꽃·타격음과 동일 앵커). */}
-                    <HammerStrike
+                    {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 용접식 불티를 캔버스에 1회 분출.
+                        가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 DOM 풀).
+                        ⚠️ 망치보다 "앞"(DOM 위)에 둬 불티가 망치 뒤로 깔리게 한다 — 불티는 임팩트 중심에서
+                        솟구치고 망치 머리도 같은 중심에 닿으므로, 불티가 망치 위면 머리를 가린다. paint order
+                        의존을 의도적으로 고정(아래 HammerStrike 가 나중 형제라 불티 위에 그려진다). */}
+                    <HitSparkCanvas
                       event={hammerStrikeEvent}
                       impactMs={anim.hammerImpactMs}
                     />
-                    {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 충돌 불티를 풀로 1회 분출(DOM 없음). */}
-                    <HitSparkEffect
+                    {/* 망치는 결과 연출·불꽃 위(전면)에 그려 내려치는 순간이 가려지지 않게 한다. impactMs 로
+                        닿는 시점을 데이터에서 받는다(떨림·불꽃·타격음과 동일 앵커). */}
+                    <HammerStrike
                       event={hammerStrikeEvent}
                       impactMs={anim.hammerImpactMs}
                     />

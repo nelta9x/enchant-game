@@ -59,7 +59,6 @@ export function ShakeBurstEffect({
         particles: makeParticles(particleCount),
         coreVar,
         edgeVar,
-        kind: 'burst',
       })
     }, burstAtMs)
     return () => clearTimeout(tid)

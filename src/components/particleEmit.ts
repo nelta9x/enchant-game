@@ -2,15 +2,15 @@ import { createContext, useCallback, useContext, type RefObject } from 'react'
 import type { Particle } from './particles'
 
 // 파티클 풀의 emit 컨텍스트(비-컴포넌트 모듈) — 풀(ParticlePool)이 자신의 emit 을 ref 에 등록하고, 소비자
-// (HitSparkEffect·버스트 경로)는 useParticleEmit 으로 그 ref 를 통해 호출한다. 컨텍스트·훅·타입을 컴포넌트
+// (성공/파괴 버스트 경로)는 useParticleEmit 으로 그 ref 를 통해 호출한다. 컨텍스트·훅·타입을 컴포넌트
 // 파일에서 분리해 둔다(react-refresh: 컴포넌트 파일은 컴포넌트만 export).
 
 // 한 번에 그릴 파티클 1개 묶음 — particles.ts 의 순수 좌표(Particle)를 그대로 쓴다.
+// (성공/파괴 버스트 전용 — Hit 불꽃은 캔버스(HitSparkCanvas)로 분리돼 이 풀을 쓰지 않는다.)
 export type ParticleEmitSpec = {
-  particles: Particle[] // 사방/위쪽으로 튀는 좌표(makeParticles / makeHitSparks)
+  particles: Particle[] // 중심에서 사방으로 튀는 좌표(makeParticles)
   coreVar: string // 밝은 코어 색(CSS var 또는 색 문자열)
   edgeVar: string // 가장자리 색
-  kind: 'burst' | 'hit' // 'burst' = 방사형 성공/파괴, 'hit' = 위로 튀는 불티(중력 낙하·섬광만)
   delaySec?: number // 전체 재생 지연(기본 0) + 파티클별 stagger 가 더해진다
 }
 
