@@ -100,18 +100,6 @@ function parseBucket(
     if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0)
       fail(`${iw}.weight must be a finite number > 0 (got ${String(weight)})`)
 
-    // 항목 전용 시간 제한(선택) — 둘 다 있거나 둘 다 없음(하나만 있으면 iint 가 누락 쪽에서 실패).
-    let durationMinMs: number | undefined
-    let durationMaxMs: number | undefined
-    if (it.durationMinMs !== undefined || it.durationMaxMs !== undefined) {
-      durationMinMs = iint('durationMinMs', 1)
-      durationMaxMs = iint('durationMaxMs', 1)
-      if (durationMinMs > durationMaxMs)
-        fail(`${iw}.durationMinMs must be <= durationMaxMs`)
-    }
-    const durOverride =
-      durationMinMs !== undefined ? { durationMinMs, durationMaxMs } : {}
-
     // 보상 종류 — 누락 시 'gold'(기존 의뢰는 incentive/additive 만 두면 된다).
     const rewardKind = it.rewardKind === undefined ? 'gold' : it.rewardKind
     if (rewardKind !== 'gold' && rewardKind !== 'item')
@@ -156,7 +144,6 @@ function parseBucket(
       const rewardItemCount = iint('rewardItemCount', 1)
       return {
         weight,
-        ...durOverride,
         ...costFields,
         rewardKind,
         rewardItemId,
@@ -178,7 +165,6 @@ function parseBucket(
 
     return {
       weight,
-      ...durOverride,
       ...costFields,
       rewardKind,
       incentiveMin,

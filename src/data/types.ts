@@ -81,10 +81,6 @@ export type AnimationConfig = {
 // (costKind/rewardKind 누락 시 로더가 각각 'item'/'gold' 로 정규화 — 기존 골드 의뢰는 itemId+incentive/additive 만 두면 된다.)
 export type CommissionItemEntry = {
   weight: number
-  // 선택: 이 항목 전용 시간 제한(둘 다 있거나 둘 다 없음). 없으면 버킷 기본 duration 을 쓴다.
-  // 물물교환처럼 특정 의뢰만 슬롯 점유를 짧게 두고 싶을 때 사용(버킷 전체 duration 은 그대로).
-  durationMinMs?: number
-  durationMaxMs?: number
 } & (
   | { costKind?: 'item'; itemId: string; requiredCount: number }
   | { costKind: 'gold'; costAmount: number }
@@ -109,8 +105,8 @@ export type CommissionItemEntry = {
 //  - minGold: 담당 골드 구간 하한(포함). 검증 전용 — 셀렉터는 maxGold 만 본다.
 //  - maxGold: 상한(미포함). null = ∞(마지막 버킷).
 //  - items: 이 버킷에서 출제될 아이템 목록(itemId + weight + 아이템별 incentive/additive). 비어있지 않음
-//  - durationMin/MaxMs: 제안 1건의 시간 제한 범위(생성 시 이 구간에서 무작위). 세션 내 각 제안은
-//    독립 만료한다(min==max 로 두면 세션이 통째로 같이 만료된다).
+//  - durationMin/MaxMs: 세션 1개의 시간 제한 범위(세션 시작 시 이 구간에서 한 번 무작위). 세션의 모든 제안이
+//    이 하나의 만료 시각을 공유해 통째로 같이 만료된다(통합 지속시간 — 카드별이 아니라 세션 1개 바로 표현).
 //  - spawnIntervalMin/MaxMs: 세션과 세션 사이 쿨다운 범위(이 구간에서 무작위). 세션이 끝나면(선택 또는
 //    전부 만료) 이 간격만큼 비운 뒤 다음 세션이 시작된다.
 export type GoldBucket = {

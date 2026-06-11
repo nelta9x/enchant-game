@@ -48,8 +48,6 @@ function entry(
     incentiveMax?: number
     additiveMin?: number
     additiveMax?: number
-    durationMinMs?: number
-    durationMaxMs?: number
   } = {},
 ): PoolEntry {
   const {
@@ -61,13 +59,10 @@ function entry(
     incentiveMax = 2.0,
     additiveMin = 0,
     additiveMax = 0,
-    durationMinMs,
-    durationMaxMs,
   } = over
   return {
     weight,
     cost: { kind: 'item', itemId, count: requiredCount },
-    ...(durationMinMs !== undefined ? { durationMinMs, durationMaxMs } : {}),
     rewardKind: 'gold',
     basePrice,
     incentiveMin,
@@ -179,6 +174,19 @@ describe('spawnSession — 한 세션 배치 출제', () => {
     }
   })
 
+  it('세션의 모든 제안은 하나의 통합 만료 시각을 공유한다(통합 지속시간)', () => {
+    // duration 범위를 min<max 로 두어 "한 번만 뽑아 전체 적용"인지(제안마다 따로 뽑지 않는지) 검증한다.
+    const settings: BucketSettings = { ...SETTINGS, durationMinMs: 10_000, durationMaxMs: 90_000 }
+    const { offers } = spawnSession(0, mulberry32(123), POOL3, settings, 3, 1)
+    expect(offers).toHaveLength(3)
+    // 전부 같은 createdAt/expiresAt — 세션 공통(관계 단언, 매직넘버 아님).
+    expect(new Set(offers.map((o) => o.createdAt)).size).toBe(1)
+    expect(new Set(offers.map((o) => o.expiresAt)).size).toBe(1)
+    // 만료는 [now+min, now+max] 범위 안.
+    expect(offers[0].expiresAt).toBeGreaterThanOrEqual(10_000)
+    expect(offers[0].expiresAt).toBeLessThanOrEqual(90_000)
+  })
+
   it('풀의 항목이 적으면 있는 만큼만 출제한다(short session)', () => {
     // 단일 항목 풀 → 1개.
     expect(spawnSession(0, RNG, POOL, SETTINGS, 3, 1).offers).toHaveLength(1)
@@ -259,22 +267,6 @@ describe('generateOne — 결정적 단건 생성 + 보상 공식(세션 내부 
     expect(c.cost).toEqual({ kind: 'item', itemId: 'faded_fluorescent', count: 2 })
     expect(c.reward).toEqual({ kind: 'item', itemId: 'sword_12', count: 1 })
     expect(c.expiresAt).toBe(1_000 + SETTINGS.durationMinMs) // min==max
-  })
-
-  it('항목 전용 duration 오버라이드가 있으면 버킷 기본값 대신 그 값으로 만료를 잡는다', () => {
-    const pool: PoolEntry[] = [
-      {
-        cost: { kind: 'item', itemId: 'x', count: 1 },
-        weight: 1,
-        durationMinMs: 5_000,
-        durationMaxMs: 5_000,
-        rewardKind: 'item',
-        rewardItemId: 'sword_1',
-        rewardItemCount: 1,
-      },
-    ]
-    const c = generateOne(pool, 1_000, mulberry32(1), SETTINGS)!
-    expect(c.expiresAt).toBe(1_000 + 5_000) // 버킷 100_000 이 아니라 항목 5_000
   })
 
   it('같은 시드는 같은 결과', () => {
@@ -413,19 +405,17 @@ describe('tick — 제안 세션 모델', () => {
     expect(s.nextSpawnAt).toBe(110_000)
   })
 
-  it('일부만 만료되면 남은 제안으로 세션이 계속된다(보충/쿨다운 없음)', () => {
-    // 항목 a 는 50_000 에 만료, b·c 는 100_000 에 만료(항목별 duration 오버라이드).
-    const staggerPool: PoolEntry[] = [
-      entry({ itemId: 'a', durationMinMs: 50_000, durationMaxMs: 50_000 }),
-      entry({ itemId: 'b' }),
-      entry({ itemId: 'c' }),
-    ]
-    const s = tickState(emptyCommissionQueue(0), 0, staggerPool)
-    const { state: s2, expired } = tick(s, 60_000, RNG, staggerPool, SETTINGS, SESSION)
-    expect(expired).toHaveLength(1) // a 만 만료
-    expect(s2.active).toHaveLength(2) // b·c 남음
-    expect(s2.nextSpawnAt).toBeNull() // 세션 계속 — 보충도 쿨다운도 없음
-    expect(checkInvariant(s2)).toBe(true)
+  it('세션은 통째로 만료된다(부분 만료 없음 — 모든 제안이 같은 만료를 공유)', () => {
+    // 만료 직전(99_999)엔 아무것도 만료되지 않고, 만료 시각(100_000)엔 세션 전체가 함께 빠진다.
+    const s = tickState(emptyCommissionQueue(0), 0) // 세션 3개, 공통 만료 100_000
+    expect(s.active).toHaveLength(3)
+    const before = tick(s, 99_999, RNG, POOL3, SETTINGS, SESSION)
+    expect(before.expired).toHaveLength(0) // 아직 아무도 만료 안 됨
+    expect(before.state.active).toHaveLength(3) // 세션 그대로
+    const at = tick(s, 100_000, RNG, POOL3, SETTINGS, SESSION)
+    expect(at.expired).toHaveLength(3) // 통째로 만료
+    expect(at.state.active).toHaveLength(0)
+    expect(checkInvariant(at.state)).toBe(true)
   })
 
   it('풀이 비면 세션 시작을 보류한다(즉시 재시도)', () => {

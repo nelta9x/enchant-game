@@ -388,42 +388,6 @@ describe('parseCommissionConfig — 물물교환(아이템 보상) 항목', () =
     expect(e.rewardKind).toBe('gold')
   })
 
-  it('항목 전용 duration 오버라이드를 파싱한다(min<=max)', () => {
-    const config = parse({
-      buckets: [
-        bucket({
-          items: [
-            itemRewardEntry({ durationMinMs: 20_000, durationMaxMs: 40_000 }),
-          ],
-        }),
-      ],
-    })
-    expect(config.buckets[0].items[0]).toMatchObject({
-      durationMinMs: 20_000,
-      durationMaxMs: 40_000,
-    })
-  })
-
-  it('항목 duration 이 min>max 이거나 한쪽만 있으면 throw', () => {
-    expect(() =>
-      parse({
-        buckets: [
-          bucket({
-            items: [
-              itemRewardEntry({ durationMinMs: 50_000, durationMaxMs: 40_000 }),
-            ],
-          }),
-        ],
-      }),
-    ).toThrow()
-    expect(() =>
-      parse({
-        buckets: [
-          bucket({ items: [itemRewardEntry({ durationMinMs: 20_000 })] }),
-        ],
-      }),
-    ).toThrow()
-  })
 })
 
 describe('loadCommission — 번들 데이터 진입점', () => {
