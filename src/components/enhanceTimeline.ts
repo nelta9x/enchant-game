@@ -1,4 +1,4 @@
-import type { AnimationConfig } from '../data/types'
+import type { AnimationConfig, ShakeBand } from '../data/types'
 import { PARTICLE_DUR } from './particles'
 
 // 강화 1회 연출의 "타임라인" 단일 출처(순수). 데이터(animation.json → AnimationConfig)의 시퀀스 타이밍 +
@@ -37,13 +37,29 @@ export type EnhanceTimeline = {
   protectedDurationMs: number // 방지(떨림만) 효과 durationMs — 떨림이 끝날 때까지
 }
 
+// 떨림 시간 범위(ms) — 강화 대상 검의 레벨로 고른 밴드의 [min, max]. rollShakeMs 가 이 범위에서 뽑는다.
+export type ShakeRange = { minMs: number; maxMs: number }
+
+// 검 레벨에 해당하는 떨림 밴드 범위를 고른다. 밴드는 레벨 [1, ∞) 를 덮는 연속 구간(로더가 강제)이라,
+// "레벨 이상인 첫 밴드"(maxLevel === null 이면 ∞)가 곧 담당 밴드다. 어떤 양수 레벨이든 마지막 밴드(=∞)에는
+// 반드시 걸리므로 find 가 비지 않지만, 방어적으로 마지막 밴드로 폴백한다.
+export function shakeRangeForLevel(
+  bands: ShakeBand[],
+  level: number,
+): ShakeRange {
+  const band =
+    bands.find((b) => b.maxLevel === null || level <= b.maxLevel) ??
+    bands[bands.length - 1]
+  return { minMs: band.minMs, maxMs: band.maxMs }
+}
+
 // 이번 강화의 떨림 시간(ms)을 [min, max] 구간에서 무작위로 뽑는다(정수, 양끝 포함). rng 주입 → 결정적 테스트.
-// min==max 면 항상 그 값(고정 떨림).
+// min==max 면 항상 그 값(고정 떨림). 범위는 호출부가 검 레벨로 미리 고른 밴드(shakeRangeForLevel)에서 온다.
 export function rollShakeMs(
-  anim: AnimationConfig,
+  range: ShakeRange,
   rng: () => number = Math.random,
 ): number {
-  const { weaponShakeMinMs: min, weaponShakeMaxMs: max } = anim
+  const { minMs: min, maxMs: max } = range
   return min + Math.floor(rng() * (max - min + 1))
 }
 

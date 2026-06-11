@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { dataManager } from '../data/DataManager'
+import type { AnimationConfig } from '../data/types'
 import { useActionHotkeys } from '../hooks/useActionHotkeys'
 import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useT, type TranslationKey } from '../i18n'
@@ -25,10 +26,18 @@ import { DropScatter, type DropEvent } from './DropScatter'
 import { dropAppearSec, dropLifetimeMs } from './drops'
 import { ItemFlight, ITEM_FLIGHT_MS, type ItemFlightEvent } from './ItemFlight'
 import { HammerStrike, type HammerStrikeEvent } from './HammerStrike'
-import { hammerStrikeMs } from './hammerTiming'
+import {
+  hammerStrikeMs,
+  type HammerShape,
+} from './hammerTiming'
+import { HammerTuningPanel, type HammerTuning } from './HammerTuningPanel'
 import { HitSparkCanvas } from './HitSparkCanvas'
 import { ParticleEmitProvider, ParticlePool } from './ParticlePool'
-import { computeEnhanceTimeline, rollShakeMs } from './enhanceTimeline'
+import {
+  computeEnhanceTimeline,
+  rollShakeMs,
+  shakeRangeForLevel,
+} from './enhanceTimeline'
 import { EnhanceButton } from './EnhanceButton'
 import {
   FloatingTextEffect,
@@ -111,7 +120,37 @@ export function GameScreen() {
 
   // 강화 연출 타이밍(망치 임팩트·떨림 범위·재강화 가드) — 데이터에서 1회 읽어 매 강화의 타임라인과
   // 임팩트 의존 props(망치·Hit 불꽃·보호 플레어)에 쓴다. load 이후라 안전(컴포넌트는 적재 후 렌더).
-  const anim = dataManager.getAnimation()
+  //
+  // DEV 타이밍 튜닝(단일 출처): 데이터 기본값으로 초기화한 useState 를 들고, DEV 패널이 라이브로 덮어쓴다.
+  // 프로덕션(패널 미렌더)에선 값이 데이터 기본 그대로라 동작 동일. anim(effectiveAnim) 과 hammerShape 를
+  // 여기 한 곳에서 만들어 모든 소비처(타임라인·플레어·불꽃·망치·잠금·방지 떨림)에 흘려 crossover 불일치 차단.
+  // 데이터(animation.json) — 망치 타이밍 기본값 + 떨림 레벨 밴드. 밴드는 패널이 만지지 않고 데이터 그대로 흐른다.
+  const dataAnim = useMemo(() => dataManager.getAnimation(), [])
+  const tuningDefaults = useMemo<HammerTuning>(
+    () => ({
+      impactMs: dataAnim.hammerImpactMs,
+      windupMs: dataAnim.hammerWindupMs,
+      holdAfterMs: dataAnim.hammerHoldAfterMs,
+      fadeoutMs: dataAnim.hammerFadeoutMs,
+      guardMs: dataAnim.reEnhanceGuardMs,
+    }),
+    [dataAnim],
+  )
+  const [tuning, setTuning] = useState<HammerTuning>(tuningDefaults)
+  // 망치 타이밍(impact/guard)은 패널에서, 떨림 밴드는 데이터에서. 매 강화는 검 레벨로 밴드를 골라 떨림을 뽑는다.
+  const anim: AnimationConfig = {
+    hammerImpactMs: tuning.impactMs,
+    hammerWindupMs: tuning.windupMs,
+    hammerHoldAfterMs: tuning.holdAfterMs,
+    hammerFadeoutMs: tuning.fadeoutMs,
+    reEnhanceGuardMs: tuning.guardMs,
+    shakeBands: dataAnim.shakeBands,
+  }
+  const hammerShape: HammerShape = {
+    windupSec: tuning.windupMs / 1000,
+    holdAfterSec: tuning.holdAfterMs / 1000,
+    fadeoutSec: tuning.fadeoutMs / 1000,
+  }
 
   // 보호 결계 상태(보호불가/부족/대기/발동) — 흩어진 조건 대신 순수 코어 한 곳에서 계산한다.
   // 검이 없으면 'disabled'(이 단계 보호 불가)로 본다. 실제 강화 적용 여부는 armed 일 때만.
@@ -192,9 +231,14 @@ export function GameScreen() {
   const [pricePopKey, setPricePopKey] = useState(0)
 
   // 직전 강화의 재강화 잠금 길이(ms) — 매 강화마다 떨림 길이에 따라 다르므로 버튼 충전 오버레이가 같은
-  // 길이로 걷히도록 보관한다(handleEnhance 가 타임라인 lockMs 로 갱신). 첫 강화 전엔 최소 떨림 기준 추정치.
+  // 길이로 걷히도록 보관한다(handleEnhance 가 타임라인 lockMs 로 갱신). 첫 강화 전엔 현재 검 레벨대의
+  // 최소 떨림 기준 추정치(검이 없으면 최저 레벨 밴드).
   const [lastLockMs, setLastLockMs] = useState(
-    () => computeEnhanceTimeline(anim, anim.weaponShakeMinMs).lockMs,
+    () =>
+      computeEnhanceTimeline(
+        anim,
+        shakeRangeForLevel(anim.shakeBands, sword?.level ?? 1).minMs,
+      ).lockMs,
   )
 
   // 강화 결과 플로팅 텍스트("아이구!..." 등) — 데이터(floatingText.json) 기반. 강화 결과(성공/실패/방지)를
@@ -329,7 +373,10 @@ export function GameScreen() {
     // 떨림 시간(shakeMs)을 1회 무작위로 뽑고, 데이터 타이밍과 합쳐 모든 마일스톤·수명을 도출한다. 아래
     // 모든 효과·사운드·공개 타이머·잠금이 이 한 객체의 슬라이스를 쓴다 — impact+shake 계산이 곳곳에서
     // 어긋나(= 강화 전/후 검 동시 노출 버그) 발생하지 않도록 한곳에서만 계산한다.
-    const tl = computeEnhanceTimeline(anim, rollShakeMs(anim))
+    // 떨림 범위는 강화 대상(강화 전) 검의 레벨대 밴드에서 고른다 — sword 는 이번 렌더의 currentSwordId
+    // 스냅샷이라 강화 전 검이다(검이 없으면 enhance() 가 이미 null 을 반환해 위에서 빠진다).
+    const shakeRange = shakeRangeForLevel(anim.shakeBands, sword?.level ?? 1)
+    const tl = computeEnhanceTimeline(anim, rollShakeMs(shakeRange))
     const burstAtSec = tl.burstAtMs / 1000
 
     // 결과 공개 지연: 강화 전 검을 떨림 동안 이름·스탯에 유지했다가, 떨림이 끝나는 순간(burstAt = revealAt)
@@ -355,7 +402,7 @@ export function GameScreen() {
       kind: 'hammerStrike',
       exclusive: false,
       locksEnhance: false,
-      durationMs: hammerStrikeMs(tl.impactMs),
+      durationMs: hammerStrikeMs(tl.impactMs, hammerShape),
     })
 
     // 강화 결과 플로팅 텍스트(데이터 기반) — 결과를 이벤트 키로 매핑해 후보 한 줄을 뽑아 검 중상단에
@@ -562,8 +609,11 @@ export function GameScreen() {
   const protectedFx = latestRunning(running, 'protectedShake')
   const shakeKey = protectedFx?.id ?? 0
   const shakeImpactSec = (protectedFx?.payload?.impactMs ?? 0) / 1000
+  // payload.shakeMs 가 실제 떨림 길이다(방지 효과가 돌 때만 의미). 폴백(효과 없음 → shakeKey 0 이라 안 흔듦)은
+  // 현재 검 레벨대의 최소 떨림이면 충분하다.
   const shakeDurationSec =
-    (protectedFx?.payload?.shakeMs ?? anim.weaponShakeMinMs) / 1000
+    (protectedFx?.payload?.shakeMs ??
+      shakeRangeForLevel(anim.shakeBands, sword?.level ?? 1).minMs) / 1000
 
   // 결과를 스크린리더에 알린다(시각 연출은 aria-hidden). 가장 최근 알림 대상 효과의 문구.
   let announceFx: { id: number; kind: string } | null = null
@@ -577,6 +627,14 @@ export function GameScreen() {
   // <lg(세로형)에선 베젤 프레임을 유지한다.
   return (
     <div className="flex min-h-svh items-center justify-center overflow-x-hidden overflow-y-auto bg-bezel p-3 sm:p-6 lg:p-0">
+      {/* DEV 전용 망치 타이밍 튜닝 패널 — import.meta.env.DEV 정적 분기라 프로덕션 빌드에선 통째로 제거된다. */}
+      {import.meta.env.DEV && (
+        <HammerTuningPanel
+          value={tuning}
+          defaults={tuningDefaults}
+          onChange={setTuning}
+        />
+      )}
       {/* lg+(데스크탑): 레이아웃은 고정 비율(좌 16rem · 가운데 28rem · 우 16rem)이며, 화면이 커지면
           루트 font-size 가 커져(아래 index.css clamp) rem 기반 UI 전체가 통째로 균일하게 스케일된다
           (가운데만 비어 보이던 1fr 제거 → 빈 공간이 비례적으로 늘지 않음). 컬럼 트랙은 justify-center 로
@@ -668,6 +726,7 @@ export function GameScreen() {
                     <HammerStrike
                       event={hammerStrikeEvent}
                       impactMs={anim.hammerImpactMs}
+                      shape={hammerShape}
                     />
                     {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
                     <FloatingTextEffect event={floatingText} />

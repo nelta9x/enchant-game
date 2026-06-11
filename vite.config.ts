@@ -13,6 +13,10 @@ import { viteSingleFile } from 'vite-plugin-singlefile'
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), viteSingleFile({ inlinePattern: [] })],
+  server: {
+    port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
+    strictPort: !!process.env.PORT,
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],

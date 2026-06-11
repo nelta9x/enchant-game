@@ -1,6 +1,12 @@
 {
   "hammerImpactMs": 360,
-  "weaponShakeMinMs": 200,
-  "weaponShakeMaxMs": 500,
-  "reEnhanceGuardMs": 100
+  "hammerWindupMs": 140,
+  "hammerHoldAfterMs": 100,
+  "hammerFadeoutMs": 120,
+  "reEnhanceGuardMs": 100,
+  "shakeBands": [
+    { "maxLevel": 10, "minMs": 100, "maxMs": 100 },
+    { "maxLevel": 20, "minMs": 500, "maxMs": 500 },
+    { "maxLevel": null, "minMs": 700, "maxMs": 700 }
+  ]
 }

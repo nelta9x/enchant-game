@@ -1,12 +1,15 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { itemSpriteUrl } from '../lib/sprites'
-import { computeHammerMotion, hammerStrikeMs } from './hammerTiming'
+import {
+  computeHammerMotion,
+  hammerStrikeMs,
+  type HammerShape,
+} from './hammerTiming'
 import { useOneShot } from './useOneShot'
 
 // 강화 "내려치기" 연출(프레젠테이션 전용) — 강화 시도마다(성공·파괴·방지 무관) 호라드릭 망치가
-// 오른쪽 위에 치켜들렸다가 빠르게 검으로 내리꽂고, 살짝 반동했다가 다시 오른쪽 위로 들어올려지며
-// 사라진다. 게임 로직과 분리되어 'hammerStrike' 이벤트(재생 id)에만 반응한다 — 결과가 무엇이었는지는
+// 오른쪽 위에 치켜들렸다가 빠르게 검으로 내리꽂고, 그 자리에서 바로 사라진다(회수 없음). 게임 로직과 분리되어 'hammerStrike' 이벤트(재생 id)에만 반응한다 — 결과가 무엇이었는지는
 // 모른 채 "내려치는 동작"만 그린다(성공·파괴·방지 공통). 타이밍/생명주기는 Effect 시스템(durationMs)이
 // 소유하고, useOneShot 이 혹시 남는 이벤트를 만료시킨다(백스톱 — 다른 연출과 동일 관례).
 //
@@ -30,9 +33,6 @@ const HOLD = { x: 196, y: -156 } // 살짝 더 당겨 든 윈드업(앤티시페
 // 임팩트 자세를 더 꺾으면(FOLLOW_TILT↑) 회전 중심 기준으로 머리가 좌하로 이동한다 — 그만큼 IMPACT 를
 // 우상으로 보정해 머리가 계속 마법진 정중앙에 닿게 한다(RECOIL·SETTLE 도 같은 델타로 이동).
 const IMPACT = { x: 24, y: -3 } // 내리꽂은 순간 — 망치 머리가 마법진(검 박스) 정중앙에 닿는다(더 꺾인 자세 보정)
-const RECOIL = { x: 50, y: -39 } // 임팩트 후 오른쪽 위로 살짝 튕겨 오름(반동) — IMPACT 기준 상대 오프셋 유지
-const SETTLE = { x: 30, y: -9 } // 반동 후 임팩트 부근으로 정착
-const LIFT = { x: 186, y: -150 } // 다시 오른쪽 위로 들어올려 사라짐
 const BASE_ROTATE = 0 // 임팩트 기준 자세(머리=위, 손잡이=아래). 키프레임의 +는 윈드업(뒤로 젖힘), -는 따라넘김
 const WINDUP_TILT = 56 // 치켜들 때 머리를 오른쪽으로 젖힌 정도(스윙 윈드업) — 클수록 크게 휘두름
 const FOLLOW_TILT = 56 // 임팩트에서 휘둘러 따라넘긴 정도(반대 방향 기울임) — 클수록 더 꺾인 타격 자세
@@ -53,12 +53,14 @@ export type HammerStrikeEvent = { id: number }
 export function HammerStrike({
   event,
   impactMs,
+  shape,
 }: {
   event: HammerStrikeEvent | null
   impactMs: number // 망치가 검에 닿기까지(데이터 hammerImpactMs) — 떨림·불꽃·타격음의 공통 앵커
+  shape?: HammerShape // 모션 모양(윈드업·정지·페이드아웃) — 미지정 시 hammerTiming 기본값
 }) {
-  const m = computeHammerMotion(impactMs / 1000)
-  const active = useOneShot(event, hammerStrikeMs(impactMs))
+  const m = computeHammerMotion(impactMs / 1000, shape)
+  const active = useOneShot(event, hammerStrikeMs(impactMs, shape))
 
   // 좁은(세로) 화면이면 치켜든 위치의 x 를 안쪽으로 줄여 화면 밖에서 시작하지 않게 한다(위 주석 참고).
   const narrowRaise = useMediaQuery(NARROW_RAISE_QUERY)
@@ -87,44 +89,41 @@ export function HammerStrike({
             }}
             animate={{
               // 치켜듦(START)→윈드업(HOLD) 대기 → 빠른 스냅으로 내리꽂아 따라넘김(-FOLLOW_TILT)·확대로
-              // 강타(IMPACT) → 반동(RECOIL) → 정착(SETTLE) → 다시 오른쪽 위로 젖히며 사라짐(LIFT).
-              x: [
-                raiseX(START.x),
-                raiseX(HOLD.x),
-                IMPACT.x,
-                RECOIL.x,
-                SETTLE.x,
-                raiseX(LIFT.x),
-              ],
-              y: [START.y, HOLD.y, IMPACT.y, RECOIL.y, SETTLE.y, LIFT.y],
+              // 강타(IMPACT) → 그 자리에서 페이드아웃(회수 없음).
+              x: [raiseX(START.x), raiseX(HOLD.x), IMPACT.x, IMPACT.x],
+              y: [START.y, HOLD.y, IMPACT.y, IMPACT.y],
               rotate: [
                 BASE_ROTATE + WINDUP_TILT,
                 BASE_ROTATE + WINDUP_TILT + 8,
                 BASE_ROTATE - FOLLOW_TILT,
-                BASE_ROTATE - 4,
-                BASE_ROTATE + 2,
-                BASE_ROTATE + WINDUP_TILT - 10,
+                BASE_ROTATE - FOLLOW_TILT,
               ],
-              scale: [0.9, 0.95, 1.08, 1.0, 1.0, 0.9],
-              opacity: [0, 1, 1, 1, 1, 0],
+              scale: [0.9, 0.95, 1.08, 1.08],
+              opacity: [0, 1, 1, 1, 0],
             }}
             transition={{
               duration: m.motionSec,
-              // 대기(0→holdUntil) → 스냅(→impact, easeIn 가속) → 반동 → 정착 → 들어올림.
+              // 대기(0→holdUntil) → 스냅(→impact, easeIn 가속) → 제자리 페이드아웃.
               times: [
                 0,
                 m.holdUntil / m.motionSec,
                 m.impactSec / m.motionSec,
-                m.recoilAt / m.motionSec,
-                m.settleAt / m.motionSec,
                 1,
               ],
-              ease: ['easeInOut', 'easeIn', 'easeOut', 'easeOut', 'easeIn'],
+              ease: ['easeInOut', 'easeIn', 'linear'],
               // opacity 는 위치 곡선과 분리한다 — 치켜든 동안에도 또렷이 보이도록 초반에 빠르게 켜고,
-              // 마지막 들어올림 구간에서만 끈다.
+              // 정지 구간 동안 유지했다가 페이드아웃. 페이드인 지점(0.12)은 임팩트보다 늦으면 times 가
+              // 비단조가 돼(motion 거부) — DEV 튜닝으로 임팩트를 짧게/정지·페이드를 길게 끌면 발생하므로
+              // 임팩트 비율로 클램프한다(위치 times 는 holdUntil≤impact≤motion 이라 이미 안전, opacity 만 보정).
               opacity: {
                 duration: m.motionSec,
-                times: [0, 0.12, 0.3, 0.5, m.settleAt / m.motionSec, 1],
+                times: [
+                  0,
+                  Math.min(0.12, m.impactSec / m.motionSec),
+                  m.impactSec / m.motionSec,
+                  m.holdAfterEnd / m.motionSec,
+                  1,
+                ],
                 ease: 'easeOut',
               },
             }}

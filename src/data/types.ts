@@ -50,22 +50,41 @@ export type FloatingTextEntry = { text: TranslationKey; weight: number }
 // 이벤트 타이밍 키(예: 'enhanceFail') → 후보 엔트리 목록. 빈 배열 = 아직 안 채운 슬롯(미표시).
 export type FloatingTextData = Record<string, FloatingTextEntry[]>
 
+// 망치 내려치기 떨림 시간의 레벨 밴드 1구간(언어 중립). 검 레벨대마다 떨림 길이를 다르게 둔다
+// (저단계는 짧고 경쾌하게, 고단계는 길고 묵직하게). GoldBucket 의 골드 구간 커버리지 패턴 미러 —
+// 밴드들은 검 레벨 [1, ∞) 를 빈틈·겹침 없이 덮어야 한다(로더가 강제). 셀렉터(shakeRangeForLevel)는
+// maxLevel 만으로 담당 밴드를 고른다: 레벨 이상인 첫 밴드(= maxLevel >= level, 마지막은 null=∞).
+//  - maxLevel: 이 밴드가 담당하는 검 레벨 상한(포함). null = ∞(마지막 밴드, 그 위 모든 레벨).
+//  - minMs / maxMs: 이 밴드에서 매 강화마다 떨림 시간을 뽑는 범위(min <= max, 둘 다 정수 >= 0).
+//    min==max 면 그 레벨대는 고정 떨림.
+export type ShakeBand = {
+  maxLevel: number | null
+  minMs: number
+  maxMs: number
+}
+
 // 강화 연출 시퀀스의 타이밍 설정(코드 상수가 아니라 별도 데이터 파일 animation.json 에서 적재).
 // "시퀀스 타이밍"(언제 망치가 닿고, 떨림이 얼마나 가고, 언제 다시 강화 가능한지)만 데이터로 둔다 —
-// 개별 파티클·모션의 "모양" 상수(분출 반경·파티클 비행 시간 등)는 프레젠테이션 코드에 남긴다(경계는
+// 개별 파티클의 "모양" 상수(분출 반경·파티클 비행 시간 등)는 프레젠테이션 코드에 남긴다(경계는
 // loadAnimation 주석 참고). 강화 1회의 연출 타임라인은 enhanceTimeline.ts 가 이 값 + 매회 랜덤 떨림
 // 시간으로 도출한다(단일 출처).
 //  - hammerImpactMs: 강화 시작(t=0)부터 망치가 검에 닿기까지(정수 >= 0). 떨림 시작·Hit 불꽃·'캉' 타격음의
 //    공통 앵커. 망치 윈드업은 고정이라 이 값은 매회 동일(랜덤이 아님).
-//  - weaponShakeMinMs / weaponShakeMaxMs: 망치가 닿은 뒤 무기가 덜덜 떠는 시간 범위(ms). 매 강화마다
-//    이 구간에서 무작위로 뽑는다(min <= max, 둘 다 정수 >= 0). 떨림이 끝나는 순간 성공/실패 버스트가 터진다.
+//  - hammerWindupMs: 닿기 직전 빠르게 내리꽂는 스냅 길이(holdUntil→impact). 모션의 "모양" 중 디자이너가
+//    데이터로 만지는 값(HammerShape 로 변환돼 흐른다).
+//  - hammerHoldAfterMs: 임팩트 직후 그 자세를 유지하는 정지 시간.
+//  - hammerFadeoutMs: 정지 후 제자리에서 사라지는 페이드아웃 길이.
 //  - reEnhanceGuardMs: 성공/실패 버스트 발생 후 다시 강화할 수 있기까지의 입력 잠금(ms, 정수 >= 0).
 //    UI 가드 전용(게임 로직 불변) — 0 = 버스트 즉시 재강화 가능.
+//  - shakeBands: 망치가 닿은 뒤 무기가 떠는 시간(ms)의 검 레벨대별 범위. 강화 대상 검의 레벨로 밴드를 골라
+//    그 [min, max] 구간에서 매회 무작위로 뽑는다(레벨 [1, ∞) 를 덮는 연속 밴드 — shakeBands[0] 이 최저 레벨대).
 export type AnimationConfig = {
   hammerImpactMs: number
-  weaponShakeMinMs: number
-  weaponShakeMaxMs: number
+  hammerWindupMs: number
+  hammerHoldAfterMs: number
+  hammerFadeoutMs: number
   reEnhanceGuardMs: number
+  shakeBands: ShakeBand[]
 }
 
 // 의뢰 버킷에서 출제될 거래 1종(언어 중립). 등장 확률(weight) + "지불(cost)" + "보상(reward)"을 아이템별로 둔다.
