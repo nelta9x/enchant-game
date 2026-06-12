@@ -1,101 +1,115 @@
-import type { TargetAndTransition } from 'motion/react'
-import type { HammerMotion } from './hammerTiming'
-
-// 망치 머리 "스프라이트 모션 블러"(흰 잔상 스미어) 연출 설정·계산(프레젠테이션 전용·순수). 내려치는 스냅
-// (HOLD→IMPACT) 동안, 망치 스프라이트의 흰 실루엣을 같은 궤적 위에 아주 조금씩 늦게 여러 겹 겹친다 —
-// 머리쪽(가까운 겹)은 망치 형상이 또렷하고, 꼬리로 갈수록(먼 겹) 더 흐리게·더 옅게 번져 하나의 흐릿한
-// 스미어로 녹는다. 즉 잔상의 "머리 부분"은 스프라이트와 같은 형상이고, 뒤로 갈수록 모션 블러가 된다.
+// 망치 스윙 "스프라이트 모션 블러"(흰 스미어)의 순수 코어 — 물감을 찍고 쭉 끌듯, 본체 망치의 프레임
+// 포즈를 받아 궤적 위에 촘촘한 스탬프(실루엣 자국)를 한 줄로 깔아 하나의 스미어를 만든다. 자국의
+// 알파는 "나이"가 정한다: 머리(최신 자국·망치 현재 위치)가 가장 진하고, 꼬리(오래된 자국)로 갈수록
+// 옅어져 움직임의 방향이 읽힌다. 임팩트 후 본체가 멈추면 새 자국이 안 생기고 남은 자국이 수명을 다해
+// 꼬리부터 망치 쪽으로 빨려들며 사라진다 — 별도 페이드 코드 없는 나이 기반 알파의 자연 귀결.
 //
-// 윈드업(거의 정지) 구간엔 본체와 겹쳐 한 덩어리로 보이고, 빠른 스냅에서만 부채처럼 퍼져 잔상이 된다
-// (느린 곳에선 자연히 안 보임). 본체(또렷한 컬러 망치) 뒤에 깔아, 겹칠 땐 본체가 덮고 스냅에서 빠져나온
-// 부분만 흰 잔상으로 남는다.
-//
-// 컴포넌트(HammerStrike)는 라이프사이클(컨트롤·렌더)만 맡고, 키프레임 타깃 조립은 여기 strikeTarget 이
-// 본체·잔상 공통으로 만든다(궤적 동일, 잔상만 늦게 시작·옅게·스냅에서만 켜짐). 흐림 정도(blurPx)는 겹마다
-// 달라 컴포넌트가 인라인 filter 로 입힌다.
+// 시간·DOM·RNG 를 모르는 결정적 모듈: 호출자가 타임스탬프(tMs)·포즈를 주입한다(고정 픽스처로 테스트).
+// 그리기(캔버스·실루엣·합성)는 hammerSmear.ts(HammerSmearSystem)가, 포즈 공급은 HammerStrike(본체
+// motion.img 의 onUpdate — 실제 그려진 값 그대로)가 맡아 본체와 스미어가 구조적으로 어긋나지 않는다.
 
-export type TrailGhost = {
-  lagMs: number // 본체보다 이만큼 늦게 같은 궤적을 시작 → 그 시차만큼 머리 진행 반대쪽(뒤)에 남는다
-  opacity: number // 잔상 최대 불투명도(본체 1.0 대비) — 머리에서 멀수록(lag↑) 옅게
-  blurPx: number // 흰 실루엣 블러(px) — 머리쪽은 또렷(작게), 꼬리로 갈수록 흐릿(크게) → 스미어로 녹음
+// 본체 motion.img 가 매 프레임 그리는 변환 그대로 — 검 박스 중심(0,0) 기준 px, x+ 오른쪽 · y- 위.
+export type TrailPose = { x: number; y: number; rotate: number; scale: number }
+
+// 캔버스가 한 프레임에 그릴 자국 하나 — 포즈 + 나이로 정해진 알파.
+export type TrailStamp = { pose: TrailPose; alpha: number }
+
+// ── 튜닝 상수(브라우저에서 눈으로 맞추는 값) ─────────────────────────────────────
+// 자국 수명(ms) — 곧 스미어 꼬리의 시간 길이. 스냅(hammerSnapMs≈60ms)보다 길어야 임팩트 순간
+// 스냅 전체가 한 줄 스미어로 남고, 임팩트 후 이 시간 안에 꼬리가 망치 쪽으로 수축하며 사라진다.
+export const TRAIL_WINDOW_MS = 80
+// 머리(나이 0) 자국의 최대 알파 — 본체(1.0) 대비. 꼬리는 나이 곡선(stampAlpha)으로 0 까지 떨어진다.
+export const TRAIL_PEAK_ALPHA = 0.5
+// 인접 자국 사이 최대 간격(px, poseDistance 기준) — 프레임 사이를 이 간격으로 보간해 점선이 아닌
+// 연속된 물감 자국을 만든다. 작을수록 매끈하고 스탬프 수가 는다(스냅 한 번에 대략 궤적길이/간격 개).
+export const STAMP_SPACING_PX = 7
+// 자국을 남기는 최소 속도(px/ms) — 윈드업(≈0.1px/ms)·정지·페이드아웃에선 펜만 따라가고 물감은 안
+// 묻는다. 스냅은 easeIn 가속이라 첫 프레임(≈1.4px/ms)부터 걸려 빠른 구간에서만 스미어가 생긴다.
+export const SPEED_GATE_PX_PER_MS = 0.7
+// 회전을 거리로 환산하는 반경(px) — 머리가 스프라이트 중심에서 이만큼 떨어져 호를 그린다고 보고
+// |Δrotate|·반경을 이동 거리에 더한다(제자리 회전도 머리는 크게 쓸므로 자국·게이트에 반영).
+export const HEAD_RADIUS_PX = 48
+// 스미어 캔버스에 입히는 CSS blur(px) — 자국 경계를 녹여 한 덩어리 물감처럼. 머리의 또렷함은
+// 어차피 위에 덮이는 본체(컬러 망치)가 담당한다.
+export const TRAIL_BLUR_PX = 2
+
+// 포즈 사이 "겉보기 이동 거리"(px) — 중심 이동 + 회전이 쓸어내는 머리 호 길이. 보간 간격·속도 게이트
+// 공용 메트릭. scale 변화는 미세(0.9→1.08)해 무시한다.
+export function poseDistance(a: TrailPose, b: TrailPose): number {
+  return (
+    Math.hypot(b.x - a.x, b.y - a.y) +
+    Math.abs(b.rotate - a.rotate) * (Math.PI / 180) * HEAD_RADIUS_PX
+  )
 }
 
-// 머리(가까움·또렷)→꼬리(멀음·흐릿) 10겹. lag 을 스냅(~60ms) 전체에 촘촘히 펼쳐 HOLD 까지 꽉 찬 긴 스미어를
-// 만든다 — lag 이 스냅보다 크면 그 겹은 임팩트 순간 자기 스냅이 아직 시작 전이라 안 보이므로(게이팅) lag 은
-// 스냅(60ms) 안에 둔다. 더 길게 하려면 겹을 더 늘려 채우고, 꼬리 opacity 를 너무 떨구지 않는다(안 그러면
-// 끝이 일찍 사라져 짧아 보임). 겹 수를 바꾸면 이 배열과 HammerStrike 의 잔상 컨트롤 호출 수를 함께 맞춘다.
-export const TRAIL: TrailGhost[] = [
-  { lagMs: 5, opacity: 0.5, blurPx: 1 },
-  { lagMs: 11, opacity: 0.45, blurPx: 1.5 },
-  { lagMs: 17, opacity: 0.4, blurPx: 2 },
-  { lagMs: 23, opacity: 0.35, blurPx: 2.5 },
-  { lagMs: 29, opacity: 0.3, blurPx: 3 },
-  { lagMs: 35, opacity: 0.26, blurPx: 3.5 },
-  { lagMs: 41, opacity: 0.22, blurPx: 4 },
-  { lagMs: 47, opacity: 0.18, blurPx: 4.5 },
-  { lagMs: 52, opacity: 0.15, blurPx: 5 },
-  { lagMs: 57, opacity: 0.12, blurPx: 5.5 },
-]
+// 자국 나이(ms) → 알파. 최신(나이 0)=peak, 수명 끝=0 의 단조 감소 — 제곱 곡선이라 꼬리 끝이 빠르게
+// 옅어져 머리 쪽 밀도가 도드라진다(움직임 방향 강조).
+export function stampAlpha(ageMs: number): number {
+  const u = Math.min(1, Math.max(0, 1 - ageMs / TRAIL_WINDOW_MS))
+  return TRAIL_PEAK_ALPHA * u * u
+}
 
-// 잔상이 임팩트 직후 사라지기까지(초) — 머리가 검에 닿는 순간 스미어가 점으로 모여 잦아든다.
-const GHOST_FADE_SEC = 0.05
-
-// 잔상 opacity 게이팅이 peak 까지 차오르는 비율(스냅 길이 대비). 작을수록 스냅 초반에 빨리 또렷해져, lag 이 큰
-// 꼬리 겹도 임팩트 순간 이미 보인다(꽉 찬 긴 스미어). 0 에 가까우면 스냅 시작 즉시 peak(윈드업 직후 갑툭튀 위험).
-const GHOST_RAMP_FRAC = 0.35
-
-type StrikeGeom = { x: number[]; y: number[]; rotate: number[]; scale: number[] }
-
-// 본체·잔상이 공유하는 키프레임 타깃을 만든다. 궤적(geom)·타이밍(m)은 동일하고, 차이는 셋뿐:
-//  - delaySec: 잔상은 이만큼 늦게 시작 → 시차만큼 뒤에 끌린다(본체 0).
-//  - opacityPeak: 최대 불투명도(본체 1).
-//  - ghost: 잔상은 페이드 곡선을 스냅 구간으로 좁혀, 윈드업엔 0·스냅에서 켜졌다 임팩트 직후 꺼진다
-//    (본체와 겹치는 윈드업에서 흰 잔상이 새지 않게). 본체는 등장~정지 내내 또렷한 기존 곡선 그대로.
-export function strikeTarget(
-  geom: StrikeGeom,
-  m: HammerMotion,
-  { opacityPeak, delaySec, ghost }: { opacityPeak: number; delaySec: number; ghost: boolean },
-): TargetAndTransition {
-  const impactRatio = m.impactSec / m.motionSec
-  // 잔상 게이팅이 peak 에 도달하는 시각 — 스냅 시작(holdUntil)에서 스냅 길이의 GHOST_RAMP_FRAC 만큼 지난 지점.
-  // 여기서 peak 에 닿아 임팩트까지 유지하므로, lag 이 큰(꼬리) 겹도 임팩트 순간 이미 또렷해 스미어가 길게 찬다.
-  const ghostPeakAt = m.holdUntil + GHOST_RAMP_FRAC * (m.impactSec - m.holdUntil)
+function lerpPose(a: TrailPose, b: TrailPose, f: number): TrailPose {
   return {
-    ...geom,
-    opacity: ghost
-      ? [0, 0, opacityPeak, opacityPeak, 0, 0]
-      : [0, opacityPeak, opacityPeak, opacityPeak, 0],
-    transition: {
-      duration: m.motionSec,
-      delay: delaySec,
-      // 대기(0→holdUntil) → 스냅(→impact, easeIn 가속) → 제자리 페이드아웃. 본체·잔상 공통 궤적 곡선.
-      times: [0, m.holdUntil / m.motionSec, impactRatio, 1],
-      ease: ['easeInOut', 'easeIn', 'linear'],
-      // opacity 는 궤적 곡선과 분리. 본체: 초반에 빠르게 켜 정지까지 유지 후 페이드(기존 곡선).
-      // 잔상: 스냅 시작(holdUntil)까지 0 → 빠르게(ghostPeakAt) peak 까지 차올라 임팩트까지 유지 → 직후
-      // (GHOST_FADE_SEC) 0. 윈드업 누수 방지하면서 꼬리까지 또렷하게(긴 스미어).
-      opacity: {
-        duration: m.motionSec,
-        delay: delaySec,
-        times: ghost
-          ? [
-              0,
-              m.holdUntil / m.motionSec,
-              ghostPeakAt / m.motionSec,
-              impactRatio,
-              Math.min(m.impactSec + GHOST_FADE_SEC, m.motionSec) / m.motionSec,
-              1,
-            ]
-          : [
-              0,
-              // 페이드인 지점(0.12)은 임팩트보다 늦으면 times 가 비단조가 돼(motion 거부) — 임팩트 비율로 클램프.
-              Math.min(0.12, impactRatio),
-              impactRatio,
-              m.holdAfterEnd / m.motionSec,
-              1,
-            ],
-        ease: 'easeOut' as const,
-      },
-    },
+    x: a.x + (b.x - a.x) * f,
+    y: a.y + (b.y - a.y) * f,
+    rotate: a.rotate + (b.rotate - a.rotate) * f,
+    scale: a.scale + (b.scale - a.scale) * f,
+  }
+}
+
+type Sample = { tMs: number; pose: TrailPose }
+
+// 포즈 히스토리 = "펜과 물감". push 는 펜을 새 포즈로 옮기고, 직전 펜에서의 평균 속도가 게이트를
+// 넘을 때만 그 사이를 STAMP_SPACING_PX 간격으로 보간해 자국을 깐다(느린 구간은 펜만 이동 — 물감을
+// 든 채 따라간다). stamps()/isAlive() 가 수명 지난 자국을 솎아내므로 호출 측 별도 청소가 없다.
+export class TrailHistory {
+  private samples: Sample[] = [] // 시간 오름차순(push 가 역행 입력을 버려 불변 유지)
+  private pen: Sample | null = null
+
+  // 새 강화의 하드 컷 — 이전 스윙의 자국·펜을 모두 버린다(다음 push 가 이전 위치와 잇지 않는다).
+  reset(): void {
+    this.samples = []
+    this.pen = null
+  }
+
+  push(tMs: number, pose: TrailPose): void {
+    const prev = this.pen
+    this.pen = { tMs, pose }
+    if (!prev || tMs <= prev.tMs) return
+    const d = poseDistance(prev.pose, pose)
+    if (d / (tMs - prev.tMs) < SPEED_GATE_PX_PER_MS) return
+    // 직전 펜(제외)→현재(포함)를 등간격 보간 — 타임스탬프도 함께 보간해 한 구간 안에서도 알파가 기운다.
+    const n = Math.max(1, Math.ceil(d / STAMP_SPACING_PX))
+    for (let i = 1; i <= n; i++) {
+      const f = i / n
+      this.samples.push({
+        tMs: prev.tMs + (tMs - prev.tMs) * f,
+        pose: lerpPose(prev.pose, pose, f),
+      })
+    }
+  }
+
+  // 지금 그려야 할 자국들 — 오래된 것→최신 순(알파 오름차순). 소비자(캔버스)는 최신부터 역순으로
+  // destination-over 합성해 겹친 픽셀에 최신 자국의 알파만 남긴다(겹침 누적으로 타는 핫스팟 방지).
+  stamps(nowMs: number): TrailStamp[] {
+    this.prune(nowMs)
+    return this.samples.map((s) => ({
+      pose: s.pose,
+      alpha: stampAlpha(nowMs - s.tMs),
+    }))
+  }
+
+  // 살아 있는 자국이 남았는가 — 캔버스 rAF 루프의 종료 조건(false 면 그릴 게 없어 루프를 멈춘다).
+  isAlive(nowMs: number): boolean {
+    this.prune(nowMs)
+    return this.samples.length > 0
+  }
+
+  private prune(nowMs: number): void {
+    const cut = nowMs - TRAIL_WINDOW_MS
+    let i = 0
+    while (i < this.samples.length && this.samples[i].tMs <= cut) i++
+    if (i > 0) this.samples.splice(0, i)
   }
 }

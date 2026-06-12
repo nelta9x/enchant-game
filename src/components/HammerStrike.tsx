@@ -2,8 +2,14 @@ import { useEffect, useRef } from 'react'
 import { motion, useAnimationControls } from 'motion/react'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { itemSpriteUrl } from '../lib/sprites'
-import { computeHammerMotion, type HammerShape } from './hammerTiming'
-import { TRAIL, strikeTarget } from './hammerTrail'
+import {
+  computeHammerMotion,
+  strikeTarget,
+  type HammerShape,
+  type StrikeGeom,
+} from './hammerTiming'
+import { TRAIL_BLUR_PX } from './hammerTrail'
+import { HammerSmearSystem } from './hammerSmear'
 
 // 강화 "내려치기" 연출(프레젠테이션 전용) — 강화 시도마다(성공·파괴·방지 무관) 호라드릭 망치가
 // 오른쪽 위로 치켜들었다가 빠르게 휘둘러 내리꽂고, 그 자리에서 바로 사라진다(회수 없음). 게임 로직과
@@ -11,10 +17,15 @@ import { TRAIL, strikeTarget } from './hammerTrail'
 // 그린다(성공·파괴·방지 공통). 타이밍은 Effect 시스템(durationMs)이 소유한다.
 //
 // 단일 인스턴스 재사용 — 다른 1회성 연출(OneShotOverlay+AnimatePresence)과 달리, 망치는 항상 마운트된
-// 고정 노드 한 벌(본체 motion.img + 머리 잔상 사본들)을 두고 새 이벤트 id 가 올 때 같은 노드들의 애니메이션을
+// 고정 노드 한 벌(본체 motion.img + 스미어 캔버스)을 두고 새 이벤트 id 가 올 때 같은 노드의 애니메이션을
 // 처음부터 재시작한다(useAnimationControls). 키 교체로 새 노드를 마운트하면 연사(꾹 누름) 중 옛 망치와 새
 // 망치가 한 프레임 겹쳐 좌우로 쓸려 보이므로, 노드를 재사용해 "동시에 망치는 항상 1세트"를 보장한다(하드 컷).
-// 대기(연출 전후)엔 INITIAL(opacity 0)에 머물러 보이지 않는다. 머리 잔상(스프라이트 모션 블러)은 hammerTrail 참고.
+// 대기(연출 전후)엔 INITIAL(opacity 0)에 머물러 보이지 않는다.
+//
+// 머리 잔상(스프라이트 모션 블러)은 본체 뒤에 깔린 캔버스 한 장 — 본체 motion.img 가 매 프레임 실제로
+// 그린 포즈(onUpdate)를 그대로 받아, 물감을 찍고 끌듯 궤적 위에 실루엣 자국을 연속으로 찍는다. 자국은
+// 나이로 옅어져(머리=진함→꼬리=옅음) 하나의 스미어가 되고, 빠른 스냅에서만 생긴다(속도 게이트 —
+// 느린 윈드업에선 자연히 안 보임). 계산은 hammerTrail.ts(순수)·그리기는 hammerSmear.ts 참고.
 //
 // 쾌감(immediacy)을 위해 "느린 활강"이 아니라 "치켜듦 → 빠른 스냅 → 강타"로 친다: 등장 즉시 오른쪽
 // 위에 치켜든 자세로 나타나(클릭 피드백) 잠깐 윈드업한 뒤, 임팩트 직전(holdUntil→impactSec)에 짧고
@@ -47,8 +58,8 @@ const FOLLOW_TILT = 56 // 임팩트에서 휘둘러 따라넘긴 정도(반대 �
 const NARROW_RAISE_QUERY = '(max-width: 640px)'
 const NARROW_RAISE_X_SCALE = 0.6
 
-// 타임라인(망치 모션의 시각 도출)은 hammerTiming.ts(순수 모듈)가 소유한다 — 임팩트 앵커만 데이터에서
-// 오고, 윈드업·정지·페이드아웃은 그 임팩트 기준 상대 오프셋이다. 컴포넌트는 그 결과(키프레임 times)만 쓴다.
+// 타임라인(망치 모션의 시각 도출)·키프레임 타깃 조립은 hammerTiming.ts(순수 모듈)가 소유한다 — 임팩트
+// 앵커만 데이터에서 오고, 윈드업·정지·페이드아웃은 그 임팩트 기준 상대 오프셋이다.
 
 export type HammerStrikeEvent = { id: number }
 
@@ -72,32 +83,32 @@ export function HammerStrike({
   // 애니메이션을 끊지 않는다. 새 이벤트마다 같은 노드를 재시작 → 동시에 본체 항상 1개·겹침 없음.
   const controls = useAnimationControls()
 
-  // 머리 스프라이트 모션 블러(흰 잔상 스미어) — 본체와 같은 궤적을 조금씩 늦게 따라오는 흰 망치 실루엣 사본들의
-  // 컨트롤(hammerTrail.TRAIL 한 겹당 하나). 머리쪽(가까운 겹)은 또렷·꼬리쪽(먼 겹)은 흐려져 하나의 스미어로
-  // 녹는다. hook 수는 정적이어야 하므로 TRAIL.length(10)와 같은 수를 명시 호출한다(겹 수를 바꾸면 TRAIL 과
-  // 여기를 함께 고친다). 본체와 한 묶음으로 play()에서 같이 리셋·재시작 → 잔상도 동시에 1세트만 존재.
-  const ghost0 = useAnimationControls()
-  const ghost1 = useAnimationControls()
-  const ghost2 = useAnimationControls()
-  const ghost3 = useAnimationControls()
-  const ghost4 = useAnimationControls()
-  const ghost5 = useAnimationControls()
-  const ghost6 = useAnimationControls()
-  const ghost7 = useAnimationControls()
-  const ghost8 = useAnimationControls()
-  const ghost9 = useAnimationControls()
-  const ghostControls = [
-    ghost0,
-    ghost1,
-    ghost2,
-    ghost3,
-    ghost4,
-    ghost5,
-    ghost6,
-    ghost7,
-    ghost8,
-    ghost9,
-  ]
+  // 머리 스프라이트 모션 블러(흰 스미어) — 본체 뒤 캔버스 한 장 + 시스템(마운트 1회 생성, 언마운트 시
+  // rAF 정리). 본체 img 의 실측 크기로 자국 크기를 맞추려 본체에도 ref 를 단다.
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const bodyRef = useRef<HTMLImageElement>(null)
+  const smearRef = useRef<HammerSmearSystem | null>(null)
+  useEffect(() => {
+    if (canvasRef.current && !smearRef.current) {
+      smearRef.current = new HammerSmearSystem(canvasRef.current, HAMMER_SPRITE)
+      smearRef.current.warmup()
+    }
+    return () => {
+      smearRef.current?.dispose()
+      smearRef.current = null
+    }
+  }, [])
+
+  // 본체가 매 프레임 실제로 그린 변환을 스미어 펜에 흘린다 — 본체와 잔상이 구조적으로 같은 궤적(키프레임
+  // 재구현 없음 → easing 이 바뀌어도 어긋날 수 없다). 자국을 남길지는 순수 코어의 속도 게이트가 정한다.
+  const onBodyUpdate = (latest: Record<string, string | number>) => {
+    smearRef.current?.push({
+      x: Number(latest.x),
+      y: Number(latest.y),
+      rotate: Number(latest.rotate),
+      scale: Number(latest.scale),
+    })
+  }
 
   // 휴면(연출 전후) 포즈 — opacity 0 으로 안 보임. 매 재생은 여기서 시작해 키프레임을 처음부터 튼다.
   const initial = {
@@ -108,12 +119,12 @@ export function HammerStrike({
     opacity: 0,
   }
 
-  // 1회 재생: 같은 노드들을 INITIAL 로 하드 리셋한 뒤 키프레임을 처음부터 튼다(연사·재강화에도 겹침 없이
-  // 재시작). 끝 키프레임이 opacity 0 이라 끝나면 알아서 사라진다. 본체(delay 0)와 잔상(머리 스프라이트 블러)을
-  // 한 묶음으로 같이 튼다 — 궤적(geom)은 동일하고 잔상만 늦게 시작·옅게·스냅에서만 켜진다(strikeTarget 참고).
+  // 1회 재생: 같은 노드를 INITIAL 로 하드 리셋한 뒤 키프레임을 처음부터 튼다(연사·재강화에도 겹침 없이
+  // 재시작). 끝 키프레임이 opacity 0 이라 끝나면 알아서 사라진다. 스미어도 같은 순간 하드 컷(begin) —
+  // 이전 강화의 잔상을 즉시 비워 "스미어는 항상 1세트"를 본체와 같은 규약으로 지킨다.
   const play = () => {
     // 치켜듦(START)→윈드업(HOLD) 대기 → 빠른 스냅으로 내리꽂아 따라넘김(-FOLLOW_TILT)·확대로 강타(IMPACT).
-    const geom = {
+    const geom: StrikeGeom = {
       x: [raiseX(START.x), raiseX(HOLD.x), IMPACT.x, IMPACT.x],
       y: [START.y, HOLD.y, IMPACT.y, IMPACT.y],
       rotate: [
@@ -124,18 +135,10 @@ export function HammerStrike({
       ],
       scale: [0.9, 0.95, 1.08, 1.08],
     }
+    // 본체 img 의 실측 렌더 크기(rem 반응 스케일 반영)를 자국 크기로 — 측정 전(0)이면 자국을 안 그린다.
+    smearRef.current?.begin(bodyRef.current?.clientWidth ?? 0)
     controls.set(initial)
-    controls.start(strikeTarget(geom, m, { opacityPeak: 1, delaySec: 0, ghost: false }))
-    ghostControls.forEach((g, i) => {
-      g.set(initial)
-      g.start(
-        strikeTarget(geom, m, {
-          opacityPeak: TRAIL[i].opacity,
-          delaySec: TRAIL[i].lagMs / 1000,
-          ghost: true,
-        }),
-      )
-    })
+    controls.start(strikeTarget(geom, m))
   }
 
   // 아래 재생 effect 가 이벤트 id 변화에만 반응하도록(impactMs·shape·narrowRaise 를 deps 에 넣으면 매
@@ -153,40 +156,37 @@ export function HammerStrike({
     if (playId !== undefined) playRef.current()
   }, [playId])
 
-  // grid place-items-center 로 잔상 사본·본체 망치를 같은 셀([grid-area:1/1])에 겹쳐 모두 박스 중앙에 자연
-  // 정렬한다(transform 중앙 정렬은 motion 의 x/y/rotate/scale 과 충돌하므로 grid 로 위치). 흰 잔상(스프라이트
-  // 실루엣)을 먼저 그려 본체 뒤에 깔고, 본체(또렷한 컬러)를 마지막에 그려 위에 덮는다 — 머리쪽 잔상은 망치
-  // 형상이 또렷하고 꼬리로 갈수록 더 흐려져 모션 블러 스미어로 녹는다.
+  // 스미어 캔버스를 먼저(밑에) 깔고 본체(또렷한 컬러)를 위에 덮는다 — 본체와 겹치는 머리 부분은 본체가
+  // 가리고, 궤적 위에 남은 자국만 흰 스미어로 보인다. 캔버스는 박스 중심 정렬(중심 = 포즈 좌표 원점)이고
+  // 스윙 전체(치켜든 오른쪽 위 ~ 임팩트)를 덮는 고정 크기다. 본체는 grid place-items-center 로 박스 중앙
+  // 정렬(transform 중앙 정렬은 motion 의 x/y/rotate/scale 과 충돌하므로 grid 로 위치).
   return (
     <div
       className="pointer-events-none absolute inset-0 grid place-items-center overflow-visible"
       aria-hidden
     >
-      {ghostControls.map((g, i) => (
-        <motion.img
-          key={i}
-          src={HAMMER_SPRITE}
-          alt=""
-          draggable={false}
-          className="col-start-1 row-start-1 h-24 w-24 object-contain sm:h-28 sm:w-28"
-          // brightness(0) invert(1) = 불투명 픽셀을 순백 망치 실루엣으로, blur 는 겹마다 달라(머리 또렷→꼬리
-          // 흐림) 스미어로 녹는다(hammerTrail.TRAIL.blurPx).
-          style={{
-            imageRendering: 'pixelated',
-            filter: `brightness(0) invert(1) blur(${TRAIL[i].blurPx}px)`,
-          }}
-          initial={initial}
-          animate={g}
-        />
-      ))}
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none absolute left-1/2 top-1/2"
+        // blur 는 자국 경계를 녹여 한 덩어리 물감 스미어로 — 머리의 또렷함은 위에 덮이는 본체가 담당.
+        style={{
+          width: '40rem',
+          height: '32rem',
+          marginLeft: '-20rem',
+          marginTop: '-16rem',
+          filter: `blur(${TRAIL_BLUR_PX}px)`,
+        }}
+      />
       <motion.img
+        ref={bodyRef}
         src={HAMMER_SPRITE}
         alt=""
         draggable={false}
-        className="col-start-1 row-start-1 h-24 w-24 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)] sm:h-28 sm:w-28"
+        className="h-24 w-24 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)] sm:h-28 sm:w-28"
         style={{ imageRendering: 'pixelated' }}
         initial={initial}
         animate={controls}
+        onUpdate={onBodyUpdate}
       />
     </div>
   )
