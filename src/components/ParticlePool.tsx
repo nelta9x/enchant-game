@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useContext,
   useEffect,
@@ -91,7 +92,10 @@ function pickSlot<T extends { isBusy: () => boolean }>(
   return slots[idx] ?? null
 }
 
-export function ParticlePool() {
+// memo: props 가 없고 context 값도 Provider 의 ref(불변)라 항상 bail-out 한다 — GameScreen 이
+// 강화마다(연사 중 초당 수십 회) 리렌더돼도 풀 슬롯 ~140개의 리렌더 팬아웃을 여기서 차단한다.
+// 슬롯 재생은 명령형(useAnimationControls + register 핸들)이라 리렌더 없이도 동작이 완전하다.
+export const ParticlePool = memo(function ParticlePool() {
   const emitRef = useContext(ParticleEmitContext)
   // 풀 크기는 앱 수명 동안 고정(데이터 불변) — 초기화 1회로 잡아 렌더마다 슬롯 수가 흔들리지 않게 한다(훅 규칙).
   const [poolSize] = useState(computePoolSize)
@@ -146,7 +150,7 @@ export function ParticlePool() {
       ))}
     </div>
   )
-}
+})
 
 // 파티클 1개(영속 노드) — 평소 투명, play 때 색·크기를 입고 한 번 튀었다가 다시 투명으로 돌아온다(재사용).
 function DotSlot({

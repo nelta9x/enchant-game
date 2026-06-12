@@ -150,11 +150,16 @@ export function GameScreen() {
   // anim 과 hammerShape 를 여기 한 곳에서 만들어 모든 소비처(타임라인·플레어·불꽃·망치·잠금·방지 떨림)에
   // 흘려 crossover 불일치를 차단한다. hammerShape 는 데이터의 망치 모양 필드에서 파생한다.
   const anim = useMemo(() => dataManager.getAnimation(), [])
-  const hammerShape: HammerShape = {
-    snapSec: anim.hammerSnapMs / 1000,
-    holdAfterSec: anim.hammerHoldAfterMs / 1000,
-    fadeoutSec: anim.hammerFadeoutMs / 1000,
-  }
+  // 모양 객체는 고정(useMemo) — 매 렌더 새 객체를 만들면 HammerStrike 가 강화 연사 리렌더마다
+  // 새 props 를 받는다(파생 데이터는 불변이므로 참조도 고정한다).
+  const hammerShape: HammerShape = useMemo(
+    () => ({
+      snapSec: anim.hammerSnapMs / 1000,
+      holdAfterSec: anim.hammerHoldAfterMs / 1000,
+      fadeoutSec: anim.hammerFadeoutMs / 1000,
+    }),
+    [anim],
+  )
 
   // 다음 강화로 등장할 검 스프라이트를 미리 디코드해 둔다 — 강화 성공 순간 <img src> 교체가
   // 동기 디코드로 프레임을 끊지 않게(검이 정해진 직후의 한가한 시점이라 임팩트와 겹치지 않는다).
