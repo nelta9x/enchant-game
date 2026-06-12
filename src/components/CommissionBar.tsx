@@ -179,7 +179,11 @@ function CommissionCard({
       ? `${formatAmount(cost.amount)} gold`
       : `${costName}${cost.count > 1 ? ` ×${cost.count}` : ''}`
   const rewardLabel =
-    reward.kind === 'gold' ? `${formatAmount(reward.amount)} gold` : rewardName
+    reward.kind === 'gold'
+      ? `${formatAmount(reward.amount)} gold`
+      : reward.kind === 'item'
+        ? `${rewardName}${reward.count > 1 ? ` ×${reward.count}` : ''}`
+        : rewardName
 
   return (
     <motion.button
@@ -252,6 +256,11 @@ function CommissionCard({
               <span className="truncate">{rewardName}</span>
               {rewardLvl !== null && (
                 <span className="shrink-0 tabular-nums">+{rewardLvl}</span>
+              )}
+              {reward.count > 1 && (
+                <span className="shrink-0 tabular-nums text-on-dark-soft">
+                  ×{reward.count}
+                </span>
               )}
             </>
           ) : null}
