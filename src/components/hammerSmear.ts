@@ -10,8 +10,16 @@
 // 실루엣은 스프라이트를 오프스크린에 1회 구워(불투명 픽셀을 토큰 색으로 치환) drawImage 로 복사한다.
 // 색은 @theme 토큰(--color-hammer-trail)을 런타임 1회 해석(hitSparks 의 팔레트 캐시와 같은 규약 —
 // 런타임 테마 전환 도입 시 무효화 필요).
+//
+// blur 도 같은 굽기 단계에서 1회 베이크한다(ensureBlurred): 캔버스 엘리먼트에 CSS filter 를 걸면
+// 대형 레이어(46×32rem, DPR2 ≈ 1472×1024 텍스처)가 스미어가 살아 있는 매 합성마다 blur 를 다시
+// 계산해 모바일(특히 WebKit)에서 비싸다. 스탬프가 화면에서 fit 배율로 축소되므로 베이크 반경은
+// TRAIL_BLUR_PX(화면 CSS px 기준)를 fit 역수로 source 공간 환산하고, blur 꼬리가 잘리지 않게
+// 사방 패딩을 더해 굽는다(그릴 땐 패딩 포함 크기 × fit — 중심 정렬이라 코어 위치는 동일).
+// ctx.filter 미지원(구형 WebKit — Safari 18 미만)이면 날 실루엣을 쓰고 호출 측(HammerStrike)이
+// 기존 CSS filter 폴백을 단다(needsCssBlur).
 
-import { TrailHistory, type TrailPose } from './hammerTrail'
+import { TRAIL_BLUR_PX, TrailHistory, type TrailPose } from './hammerTrail'
 
 const DEG2RAD = Math.PI / 180
 
@@ -30,6 +38,9 @@ export class HammerSmearSystem {
   private spriteUrl: string
   private history = new TrailHistory()
   private silhouette: HTMLCanvasElement | null = null // 흰 실루엣(1회 구움) — 로드 전엔 자국을 안 그린다
+  private blurred: HTMLCanvasElement | null = null // blur 베이크 실루엣(+패딩) — ensureBlurred 가 관리
+  private blurredFit = 0 // 베이크에 쓴 fit — 리사이즈로 달라지면 다시 굽는다
+  private supportsCtxFilter: boolean
   private spriteSize = 0 // 본체 img 의 렌더 한 변(px, 정사각 박스) — begin 이 측정값을 받는다
   private w = 0 // 캔버스 CSS 크기 — begin/warmup 에서 동기화
   private h = 0
@@ -45,6 +56,15 @@ export class HammerSmearSystem {
     if (!ctx) throw new Error('HammerSmearSystem: 2d context unavailable')
     this.ctx = ctx
     this.spriteUrl = spriteUrl
+    // ctx.filter 지원 감지(설정 후 readback — 미지원 구현은 'none' 그대로). blur 베이크 가능 여부.
+    ctx.filter = 'blur(1px)'
+    this.supportsCtxFilter = ctx.filter !== 'none'
+    ctx.filter = 'none'
+  }
+
+  // ctx.filter 미지원이라 blur 를 베이크할 수 없는가 — true 면 호출 측이 캔버스에 CSS filter 폴백을 단다.
+  needsCssBlur(): boolean {
+    return !this.supportsCtxFilter
   }
 
   // 첫 강화의 일회성 비용(실루엣 굽기·버퍼 할당·토큰 해석)을 마운트로 옮긴다. 레이아웃 전(rect 0)이면
@@ -101,6 +121,28 @@ export class HammerSmearSystem {
     this.raf = requestAnimationFrame(this.loop)
   }
 
+  // blur 베이크 실루엣을 (없거나 fit 이 바뀌었으면) 굽는다 — 화면 blur 반경(TRAIL_BLUR_PX)을
+  // fit 역수로 source 공간 환산하고, 가우시안 꼬리가 잘리지 않게 반경 2배 패딩을 사방에 둔다.
+  // 비용은 스프라이트 한 장 1회(≈128² + 패딩)라 무시 가능. 미지원 환경은 날 실루엣 반환(CSS 폴백).
+  private ensureBlurred(fit: number): HTMLCanvasElement | null {
+    const sil = this.silhouette
+    if (!sil) return null
+    if (!this.supportsCtxFilter) return sil
+    if (this.blurred && Math.abs(fit - this.blurredFit) < 0.01) return this.blurred
+    const blurPx = TRAIL_BLUR_PX / fit
+    const pad = Math.ceil(blurPx * 2)
+    const off = document.createElement('canvas')
+    off.width = sil.width + pad * 2
+    off.height = sil.height + pad * 2
+    const g = off.getContext('2d')
+    if (!g) return sil
+    g.filter = `blur(${blurPx}px)`
+    g.drawImage(sil, pad, pad)
+    this.blurred = off
+    this.blurredFit = fit
+    return off
+  }
+
   private draw(nowMs: number) {
     this.clear()
     const sil = this.silhouette
@@ -108,14 +150,20 @@ export class HammerSmearSystem {
     const stamps = this.history.stamps(nowMs)
     if (stamps.length === 0) return
     // 본체 img(object-contain·정사각 박스)와 같은 맞춤 — 비율 유지로 박스 안에 들어가는 크기.
+    // fit 은 코어(원본 실루엣) 크기 기준 — 스탬프(blur 베이크본)는 패딩 포함이라 그릴 때 같은
+    // 배율로 함께 커진다(중심 정렬이라 코어 위치는 동일).
     const fit = Math.min(
       this.spriteSize / sil.width,
       this.spriteSize / sil.height,
     )
-    const dw = sil.width * fit
-    const dh = sil.height * fit
+    const stamp = this.ensureBlurred(fit)
+    if (!stamp) return
+    const dw = stamp.width * fit
+    const dh = stamp.height * fit
     const ctx = this.ctx
-    ctx.imageSmoothingEnabled = false // 본체의 imageRendering: pixelated 와 같은 결
+    // blur 베이크본은 부드러운 보간으로(true) — nearest 로 축소하면 베이크한 그라데이션이 계단진다.
+    // CSS blur 폴백(베이크 불가) 경로만 본체와 같은 pixelated(false) — blur 가 계단을 어차피 녹인다.
+    ctx.imageSmoothingEnabled = this.supportsCtxFilter
     ctx.globalCompositeOperation = 'destination-over'
     // 최신(머리)부터 역순으로 — 겹친 픽셀엔 최신 자국의 알파만 남는다(파일 머리 주석 참고).
     for (let i = stamps.length - 1; i >= 0; i--) {
@@ -126,7 +174,7 @@ export class HammerSmearSystem {
       ctx.translate(this.w / 2 + s.pose.x, this.h / 2 + s.pose.y)
       ctx.rotate(s.pose.rotate * DEG2RAD)
       ctx.scale(s.pose.scale, s.pose.scale)
-      ctx.drawImage(sil, -dw / 2, -dh / 2, dw, dh)
+      ctx.drawImage(stamp, -dw / 2, -dh / 2, dw, dh)
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalAlpha = 1

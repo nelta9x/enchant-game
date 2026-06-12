@@ -80,6 +80,12 @@ export function HammerStrike({
     if (canvasRef.current && !smearRef.current) {
       smearRef.current = new HammerSmearSystem(canvasRef.current, HAMMER_SPRITE)
       smearRef.current.warmup()
+      // blur 는 실루엣에 1회 베이크된다(hammerSmear) — 대형 캔버스 레이어에 CSS filter 를 상시
+      // 걸면 매 합성마다 blur 를 다시 계산해 모바일에서 비싸다. ctx.filter 미지원(구형 WebKit)
+      // 환경만 기존 CSS filter 로 폴백해 같은 시각을 유지한다.
+      if (smearRef.current.needsCssBlur()) {
+        canvasRef.current.style.filter = `blur(${TRAIL_BLUR_PX}px)`
+      }
     }
     return () => {
       smearRef.current?.dispose()
@@ -144,14 +150,14 @@ export function HammerStrike({
       <canvas
         ref={canvasRef}
         className="pointer-events-none absolute left-1/2 top-1/2"
-        // blur 는 자국 경계를 녹여 한 덩어리 물감 스미어로 — 머리의 또렷함은 위에 덮이는 본체가 담당.
+        // blur(자국 경계를 녹여 한 덩어리 물감 스미어로)는 실루엣 베이크가 담당 — 여기 CSS filter 를
+        // 걸지 않는다(위 effect 의 ctx.filter 미지원 폴백만 예외). 머리의 또렷함은 위에 덮이는 본체가 담당.
         // 크기는 스윙 호 전체(윈드업 x≈265px + 회전 스프라이트 반경)를 덮도록 ±368×±256px.
         style={{
           width: '46rem',
           height: '32rem',
           marginLeft: '-23rem',
           marginTop: '-16rem',
-          filter: `blur(${TRAIL_BLUR_PX}px)`,
         }}
       />
       <motion.img
