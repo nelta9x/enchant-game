@@ -128,7 +128,8 @@ export class HammerSmearSystem {
     const sil = this.silhouette
     if (!sil) return null
     if (!this.supportsCtxFilter) return sil
-    if (this.blurred && Math.abs(fit - this.blurredFit) < 0.01) return this.blurred
+    if (this.blurred && Math.abs(fit - this.blurredFit) < 0.01)
+      return this.blurred
     const blurPx = TRAIL_BLUR_PX / fit
     const pad = Math.ceil(blurPx * 2)
     const off = document.createElement('canvas')
