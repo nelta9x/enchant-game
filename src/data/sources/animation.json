@@ -1,6 +1,6 @@
 {
   "hammerImpactMs": 325,
-  "hammerWindupMs": 60,
+  "hammerSnapMs": 60,
   "hammerHoldAfterMs": 370,
   "hammerFadeoutMs": 100,
   "reEnhanceGuardMs": 100,

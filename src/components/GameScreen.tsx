@@ -150,7 +150,7 @@ export function GameScreen() {
   // 흘려 crossover 불일치를 차단한다. hammerShape 는 데이터의 망치 모양 필드에서 파생한다.
   const anim = useMemo(() => dataManager.getAnimation(), [])
   const hammerShape: HammerShape = {
-    windupSec: anim.hammerWindupMs / 1000,
+    snapSec: anim.hammerSnapMs / 1000,
     holdAfterSec: anim.hammerHoldAfterMs / 1000,
     fadeoutSec: anim.hammerFadeoutMs / 1000,
   }

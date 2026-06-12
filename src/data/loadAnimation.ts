@@ -66,7 +66,7 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
   if (!isRecord(raw)) fail('animation root must be an object')
 
   const hammerImpactMs = intNonNeg(raw, 'hammerImpactMs')
-  const hammerWindupMs = intNonNeg(raw, 'hammerWindupMs')
+  const hammerSnapMs = intNonNeg(raw, 'hammerSnapMs')
   const hammerHoldAfterMs = intNonNeg(raw, 'hammerHoldAfterMs')
   const hammerFadeoutMs = intNonNeg(raw, 'hammerFadeoutMs')
   const reEnhanceGuardMs = intNonNeg(raw, 'reEnhanceGuardMs')
@@ -100,7 +100,7 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
 
   return {
     hammerImpactMs,
-    hammerWindupMs,
+    hammerSnapMs,
     hammerHoldAfterMs,
     hammerFadeoutMs,
     reEnhanceGuardMs,
