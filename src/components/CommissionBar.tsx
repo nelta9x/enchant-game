@@ -69,12 +69,6 @@ export function CommissionBar({
     (_, i) => active[i] ?? null,
   )
 
-  // 제안 잠금 게이트(스토어와 동일 기준: 도달 강화 레벨 maxLevelReached >= unlockAtLevel). 잠금 중엔
-  // 스토어가 active 를 비워 두지만(출제 안 함), 빈 바 영역까지 통째로 숨겨 초반 내내 "제안" 리전이
-  // 노출되지 않게 한다. 단조라 한 번 해제되면 다시 잠기지 않는다.
-  const maxLevelReached = useGameStore((s) => s.maxLevelReached)
-  const locked = maxLevelReached < config.unlockAtLevel
-
   // 키보드(1·2·3) 납품 시 코인 연출의 출발점이 될 카드 DOM 을 슬롯 인덱스로 찾기 위한 컨테이너(클릭 경로는 currentTarget 사용).
   const slotsRef = useRef<HTMLDivElement>(null)
   const onSlot = useCallback(
@@ -94,13 +88,15 @@ export function CommissionBar({
   )
   useCommissionHotkey({ enabled: hotkeysEnabled, onSlot })
 
-  // 잠금 중이면 바 영역을 통째로 렌더하지 않는다(훅은 위에서 모두 호출한 뒤 — 훅 순서 불변).
-  if (locked) return null
+  // 제안 기능이 잠긴 초반에도 바 영역을 통째로 숨기지 않는다 — 잠금 중 스토어가 active 를 비워 두므로
+  // (출제 안 함) 일반 렌더 경로가 전 슬롯 EmptySlot + idle 타이머 스페이서로 같은 높이의 빈 영역을 확보해,
+  // 해제 전후로 아래 UI 위치가 흔들리지 않게 한다(픽셀 단위로 동일한 footprint). 해제는 단조라 한 번뿐.
 
   // 통합 세션 타이머: 세션의 모든 제안이 같은 만료를 공유하므로 아무 제안(active[0])에서 createdAt/expiresAt 를
-  // 읽어 카드 묶음 아래 단일 바로 표현한다. 세션이 비면(쿨다운) null → 바를 렌더하지 않는다. active 의 id 는
-  // 단조 증가하고 complete/만료가 세션을 통째로 비우므로, 한 세션이 떠 있는 동안 active[0].id 는 안정적이다
-  // (세션 단위 key) — 새 세션이 시작될 때만 바뀌어 바가 처음부터 다시 줄어든다.
+  // 읽어 카드 묶음 아래 단일 바로 표현한다. 세션이 비면(쿨다운/잠금) null → 바는 보이지 않는 동일 높이
+  // 스페이서로 자리만 지킨다(아래 SessionTimerBar active=false). active 의 id 는 단조 증가하고 complete/만료가
+  // 세션을 통째로 비우므로, 한 세션이 떠 있는 동안 active[0].id 는 안정적이다 (세션 단위 key) — 새 세션이
+  // 시작될 때만 바뀌어 바가 처음부터 다시 줄어든다.
   const session = active[0] ?? null
 
   return (
@@ -134,13 +130,16 @@ export function CommissionBar({
             )}
           </div>
         </div>
-        {session && (
-          <SessionTimerBar
-            key={session.id}
-            createdAt={session.createdAt}
-            expiresAt={session.expiresAt}
-          />
-        )}
+        {/* 타이머 바 슬롯은 세션이 없어도(쿨다운/잠금) 항상 자식으로 두어 부모 flex-col gap-1.5 의 간격과
+            바 높이를 항상 확보한다 — 세션이 떴다 사라질 때 아래 UI 가 흔들리지 않게. 비활성 구간은
+            보이지 않는 동일 높이 스페이서로 그린다(SessionTimerBar 내부). key 는 세션 id 기반을 유지하되
+            쿨다운 구간은 'idle' 로 두어 idle↔세션 전환 시 remount → 새 세션 애니메이션이 처음부터 재생된다. */}
+        <SessionTimerBar
+          key={session?.id ?? 'idle'}
+          createdAt={session?.createdAt ?? 0}
+          expiresAt={session?.expiresAt ?? 0}
+          active={session !== null}
+        />
       </div>
     </div>
   )
@@ -277,19 +276,27 @@ function KeyHint({ slot, active }: { slot: number; active: boolean }) {
 }
 
 // 통합 세션 타이머 바 — 세션의 모든 제안이 공유하는 만료까지 남은 시간을 카드 묶음 "아래" 단일 바로 표현한다
-// (카드별 바가 아니라 세션 1개 바 = 통합 지속시간). 바는 세션 id 로 key 되어 마운트/언마운트되고(완료·만료 시
-// 언마운트), 생성(createdAt) 직후 같은 렌더 커밋에서 마운트되므로 전체 길이(expiresAt-createdAt)를 기준으로
-// scaleX 1→0 을 선형 애니메이션한다(매 프레임 재렌더·rAF·Date.now 폴링 없이 컴포지터가 처리 — 카드 타이머가
-// 쓰던 것과 동일 철학, 순수 렌더 유지). 새 세션이 시작될 때만 key 가 바뀌어 처음부터 다시 줄어든다.
+// (카드별 바가 아니라 세션 1개 바 = 통합 지속시간). 슬롯은 레이아웃 안정을 위해 항상 마운트돼 있고(쿨다운/잠금
+// 구간은 active=false 로 보이지 않는 동일 높이 스페이서), 세션 id(쿨다운은 'idle') 로 key 되어 idle↔세션 전환 시
+// remount 된다. 세션 생성(createdAt) 직후 같은 렌더 커밋에서 활성 마운트되므로 전체 길이(expiresAt-createdAt)를
+// 기준으로 scaleX 1→0 을 선형 애니메이션한다(매 프레임 재렌더·rAF·Date.now 폴링 없이 컴포지터가 처리 — 카드
+// 타이머가 쓰던 것과 동일 철학, 순수 렌더 유지). 새 세션이 시작될 때만 key 가 바뀌어 처음부터 다시 줄어든다.
 // 시간이 줄수록 황금→적색으로 물들어 임박을 알린다(motion 은 CSS var 키프레임 보간을 못 하므로 진행색은
 // 토큰을 런타임에 1회 해석한 실제 값(cssColorToken)을 쓴다 — index.css 단일 출처 유지, hex 사본 없음).
 function SessionTimerBar({
   createdAt,
   expiresAt,
+  active,
 }: {
   createdAt: number
   expiresAt: number
+  // 세션이 떠 있는지. false(쿨다운/잠금)면 같은 높이의 보이지 않는 스페이서만 그려 레이아웃 높이만 유지한다.
+  active: boolean
 }) {
+  // 비활성 구간: 트랙·애니메이션 없이 동일 높이(h-1.5) 투명 스페이서. 빈 회색 트랙을 굳이 보여 주지 않는다
+  // (EmptySlot 이 허전한 placeholder 를 비우는 것과 같은 철학). 토큰 해석도 건너뛴다.
+  if (!active) return <span className="block h-1.5 w-full" aria-hidden />
+
   const totalSec = Math.max(0, expiresAt - createdAt) / 1000
   const gold = cssColorToken('--color-gold')
   const danger = cssColorToken('--color-danger')
