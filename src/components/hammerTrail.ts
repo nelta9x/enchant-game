@@ -1,8 +1,11 @@
 // 망치 스윙 "스프라이트 모션 블러"(흰 스미어)의 순수 코어 — 물감을 찍고 쭉 끌듯, 본체 망치의 프레임
 // 포즈를 받아 궤적 위에 촘촘한 스탬프(실루엣 자국)를 한 줄로 깔아 하나의 스미어를 만든다. 자국의
-// 알파는 "나이"가 정한다: 머리(최신 자국·망치 현재 위치)가 가장 진하고, 꼬리(오래된 자국)로 갈수록
-// 옅어져 움직임의 방향이 읽힌다. 임팩트 후 본체가 멈추면 새 자국이 안 생기고 남은 자국이 수명을 다해
-// 꼬리부터 망치 쪽으로 빨려들며 사라진다 — 별도 페이드 코드 없는 나이 기반 알파의 자연 귀결.
+// 알파는 두 요인의 곱이다: ① 나이(시간 — 오래될수록 옅게·결국 소멸) ② 머리로부터의 궤적 거리(공간 —
+// 멀수록 옅게). 거리 falloff 가 핵심이다: 스냅은 easeIn 가속이라 궤적 대부분이 임팩트 직전 짧은
+// 시간에 깔려 자국들의 나이 차가 작다 — 나이만으로는 전부 비슷하게 밝아 "지나간 궤적" 느낌이 안
+// 난다. 거리 기반 falloff 는 easing 과 무관하게 꼬리 끝이 확실히 옅은 공간 그라데이션을 보장한다.
+// 임팩트 후 본체가 멈추면 새 자국이 안 생기고 남은 자국이 나이로 수명을 다해 꼬리부터 망치 쪽으로
+// 빨려들며 사라진다 — 별도 페이드 코드 없는 자연 귀결.
 //
 // 시간·DOM·RNG 를 모르는 결정적 모듈: 호출자가 타임스탬프(tMs)·포즈를 주입한다(고정 픽스처로 테스트).
 // 그리기(캔버스·실루엣·합성)는 hammerSmear.ts(HammerSmearSystem)가, 포즈 공급은 HammerStrike(본체
@@ -29,6 +32,9 @@ export const SPEED_GATE_PX_PER_MS = 0.7
 // 회전을 거리로 환산하는 반경(px) — 머리가 스프라이트 중심에서 이만큼 떨어져 호를 그린다고 보고
 // |Δrotate|·반경을 이동 거리에 더한다(제자리 회전도 머리는 크게 쓸므로 자국·게이트에 반영).
 export const HEAD_RADIUS_PX = 48
+// 머리(펜)로부터 이 궤적 거리(px)에서 자국이 완전히 사라진다 — 스냅 전체 호 길이(≈330px)보다 살짝
+// 길게 잡아 꼬리 끝이 가까스로 비치게. 줄이면 보이는 꼬리가 짧아지고, 늘리면 꼬리 끝이 진해진다.
+export const TAIL_FALLOFF_PX = 380
 // 스미어 캔버스에 입히는 CSS blur(px) — 자국 경계를 녹여 한 덩어리 물감처럼. 머리의 또렷함은
 // 어차피 위에 덮이는 본체(컬러 망치)가 담당한다.
 export const TRAIL_BLUR_PX = 2
@@ -42,11 +48,15 @@ export function poseDistance(a: TrailPose, b: TrailPose): number {
   )
 }
 
-// 자국 나이(ms) → 알파. 최신(나이 0)=peak, 수명 끝=0 의 단조 감소 — 제곱 곡선이라 꼬리 끝이 빠르게
-// 옅어져 머리 쪽 밀도가 도드라진다(움직임 방향 강조).
-export function stampAlpha(ageMs: number): number {
-  const u = Math.min(1, Math.max(0, 1 - ageMs / TRAIL_WINDOW_MS))
-  return TRAIL_PEAK_ALPHA * u * u
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+
+// 자국 알파 = peak × 나이 감쇠(선형 — 임팩트 후 소멸 담당) × 거리 감쇠(제곱 — 꼬리로 갈수록 빠르게
+// 옅어지는 공간 그라데이션 담당). 거리 제곱 곡선이 "물감이 끌리며 말라가는" 꼬리를 만든다(파일 머리
+// 주석 참고 — 나이만으로는 easeIn 가속 탓에 전부 비슷하게 밝다).
+export function stampAlpha(ageMs: number, distFromHeadPx: number): number {
+  const ageU = clamp01(1 - ageMs / TRAIL_WINDOW_MS)
+  const distU = clamp01(1 - distFromHeadPx / TAIL_FALLOFF_PX)
+  return TRAIL_PEAK_ALPHA * ageU * distU * distU
 }
 
 function lerpPose(a: TrailPose, b: TrailPose, f: number): TrailPose {
@@ -58,33 +68,43 @@ function lerpPose(a: TrailPose, b: TrailPose, f: number): TrailPose {
   }
 }
 
-type Sample = { tMs: number; pose: TrailPose }
+type Sample = { tMs: number; dist: number; pose: TrailPose } // dist = 깔린 지점까지의 펜 누적 궤적 거리(px)
 
 // 포즈 히스토리 = "펜과 물감". push 는 펜을 새 포즈로 옮기고, 직전 펜에서의 평균 속도가 게이트를
 // 넘을 때만 그 사이를 STAMP_SPACING_PX 간격으로 보간해 자국을 깐다(느린 구간은 펜만 이동 — 물감을
-// 든 채 따라간다). stamps()/isAlive() 가 수명 지난 자국을 솎아내므로 호출 측 별도 청소가 없다.
+// 든 채 따라간다). 펜의 누적 이동 거리(cum)를 자국마다 기록해 "머리로부터의 궤적 거리"(거리 감쇠의
+// 입력)를 펜 현재 누적치와의 차로 얻는다. stamps()/isAlive() 가 수명 지난 자국을 솎아낸다.
 export class TrailHistory {
   private samples: Sample[] = [] // 시간 오름차순(push 가 역행 입력을 버려 불변 유지)
   private pen: Sample | null = null
+  private cum = 0 // 펜 누적 궤적 거리(px) — 게이트와 무관하게 매 push 누적(자국 dist 의 기준)
 
   // 새 강화의 하드 컷 — 이전 스윙의 자국·펜을 모두 버린다(다음 push 가 이전 위치와 잇지 않는다).
   reset(): void {
     this.samples = []
     this.pen = null
+    this.cum = 0
   }
 
   push(tMs: number, pose: TrailPose): void {
     const prev = this.pen
-    this.pen = { tMs, pose }
-    if (!prev || tMs <= prev.tMs) return
+    if (!prev || tMs <= prev.tMs) {
+      this.pen = { tMs, dist: this.cum, pose }
+      return
+    }
     const d = poseDistance(prev.pose, pose)
+    const start = this.cum
+    this.cum += d
+    this.pen = { tMs, dist: this.cum, pose }
     if (d / (tMs - prev.tMs) < SPEED_GATE_PX_PER_MS) return
-    // 직전 펜(제외)→현재(포함)를 등간격 보간 — 타임스탬프도 함께 보간해 한 구간 안에서도 알파가 기운다.
+    // 직전 펜(제외)→현재(포함)를 등간격 보간 — 타임스탬프·누적 거리도 함께 보간해 한 구간 안에서도
+    // 알파(나이·거리 감쇠)가 기운다.
     const n = Math.max(1, Math.ceil(d / STAMP_SPACING_PX))
     for (let i = 1; i <= n; i++) {
       const f = i / n
       this.samples.push({
         tMs: prev.tMs + (tMs - prev.tMs) * f,
+        dist: start + d * f,
         pose: lerpPose(prev.pose, pose, f),
       })
     }
@@ -96,7 +116,7 @@ export class TrailHistory {
     this.prune(nowMs)
     return this.samples.map((s) => ({
       pose: s.pose,
-      alpha: stampAlpha(nowMs - s.tMs),
+      alpha: stampAlpha(nowMs - s.tMs, this.cum - s.dist),
     }))
   }
 

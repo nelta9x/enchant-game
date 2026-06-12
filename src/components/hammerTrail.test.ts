@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   STAMP_SPACING_PX,
+  TAIL_FALLOFF_PX,
   TRAIL_WINDOW_MS,
   TrailHistory,
   poseDistance,
@@ -33,8 +34,10 @@ describe('TrailHistory — 망치 스윙 스미어 자국', () => {
     for (let i = 1; i < stamps.length; i++) {
       expect(stamps[i].alpha).toBeGreaterThanOrEqual(stamps[i - 1].alpha)
     }
-    expect(stamps[0].alpha).toBeGreaterThan(0)
-    expect(stamps[stamps.length - 1].alpha).toBeGreaterThan(stamps[0].alpha)
+    // 머리(최신)는 또렷하고 꼬리보다 진하다 — 꼬리 "끝"은 falloff 를 넘으면 정당하게 0 일 수 있다.
+    const head = stamps[stamps.length - 1]
+    expect(head.alpha).toBeGreaterThan(0)
+    expect(head.alpha).toBeGreaterThan(stamps[0].alpha)
   })
 
   it('한 프레임에 크게 점프해도 자국 사이가 스탬프 간격 이하로 보간된다(끊김 없는 물감 자국)', () => {
@@ -96,11 +99,25 @@ describe('TrailHistory — 망치 스윙 스미어 자국', () => {
   })
 })
 
-describe('stampAlpha — 나이 기반 알파 곡선', () => {
+describe('stampAlpha — 나이 × 거리 감쇠 알파', () => {
   it('최신이 가장 진하고 나이 들수록 옅어지다 수명 끝에 0이 된다', () => {
-    expect(stampAlpha(0)).toBeGreaterThan(stampAlpha(TRAIL_WINDOW_MS / 2))
-    expect(stampAlpha(TRAIL_WINDOW_MS / 2)).toBeGreaterThan(0)
-    expect(stampAlpha(TRAIL_WINDOW_MS)).toBe(0)
-    expect(stampAlpha(TRAIL_WINDOW_MS * 2)).toBe(0)
+    expect(stampAlpha(0, 0)).toBeGreaterThan(stampAlpha(TRAIL_WINDOW_MS / 2, 0))
+    expect(stampAlpha(TRAIL_WINDOW_MS / 2, 0)).toBeGreaterThan(0)
+    expect(stampAlpha(TRAIL_WINDOW_MS, 0)).toBe(0)
+    expect(stampAlpha(TRAIL_WINDOW_MS * 2, 0)).toBe(0)
+  })
+
+  it('같은 나이라도 머리에서 멀수록 옅어지다 falloff 끝에 0이 된다(공간 그라데이션)', () => {
+    expect(stampAlpha(0, 0)).toBeGreaterThan(stampAlpha(0, TAIL_FALLOFF_PX / 2))
+    expect(stampAlpha(0, TAIL_FALLOFF_PX / 2)).toBeGreaterThan(0)
+    expect(stampAlpha(0, TAIL_FALLOFF_PX)).toBe(0)
+    expect(stampAlpha(0, TAIL_FALLOFF_PX * 2)).toBe(0)
+  })
+
+  it('거리 감쇠는 나이 감쇠보다 가파르다 — 꼬리가 시간보다 공간으로 먼저 옅어진다', () => {
+    // 같은 비율(절반 지점)에서 거리 감쇠(제곱)가 나이 감쇠(선형)보다 알파를 더 깎는다.
+    expect(stampAlpha(0, TAIL_FALLOFF_PX / 2)).toBeLessThan(
+      stampAlpha(TRAIL_WINDOW_MS / 2, 0),
+    )
   })
 })
