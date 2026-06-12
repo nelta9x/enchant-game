@@ -10,10 +10,11 @@ import { isRecord, makeFail } from './validate'
 //  - JSON 은 컴파일 타임 타입 보장이 없으므로 로드 시점에 런타임 검증으로 형태를 강제한다(잘못 편집된
 //    JSON 이 조용히 이상 동작하지 않고 시작 단계에서 즉시 실패하게 한다).
 //
-// 데이터 vs 코드 경계: 이 파일이 담는 것은 강화 1회의 "언제"(시퀀스 마일스톤)뿐이다. 개별 파티클의
-// 분출 반경·비행 시간(particles.ts), 떨림 키프레임 모양(shake.ts), 플로팅 텍스트 체공 길이
-// (floatingText.ts) 같은 "모양/연출 디테일" 상수는 프레젠테이션 코드에 남긴다 — 운영자가 흔히 만지는
-// 게임 호흡(타이밍)은 데이터로, 디자이너가 손대는 모션 디테일은 코드로 나눈다.
+// 데이터 vs 코드 경계: 이 파일이 담는 것은 강화 1회의 "언제"(시퀀스 마일스톤)와 "어디에 닿는가"
+// (hammerFaceOffset — 폭발이 붙는 망치 스프라이트 지점)뿐이다. 개별 파티클의 분출 반경·비행 시간
+// (particles.ts), 떨림 키프레임 모양(shake.ts), 플로팅 텍스트 체공 길이(floatingText.ts) 같은
+// "모양/연출 디테일" 상수는 프레젠테이션 코드에 남긴다 — 운영자가 흔히 만지는 게임 호흡(타이밍)과
+// 접점은 데이터로, 디자이너가 손대는 모션 디테일은 코드로 나눈다.
 //
 // parseAnimationConfig 는 순수 함수로 분리해 테스트 가능하게 두고, loadAnimation 이 번들 데이터의 진입점이다.
 
@@ -25,6 +26,18 @@ function intNonNeg(raw: Record<string, unknown>, key: string): number {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 0)
     fail(`${key} must be an integer >= 0 (got ${String(v)})`)
   return v as number
+}
+
+// 임팩트 접점(hammerFaceOffset) 검증 — 스프라이트 공간 px 오프셋이라 부호 제약 없는 유한 수 {x, y}.
+function parseFaceOffset(raw: unknown): { x: number; y: number } {
+  if (!isRecord(raw)) fail('hammerFaceOffset must be an object { x, y }')
+  const fnum = (key: 'x' | 'y'): number => {
+    const v = raw[key]
+    if (typeof v !== 'number' || !Number.isFinite(v))
+      fail(`hammerFaceOffset.${key} must be a finite number (got ${String(v)})`)
+    return v
+  }
+  return { x: fnum('x'), y: fnum('y') }
 }
 
 // 떨림 레벨 밴드 1구간 검증. maxLevel(상한, null=∞) + 떨림 범위(minMs <= maxMs, 정수 >= 0).
@@ -69,6 +82,7 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
   const hammerSnapMs = intNonNeg(raw, 'hammerSnapMs')
   const hammerHoldAfterMs = intNonNeg(raw, 'hammerHoldAfterMs')
   const hammerFadeoutMs = intNonNeg(raw, 'hammerFadeoutMs')
+  const hammerFaceOffset = parseFaceOffset(raw.hammerFaceOffset)
   const reEnhanceGuardMs = intNonNeg(raw, 'reEnhanceGuardMs')
 
   // shakeBands: 비어있지 않은 배열. 각 밴드는 parseShakeBand 로 검증.
@@ -103,6 +117,7 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
     hammerSnapMs,
     hammerHoldAfterMs,
     hammerFadeoutMs,
+    hammerFaceOffset,
     reEnhanceGuardMs,
     shakeBands,
   }

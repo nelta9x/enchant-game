@@ -42,21 +42,17 @@
   --color-danger-glow: #ff7a5c; /* 파괴 연출 파티클 코어(밝은 적색) */
   --color-gold-glow: #ffe79a; /* 성공 연출 파티클 코어(밝은 황금색) */
 
-  /* Hit 불꽃(망치 임팩트 불티) — 성공/실패 버스트와 구분되는 "달궈진 쇠 용접 불티" 톤. 캔버스
-     (HitSparkCanvas/hitSparks.ts)가 이 토큰들을 런타임 1회 rgb 로 해석해 그린다. 불티는 비행하며 "식는다":
-     머리 호박(flash) → 주황(core) → 적색(edge) → 잿불(ember)의 4-stop 을 coolAt 으로 보간한다(캔버스 stroke).
-     밝은 크림 스테이지(#cdc6b5) 위 대비를 위해 채도 높은 색 + outline 어두운 테두리(코어 밑 stroke)를 쓴다.
-     토큰만 바꿔 색감을 조절한다. */
-  --color-hit-arc: #dff0ff; /* 용접 아크 코어(청백색) — 임팩트 중심 발화점 */
-  --color-hit-arc-core: #ffffff; /* 발화 정중앙 백색 점(아크 코어 위) */
-  --color-hit-arc-halo: #ffeeb4; /* 발화 아크 외곽 크림 헤일로 */
-  --color-hit-flash: #ffd24a; /* 불티 머리(밝은 호박색) — 글로우 스프라이트 색·식어가는 시작점 */
-  --color-hit-core: #ff8c1a; /* 불티 중간(주황) */
-  --color-hit-edge: #ee3a0e; /* 불티 꼬리(적색) */
+  /* Hit 불꽃(망치 임팩트 불티·화구·불혀) — 성공/실패 버스트와 구분되는 "화염" 톤: 백열 중심 →
+     노랑 → 주황 → 적색 → 잿불. 캔버스(HitSparkCanvas/hitSparks.ts)가 이 토큰들을 런타임 1회 rgb 로
+     해석해 그린다. 불티는 비행하며 "식는다": 머리(flash) → 주황(core) → 적색(edge) → 잿불(ember)의
+     4-stop 을 coolAt 으로 보간하고(캔버스 stroke), 같은 램프가 화구·불혀 그라데이션에도 쓰인다.
+     밝은 크림 스테이지(#cdc6b5) 위 대비는 채도 높은 색 + 글로우 후광으로 만든다 — 연한 파스텔
+     노랑은 베이지 위에서 씻겨 보인다. 토큰만 바꿔 색감을 조절한다. */
+  --color-hit-arc-core: #ffffff; /* 화염 백열 중심색 — 화구·불혀 그라데이션의 가장 뜨거운 속 */
+  --color-hit-flash: #ffc31f; /* 불티 머리(채도 높은 화염 노랑) — 글로우 스프라이트 색·식어가는 시작점 */
+  --color-hit-core: #ff7a10; /* 불티 중간(진한 주황) */
+  --color-hit-edge: #f23d0a; /* 불티 꼬리(선명한 적색) */
   --color-hit-ember: #4d1003; /* 식은 잿불(어두운 적색) */
-  --color-hit-head-hot: #ffeec8; /* 불티 머리 백열 하이라이트 시작(뜨거움) */
-  --color-hit-head-warm: #ff8032; /* 불티 머리 하이라이트 끝(식음) */
-  --color-hit-outline: #2a0a01; /* 불티 어두운 테두리 — 밝은 배경에서 또렷하게(코어 밑 stroke) */
   --color-floating-text: #ffffff; /* 강화 결과 플로팅 텍스트(흰색 — 추후 토큰만 바꿔 변경) */
   --color-hammer-trail: #ffffff; /* 망치 스윙 모션 블러 스미어(실루엣 자국) — 캔버스(hammerSmear.ts)가 런타임 1회 해석 */
 

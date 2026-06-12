@@ -722,21 +722,23 @@ export function GameScreen() {
                     {successEvents.map((ev) => (
                       <SuccessEffect key={ev.id} event={ev} />
                     ))}
-                    {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 용접식 불티를 캔버스에 1회 분출.
-                        가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 DOM 풀).
-                        ⚠️ 망치보다 "앞"(DOM 위)에 둬 불티가 망치 뒤로 깔리게 한다 — 불티는 임팩트 중심에서
-                        솟구치고 망치 머리도 같은 중심에 닿으므로, 불티가 망치 위면 머리를 가린다. paint order
-                        의존을 의도적으로 고정(아래 HammerStrike 가 나중 형제라 불티 위에 그려진다). */}
-                    <HitSparkCanvas
-                      event={hammerStrikeEvent}
-                      impactMs={anim.hammerImpactMs}
-                    />
-                    {/* 망치는 결과 연출·불꽃 위(전면)에 그려 내려치는 순간이 가려지지 않게 한다. impactMs 로
-                        닿는 시점을 데이터에서 받는다(떨림·불꽃·타격음과 동일 앵커). */}
+                    {/* 망치는 결과 연출 위에 그린다. impactMs 로 닿는 시점을 데이터에서 받는다(떨림·불꽃·
+                        타격음과 동일 앵커). */}
                     <HammerStrike
                       event={hammerStrikeEvent}
                       impactMs={anim.hammerImpactMs}
                       shape={hammerShape}
+                    />
+                    {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 불티·잉걸불·화구·불혀를 캔버스에 1회 폭발.
+                        가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 DOM 풀).
+                        ⚠️ 망치보다 "뒤"(DOM 아래)가 아니라 위에 둔다 — 불꽃의 화구·불혀는 임팩트 중심에서
+                        피어나는데, 바로 그 자리에 망치 머리가 닿아 정지(holdAfter)하므로 망치 뒤에 깔면 핵심
+                        연출이 통째로 가려진다. 임팩트 섬광이 잠깐(≤0.2s) 망치 머리를 삼키는 것이 의도된 강렬함.
+                        paint order 의존을 의도적으로 고정(HitSparkCanvas 가 나중 형제라 망치 위에 그려진다). */}
+                    <HitSparkCanvas
+                      event={hammerStrikeEvent}
+                      impactMs={anim.hammerImpactMs}
+                      faceOffset={anim.hammerFaceOffset}
                     />
                     {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
                     <FloatingTextEffect event={floatingText} />

@@ -33,7 +33,7 @@ export const SPEED_GATE_PX_PER_MS = 0.7
 // |Δrotate|·반경을 이동 거리에 더한다(제자리 회전도 머리는 크게 쓸므로 자국·게이트에 반영).
 export const HEAD_RADIUS_PX = 48
 // 머리(펜)로부터 이 궤적 거리(px)에서 자국이 완전히 사라진다 — 스냅 전체 poseDistance(호 ≈293px +
-// 회전 환산 ≈97px ≈ 390px)보다 살짝 길게 잡아 꼬리 끝이 가까스로 비치게. 줄이면 보이는 꼬리가
+// 회전 환산 ≈89px ≈ 382px)보다 살짝 길게 잡아 꼬리 끝이 가까스로 비치게. 줄이면 보이는 꼬리가
 // 짧아지고, 늘리면 꼬리 끝이 진해진다.
 export const TAIL_FALLOFF_PX = 450
 // 스미어 blur(px, 화면 CSS px 기준) — 자국 경계를 녹여 한 덩어리 물감처럼. 머리의 또렷함은
