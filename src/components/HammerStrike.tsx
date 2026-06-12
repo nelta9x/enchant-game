@@ -3,6 +3,7 @@ import { motion, useAnimationControls } from 'motion/react'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { itemSpriteUrl } from '../lib/sprites'
 import { computeHammerMotion, type HammerShape } from './hammerTiming'
+import { TRAIL, strikeTarget } from './hammerTrail'
 
 // 강화 "내려치기" 연출(프레젠테이션 전용) — 강화 시도마다(성공·파괴·방지 무관) 호라드릭 망치가
 // 오른쪽 위로 치켜들었다가 빠르게 휘둘러 내리꽂고, 그 자리에서 바로 사라진다(회수 없음). 게임 로직과
@@ -10,10 +11,10 @@ import { computeHammerMotion, type HammerShape } from './hammerTiming'
 // 그린다(성공·파괴·방지 공통). 타이밍은 Effect 시스템(durationMs)이 소유한다.
 //
 // 단일 인스턴스 재사용 — 다른 1회성 연출(OneShotOverlay+AnimatePresence)과 달리, 망치는 항상 마운트된
-// motion.img 한 개를 두고 새 이벤트 id 가 올 때 같은 노드의 애니메이션을 처음부터 재시작한다
-// (useAnimationControls). 키 교체로 새 노드를 마운트하면 연사(꾹 누름) 중 옛 망치와 새 망치가 한 프레임
-// 겹쳐 좌우로 쓸려 보이므로, 노드를 재사용해 "동시에 망치는 항상 1개"를 보장한다(하드 컷). 대기(연출 전후)
-// 엔 INITIAL(opacity 0)에 머물러 보이지 않는다.
+// 고정 노드 한 벌(본체 motion.img + 머리 잔상 사본들)을 두고 새 이벤트 id 가 올 때 같은 노드들의 애니메이션을
+// 처음부터 재시작한다(useAnimationControls). 키 교체로 새 노드를 마운트하면 연사(꾹 누름) 중 옛 망치와 새
+// 망치가 한 프레임 겹쳐 좌우로 쓸려 보이므로, 노드를 재사용해 "동시에 망치는 항상 1세트"를 보장한다(하드 컷).
+// 대기(연출 전후)엔 INITIAL(opacity 0)에 머물러 보이지 않는다. 머리 잔상(스프라이트 모션 블러)은 hammerTrail 참고.
 //
 // 쾌감(immediacy)을 위해 "느린 활강"이 아니라 "치켜듦 → 빠른 스냅 → 강타"로 친다: 등장 즉시 오른쪽
 // 위에 치켜든 자세로 나타나(클릭 피드백) 잠깐 윈드업한 뒤, 임팩트 직전(holdUntil→impactSec)에 짧고
@@ -66,10 +67,37 @@ export function HammerStrike({
   const narrowRaise = useMediaQuery(NARROW_RAISE_QUERY)
   const raiseX = (v: number) => (narrowRaise ? v * NARROW_RAISE_X_SCALE : v)
 
-  // 단일 인스턴스 — 항상 마운트된 motion.img 한 개를 useAnimationControls 로 명령형 재생한다. motion 이
+  // 본체(또렷한 컬러 망치) — 항상 마운트된 motion.img 를 useAnimationControls 로 명령형 재생한다. motion 이
   // transform/opacity 를 단독 소유하므로(React 인라인 style 과 충돌 없음) 평범한 <img>+useAnimate 처럼 재렌더가
-  // 애니메이션을 끊지 않는다. 새 이벤트마다 같은 노드를 재시작 → 동시에 망치 항상 1개·겹침 없음.
+  // 애니메이션을 끊지 않는다. 새 이벤트마다 같은 노드를 재시작 → 동시에 본체 항상 1개·겹침 없음.
   const controls = useAnimationControls()
+
+  // 머리 스프라이트 모션 블러(흰 잔상 스미어) — 본체와 같은 궤적을 조금씩 늦게 따라오는 흰 망치 실루엣 사본들의
+  // 컨트롤(hammerTrail.TRAIL 한 겹당 하나). 머리쪽(가까운 겹)은 또렷·꼬리쪽(먼 겹)은 흐려져 하나의 스미어로
+  // 녹는다. hook 수는 정적이어야 하므로 TRAIL.length(10)와 같은 수를 명시 호출한다(겹 수를 바꾸면 TRAIL 과
+  // 여기를 함께 고친다). 본체와 한 묶음으로 play()에서 같이 리셋·재시작 → 잔상도 동시에 1세트만 존재.
+  const ghost0 = useAnimationControls()
+  const ghost1 = useAnimationControls()
+  const ghost2 = useAnimationControls()
+  const ghost3 = useAnimationControls()
+  const ghost4 = useAnimationControls()
+  const ghost5 = useAnimationControls()
+  const ghost6 = useAnimationControls()
+  const ghost7 = useAnimationControls()
+  const ghost8 = useAnimationControls()
+  const ghost9 = useAnimationControls()
+  const ghostControls = [
+    ghost0,
+    ghost1,
+    ghost2,
+    ghost3,
+    ghost4,
+    ghost5,
+    ghost6,
+    ghost7,
+    ghost8,
+    ghost9,
+  ]
 
   // 휴면(연출 전후) 포즈 — opacity 0 으로 안 보임. 매 재생은 여기서 시작해 키프레임을 처음부터 튼다.
   const initial = {
@@ -80,13 +108,12 @@ export function HammerStrike({
     opacity: 0,
   }
 
-  // 1회 재생: 같은 노드를 INITIAL 로 하드 리셋한 뒤 키프레임을 처음부터 튼다(연사·재강화에도 겹침 없이 재시작).
-  // 끝 키프레임이 opacity 0 이라 끝나면 알아서 사라진다.
+  // 1회 재생: 같은 노드들을 INITIAL 로 하드 리셋한 뒤 키프레임을 처음부터 튼다(연사·재강화에도 겹침 없이
+  // 재시작). 끝 키프레임이 opacity 0 이라 끝나면 알아서 사라진다. 본체(delay 0)와 잔상(머리 스프라이트 블러)을
+  // 한 묶음으로 같이 튼다 — 궤적(geom)은 동일하고 잔상만 늦게 시작·옅게·스냅에서만 켜진다(strikeTarget 참고).
   const play = () => {
-    controls.set(initial)
-    controls.start({
-      // 치켜듦(START)→윈드업(HOLD) 대기 → 빠른 스냅으로 내리꽂아 따라넘김(-FOLLOW_TILT)·확대로
-      // 강타(IMPACT) → 그 자리에서 페이드아웃(회수 없음).
+    // 치켜듦(START)→윈드업(HOLD) 대기 → 빠른 스냅으로 내리꽂아 따라넘김(-FOLLOW_TILT)·확대로 강타(IMPACT).
+    const geom = {
       x: [raiseX(START.x), raiseX(HOLD.x), IMPACT.x, IMPACT.x],
       y: [START.y, HOLD.y, IMPACT.y, IMPACT.y],
       rotate: [
@@ -96,27 +123,18 @@ export function HammerStrike({
         BASE_ROTATE - FOLLOW_TILT,
       ],
       scale: [0.9, 0.95, 1.08, 1.08],
-      opacity: [0, 1, 1, 1, 0],
-      transition: {
-        duration: m.motionSec,
-        // 대기(0→holdUntil) → 스냅(→impact, easeIn 가속) → 제자리 페이드아웃.
-        times: [0, m.holdUntil / m.motionSec, m.impactSec / m.motionSec, 1],
-        ease: ['easeInOut', 'easeIn', 'linear'],
-        // opacity 는 위치 곡선과 분리한다 — 치켜든 동안에도 또렷이 보이도록 초반에 빠르게 켜고,
-        // 정지 구간 동안 유지했다가 페이드아웃. 페이드인 지점(0.12)은 임팩트보다 늦으면 times 가
-        // 비단조가 돼(motion 거부) — 임팩트 비율로 클램프한다(위치 times 는 holdUntil≤impact≤motion 이라 안전).
-        opacity: {
-          duration: m.motionSec,
-          times: [
-            0,
-            Math.min(0.12, m.impactSec / m.motionSec),
-            m.impactSec / m.motionSec,
-            m.holdAfterEnd / m.motionSec,
-            1,
-          ],
-          ease: 'easeOut',
-        },
-      },
+    }
+    controls.set(initial)
+    controls.start(strikeTarget(geom, m, { opacityPeak: 1, delaySec: 0, ghost: false }))
+    ghostControls.forEach((g, i) => {
+      g.set(initial)
+      g.start(
+        strikeTarget(geom, m, {
+          opacityPeak: TRAIL[i].opacity,
+          delaySec: TRAIL[i].lagMs / 1000,
+          ghost: true,
+        }),
+      )
     })
   }
 
@@ -135,16 +153,37 @@ export function HammerStrike({
     if (playId !== undefined) playRef.current()
   }, [playId])
 
+  // grid place-items-center 로 잔상 사본·본체 망치를 같은 셀([grid-area:1/1])에 겹쳐 모두 박스 중앙에 자연
+  // 정렬한다(transform 중앙 정렬은 motion 의 x/y/rotate/scale 과 충돌하므로 grid 로 위치). 흰 잔상(스프라이트
+  // 실루엣)을 먼저 그려 본체 뒤에 깔고, 본체(또렷한 컬러)를 마지막에 그려 위에 덮는다 — 머리쪽 잔상은 망치
+  // 형상이 또렷하고 꼬리로 갈수록 더 흐려져 모션 블러 스미어로 녹는다.
   return (
     <div
-      className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-visible"
+      className="pointer-events-none absolute inset-0 grid place-items-center overflow-visible"
       aria-hidden
     >
+      {ghostControls.map((g, i) => (
+        <motion.img
+          key={i}
+          src={HAMMER_SPRITE}
+          alt=""
+          draggable={false}
+          className="col-start-1 row-start-1 h-24 w-24 object-contain sm:h-28 sm:w-28"
+          // brightness(0) invert(1) = 불투명 픽셀을 순백 망치 실루엣으로, blur 는 겹마다 달라(머리 또렷→꼬리
+          // 흐림) 스미어로 녹는다(hammerTrail.TRAIL.blurPx).
+          style={{
+            imageRendering: 'pixelated',
+            filter: `brightness(0) invert(1) blur(${TRAIL[i].blurPx}px)`,
+          }}
+          initial={initial}
+          animate={g}
+        />
+      ))}
       <motion.img
         src={HAMMER_SPRITE}
         alt=""
         draggable={false}
-        className="h-24 w-24 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)] sm:h-28 sm:w-28"
+        className="col-start-1 row-start-1 h-24 w-24 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.35)] sm:h-28 sm:w-28"
         style={{ imageRendering: 'pixelated' }}
         initial={initial}
         animate={controls}
