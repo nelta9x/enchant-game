@@ -8,7 +8,7 @@
 // GameScreen 이 데이터를 HammerShape 로 조립해 흘려보낸다(임팩트는 ms, 모양은 초 단위). 데이터는
 // import 시점에 로드돼 있지 않으므로(모듈 평가 < dataManager.load) 모듈 상수가 아니라 런타임 호출로 둔다.
 
-import type { TargetAndTransition } from 'motion/react'
+import type { Easing, TargetAndTransition } from 'motion/react'
 
 const TAIL_MS = 60 // 모션 종료 후 효과가 running 에서 빠질 때까지 여유(ShakeBurst 의 +60 관례)
 
@@ -50,7 +50,8 @@ export function hammerStrikeMs(impactMs: number, shape: HammerShape): number {
   )
 }
 
-// 본체 망치의 키프레임 궤적(치켜듦→윈드업→스냅→임팩트 정지) — HammerStrike 가 모션 상수로 조립해 넘긴다.
+// 본체 망치의 키프레임 궤적(치켜듦→윈드업→스냅→임팩트 정지) — hammerSwing.ts 가 피벗 호(arc)
+// 모델에서 샘플링해 조립한다.
 export type StrikeGeom = {
   x: number[]
   y: number[]
@@ -58,21 +59,31 @@ export type StrikeGeom = {
   scale: number[]
 }
 
-// 본체 망치의 키프레임 타깃 — 궤적(geom)에 타이밍(m)을 입힌다. 대기(0→holdUntil) → 스냅(→impact,
-// easeIn 가속) → 제자리 정지·페이드아웃. opacity 는 궤적 곡선과 분리: 초반에 빠르게 켜 정지까지
-// 유지하다 페이드아웃 구간에서 꺼진다.
+// 궤적 + 시간 배치 — 호 샘플은 등각이라 가속(임팩트로 갈수록 빠름)은 비균등 times 가 만든다.
+// times 는 키프레임마다 하나(0~1, motionSec 기준), ease 는 구간마다 하나(times.length - 1).
+export type SwingKeyframes = StrikeGeom & {
+  times: number[]
+  ease: Easing[]
+}
+
+// 본체 망치의 키프레임 타깃 — 궤적(kf: 포즈·times·ease 가 한 몸)에 전체 길이(m)를 입힌다. opacity 는
+// 궤적 곡선과 분리: 초반에 빠르게 켜 정지까지 유지하다 페이드아웃 구간에서 꺼진다.
+// (kf 를 spread 하면 times·ease 가 스타일 값으로 새므로 채널을 명시적으로 옮긴다.)
 export function strikeTarget(
-  geom: StrikeGeom,
+  kf: SwingKeyframes,
   m: HammerMotion,
 ): TargetAndTransition {
   const impactRatio = m.impactSec / m.motionSec
   return {
-    ...geom,
+    x: kf.x,
+    y: kf.y,
+    rotate: kf.rotate,
+    scale: kf.scale,
     opacity: [0, 1, 1, 1, 0],
     transition: {
       duration: m.motionSec,
-      times: [0, m.holdUntil / m.motionSec, impactRatio, 1],
-      ease: ['easeInOut', 'easeIn', 'linear'],
+      times: kf.times,
+      ease: kf.ease,
       opacity: {
         duration: m.motionSec,
         times: [

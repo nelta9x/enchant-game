@@ -6,8 +6,8 @@ import {
   computeHammerMotion,
   strikeTarget,
   type HammerShape,
-  type StrikeGeom,
 } from './hammerTiming'
+import { swingKeyframes } from './hammerSwing'
 import { TRAIL_BLUR_PX } from './hammerTrail'
 import { HammerSmearSystem } from './hammerSmear'
 
@@ -38,28 +38,15 @@ import { HammerSmearSystem } from './hammerSmear'
 
 const HAMMER_SPRITE = itemSpriteUrl('horadric_hammer.png')
 
-// ── 모션 튜닝 상수(브라우저에서 눈으로 맞추는 값) ─────────────────────────────────
-// x·y(px): 검 박스 "중심"(0,0) 기준 망치 중심의 위치. x 양수 = 오른쪽, y 음수 = 위.
-// 머리=위·손잡이=아래라, 임팩트에서 망치를 검 위(중심 살짝 위)에 겹쳐 머리가 검 윗날 근처에 오게 둔다.
-const START = { x: 178, y: -140 } // 등장 즉시 치켜든 자세(오른쪽 위) — overflow-visible 라 박스 밖이어도 안 잘린다
-const HOLD = { x: 196, y: -156 } // 살짝 더 당겨 든 윈드업(앤티시페이션) — 곧 휘둘러 내리꽂을 준비
-// 임팩트 자세를 더 꺾으면(FOLLOW_TILT↑) 회전 중심 기준으로 머리가 좌하로 이동한다 — 그만큼 IMPACT 를
-// 우상으로 보정해 머리가 계속 마법진 정중앙에 닿게 한다(휘두르는 궤적이라 START 가 오른쪽 위로 멀다).
-const IMPACT = { x: 24, y: -3 } // 내리꽂은 순간 — 망치 머리가 마법진(검 박스) 정중앙에 닿는다(더 꺾인 자세 보정)
-const BASE_ROTATE = 0 // 임팩트 기준 자세(머리=위, 손잡이=아래). 키프레임의 +는 윈드업(뒤로 젖힘), -는 따라넘김
-const WINDUP_TILT = 56 // 치켜들 때 머리를 오른쪽으로 젖힌 정도(스윙 윈드업) — 클수록 크게 휘두름
-const FOLLOW_TILT = 56 // 임팩트에서 휘둘러 따라넘긴 정도(반대 방향 기울임) — 클수록 더 꺾인 타격 자세
-
-// 좁은(세로) 화면 보정 — 치켜든 자세(START·HOLD)의 +x 가 검 박스 중심에서 오른쪽으로 멀리 나가면 폭이
-// 좁을 때 화면 밖으로 넘쳐 가로 스크롤/줌(확대처럼 보임)을 만든다. 그 raised 위치의 x 만 안쪽으로 줄여
-// (임팩트 부근 위치는 그대로) 화면 안에서 시작하게 한다. 임팩트는 검 근처라 영향 없음.
-// 값(0.6)·기준폭(sm=640px)은 눈으로 맞추는 튜닝값 — 거슬리면 조정. (가로 넘침 자체는 루트의 overflow-x 가
-// 한 번 더 막는다 — GameScreen 최상위 컨테이너.)
+// 좁은(세로) 화면 보정의 분기점 — 폭이 좁으면 치켜든 자세가 화면 밖으로 넘쳐 가로 스크롤/줌을
+// 만들므로, 호의 x 를 안쪽으로 압축한다(계산은 hammerSwing.ts 의 narrow 분기 — 임팩트 x 는 불변).
+// 기준폭(sm=640px)은 눈으로 맞추는 튜닝값. (가로 넘침 자체는 루트의 overflow-x 가 한 번 더 막는다
+// — GameScreen 최상위 컨테이너.)
 const NARROW_RAISE_QUERY = '(max-width: 640px)'
-const NARROW_RAISE_X_SCALE = 0.6
 
-// 타임라인(망치 모션의 시각 도출)·키프레임 타깃 조립은 hammerTiming.ts(순수 모듈)가 소유한다 — 임팩트
-// 앵커만 데이터에서 오고, 윈드업·정지·페이드아웃은 그 임팩트 기준 상대 오프셋이다.
+// 궤적(피벗 호 + 손목 스냅 모델·튜닝 상수)은 hammerSwing.ts, 타임라인(모션 시각 도출)·키프레임 타깃
+// 조립은 hammerTiming.ts — 둘 다 순수 모듈이다. 임팩트 시각만 데이터에서 오고, 임팩트 "포즈"는
+// hammerSwing 의 앵커 상수다(떨림·불꽃·타격음과 동기화되는 지점이라 튜닝해도 변하지 않는다).
 
 export type HammerStrikeEvent = { id: number }
 
@@ -74,9 +61,10 @@ export function HammerStrike({
 }) {
   const m = computeHammerMotion(impactMs / 1000, shape)
 
-  // 좁은(세로) 화면이면 치켜든 위치의 x 를 안쪽으로 줄여 화면 밖에서 시작하지 않게 한다(위 주석 참고).
+  // 좁은(세로) 화면이면 호의 x 를 안쪽으로 압축해 화면 밖에서 시작하지 않게 한다(위 주석 참고).
   const narrowRaise = useMediaQuery(NARROW_RAISE_QUERY)
-  const raiseX = (v: number) => (narrowRaise ? v * NARROW_RAISE_X_SCALE : v)
+  // 스윙 전체 키프레임(피벗 호 샘플) — 등장 포즈(initial)와 재생 타깃이 같은 배열을 본다.
+  const kf = swingKeyframes(m, narrowRaise)
 
   // 본체(또렷한 컬러 망치) — 항상 마운트된 motion.img 를 useAnimationControls 로 명령형 재생한다. motion 이
   // transform/opacity 를 단독 소유하므로(React 인라인 style 과 충돌 없음) 평범한 <img>+useAnimate 처럼 재렌더가
@@ -112,10 +100,10 @@ export function HammerStrike({
 
   // 휴면(연출 전후) 포즈 — opacity 0 으로 안 보임. 매 재생은 여기서 시작해 키프레임을 처음부터 튼다.
   const initial = {
-    x: raiseX(START.x),
-    y: START.y,
-    rotate: BASE_ROTATE + WINDUP_TILT,
-    scale: 0.9,
+    x: kf.x[0],
+    y: kf.y[0],
+    rotate: kf.rotate[0],
+    scale: kf.scale[0],
     opacity: 0,
   }
 
@@ -123,22 +111,10 @@ export function HammerStrike({
   // 재시작). 끝 키프레임이 opacity 0 이라 끝나면 알아서 사라진다. 스미어도 같은 순간 하드 컷(begin) —
   // 이전 강화의 잔상을 즉시 비워 "스미어는 항상 1세트"를 본체와 같은 규약으로 지킨다.
   const play = () => {
-    // 치켜듦(START)→윈드업(HOLD) 대기 → 빠른 스냅으로 내리꽂아 따라넘김(-FOLLOW_TILT)·확대로 강타(IMPACT).
-    const geom: StrikeGeom = {
-      x: [raiseX(START.x), raiseX(HOLD.x), IMPACT.x, IMPACT.x],
-      y: [START.y, HOLD.y, IMPACT.y, IMPACT.y],
-      rotate: [
-        BASE_ROTATE + WINDUP_TILT,
-        BASE_ROTATE + WINDUP_TILT + 8,
-        BASE_ROTATE - FOLLOW_TILT,
-        BASE_ROTATE - FOLLOW_TILT,
-      ],
-      scale: [0.9, 0.95, 1.08, 1.08],
-    }
     // 본체 img 의 실측 렌더 크기(rem 반응 스케일 반영)를 자국 크기로 — 측정 전(0)이면 자국을 안 그린다.
     smearRef.current?.begin(bodyRef.current?.clientWidth ?? 0)
     controls.set(initial)
-    controls.start(strikeTarget(geom, m))
+    controls.start(strikeTarget(kf, m))
   }
 
   // 아래 재생 effect 가 이벤트 id 변화에만 반응하도록(impactMs·shape·narrowRaise 를 deps 에 넣으면 매
@@ -169,10 +145,11 @@ export function HammerStrike({
         ref={canvasRef}
         className="pointer-events-none absolute left-1/2 top-1/2"
         // blur 는 자국 경계를 녹여 한 덩어리 물감 스미어로 — 머리의 또렷함은 위에 덮이는 본체가 담당.
+        // 크기는 스윙 호 전체(윈드업 x≈265px + 회전 스프라이트 반경)를 덮도록 ±368×±256px.
         style={{
-          width: '40rem',
+          width: '46rem',
           height: '32rem',
-          marginLeft: '-20rem',
+          marginLeft: '-23rem',
           marginTop: '-16rem',
           filter: `blur(${TRAIL_BLUR_PX}px)`,
         }}
