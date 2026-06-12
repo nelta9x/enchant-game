@@ -181,6 +181,9 @@ export function SwordStage({
               <img
                 src={swordSpriteUrl(sword.sprite)}
                 alt={t(sword.nameKey)}
+                // async: 교체 프레임에서 동기 디코드로 래스터를 막지 않는다(다음 검은 프리디코드돼 있어
+                // 보통 즉시 그려진다 — GameScreen 의 preloadImage effect 참고).
+                decoding="async"
                 className="h-36 w-36 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] sm:h-40 sm:w-40"
                 style={{ imageRendering: 'pixelated' }}
                 draggable={false}
