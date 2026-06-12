@@ -10,14 +10,22 @@ import {
 import { createCommissionStore } from './commissionStore'
 import { useGameStore } from './gameStore'
 import { dataManager } from '../data/DataManager'
-import type { CommissionConfig, GoldBucket, Material } from '../data/types'
+import type { CommissionConfig, GoldBucket } from '../data/types'
+import type { Commission } from './commissionQueue'
 
-// 골드 보상 Material 에서 금액 추출(본 픽스처는 전부 골드 의뢰 — 아니면 0 으로 단언 실패 유도).
-const goldOf = (reward: Material): number =>
-  reward.kind === 'gold' ? reward.amount : 0
-// 아이템 비용 의뢰의 납품 itemId 추출(본 픽스처는 골드 비용을 쓰지 않음 — 골드면 빈 문자열로 단언 실패 유도).
-const costItemId = (cost: Material): string =>
-  cost.kind === 'item' ? cost.itemId : ''
+// 거래(trade) 제안임을 확정하고 그 타입으로 좁힌다 — 본 파일 픽스처는 전부 거래 풀만 다룬다(도박은 별도).
+function asTrade<T extends { kind: 'trade' | 'gamble' }>(
+  c: T,
+): Extract<T, { kind: 'trade' }> {
+  if (c.kind !== 'trade') throw new Error('expected a trade offer')
+  return c as Extract<T, { kind: 'trade' }>
+}
+// 골드 보상에서 금액 추출(본 픽스처는 전부 골드 의뢰 — 거래·골드 보상이 아니면 0 으로 단언 실패 유도).
+const goldOf = (c: Commission): number =>
+  c.kind === 'trade' && c.reward.kind === 'gold' ? c.reward.amount : 0
+// 아이템 비용 의뢰의 납품 itemId 추출(본 픽스처는 골드 비용을 쓰지 않음 — 아니면 빈 문자열로 단언 실패 유도).
+const costItemId = (c: Commission): string =>
+  c.kind === 'trade' && c.cost.kind === 'item' ? c.cost.itemId : ''
 
 // 셸(타이머+데이터) 통합 테스트. 풀 basePrice 는 실제 데이터(DataManager)를 쓰되, 설정은 픽스처를 주입해
 // production 값과 독립시킨다. 출제 풀은 보유 골드가 고르므로(currentBucket), 테스트는 gold 를 세팅해
@@ -31,7 +39,7 @@ beforeEach(() => {
   // 기본은 버킷 A([0, 500000)) 구간. 개별 테스트가 필요하면 gold 를 덮어 다른 버킷을 고른다.
   // maxLevelReached 를 0 으로 리셋해 잠금 게이트 테스트의 출발 바닥을 고정한다(전역 store 공유 → 이전 테스트
   // 잔존값 방지). 본 파일의 CONFIG/BARTER 픽스처는 unlockAtLevel:0 이라 나머지 테스트는 값과 무관하게 활성.
-  useGameStore.setState({ gold: 1000, maxLevelReached: 0 })
+  useGameStore.setState({ gold: 1000, maxLevelReached: 0, gambleSession: null })
 })
 afterEach(() => vi.useRealTimers())
 
@@ -81,6 +89,7 @@ const CONFIG: CommissionConfig = {
     ]),
     bucket(1_000_000, null, [{ itemId: 'iron_scrap', weight: 1 }]),
   ],
+  gamble: null,
 }
 
 describe('commissionStore — 제안 세션 모델', () => {
@@ -89,7 +98,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     store.getState().start()
     expect(store.getState().active).toHaveLength(3) // 세션 3개 한 번에
     // 버킷 A(검 단계 3,4,5)에서만 출제 + 세션 내 중복 없음.
-    const ids = store.getState().active.map((c) => costItemId(c.cost))
+    const ids = store.getState().active.map((c) => costItemId(c))
     for (const id of ids) expect(['sword_3', 'sword_4', 'sword_5']).toContain(id)
     expect(new Set(ids).size).toBe(3) // 서로 다른 제안
     expect(store.getState().nextSpawnAt).toBeNull() // 세션이 떠 있음 → 정지
@@ -107,11 +116,41 @@ describe('commissionStore — 제안 세션 모델', () => {
     // 고른 제안의 납품 재료만 보유시킨다.
     useGameStore.setState({
       currentSwordId: null,
-      items: [{ itemId: costItemId(target.cost), count: 1 }],
+      items: [{ itemId: costItemId(target), count: 1 }],
       gold: 0,
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
     expect(store.getState().active).toHaveLength(0) // 세션 전체 종료(나머지도 사라짐)
+    store.getState().stop()
+  })
+
+  it('도박 세션 중엔 _tick 이 동결돼 새 제안을 스폰하지 않는다("제안만 남고")', () => {
+    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
+    store.getState().start()
+    // 빈 바로 만든다(쿨다운 예약) — 도박 카드 클릭 시 complete 가 active 를 비우는 상황을 모사.
+    const target = store.getState().active[0]
+    useGameStore.setState({
+      currentSwordId: null,
+      items: [{ itemId: costItemId(target), count: 1 }],
+      gold: 0,
+    })
+    store.getState().fulfill(target.id)
+    expect(store.getState().active).toHaveLength(0)
+    // 도박 세션을 연다 → 쿨다운이 지나도 동결돼 재스폰 안 됨.
+    useGameStore.setState({
+      gambleSession: {
+        press: { baseLevel: 15, currentLevel: 15, round: 0, status: 'rolling' },
+        params: { successChance: 0.5, winDelta: 1, loseDelta: 3, maxRounds: 3 },
+        deadline: 999_999,
+      },
+    })
+    // 쿨다운(spawnInterval 10s)을 한참 넘겨도(20s) 동결 중엔 스폰되지 않는다.
+    vi.advanceTimersByTime(20_000)
+    expect(store.getState().active).toHaveLength(0) // 동결 — 스폰 없음
+    // 세션이 비워지면 동결이 풀려, 쿨다운을 세는 tick 뒤 다음 세션이 재스폰된다.
+    useGameStore.setState({ gambleSession: null })
+    vi.advanceTimersByTime(30_000)
+    expect(store.getState().active.length).toBeGreaterThan(0)
     store.getState().stop()
   })
 
@@ -132,7 +171,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     low.getState().start()
     expect(low.getState().active.length).toBeGreaterThan(0)
     for (const c of low.getState().active) {
-      expect(['sword_3', 'sword_4', 'sword_5']).toContain(costItemId(c.cost))
+      expect(['sword_3', 'sword_4', 'sword_5']).toContain(costItemId(c))
     }
     low.getState().stop()
 
@@ -142,7 +181,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     high.getState().start()
     expect(high.getState().active.length).toBeGreaterThan(0)
     for (const c of high.getState().active) {
-      expect(['sword_4', 'sword_5', 'sword_6']).toContain(costItemId(c.cost)) // buckets[1]
+      expect(['sword_4', 'sword_5', 'sword_6']).toContain(costItemId(c)) // buckets[1]
     }
     high.getState().stop()
   })
@@ -153,7 +192,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     const below = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     below.getState().start()
     for (const c of below.getState().active) {
-      expect(['sword_3', 'sword_4', 'sword_5']).toContain(costItemId(c.cost)) // 버킷 A
+      expect(['sword_3', 'sword_4', 'sword_5']).toContain(costItemId(c)) // 버킷 A
     }
     below.getState().stop()
 
@@ -161,7 +200,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     const atBoundary = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     atBoundary.getState().start()
     for (const c of atBoundary.getState().active) {
-      expect(['sword_4', 'sword_5', 'sword_6']).toContain(costItemId(c.cost)) // 버킷 B
+      expect(['sword_4', 'sword_5', 'sword_6']).toContain(costItemId(c)) // 버킷 B
     }
     atBoundary.getState().stop()
   })
@@ -172,8 +211,8 @@ describe('commissionStore — 제안 세션 모델', () => {
     store.getState().start()
     expect(store.getState().active.length).toBeGreaterThan(0)
     for (const c of store.getState().active) {
-      expect(costItemId(c.cost)).toBe('iron_scrap')
-      expect(goldOf(c.reward)).toBeGreaterThan(0) // basePrice(items.json) 기반 골드 보상
+      expect(costItemId(c)).toBe('iron_scrap')
+      expect(goldOf(c)).toBeGreaterThan(0) // basePrice(items.json) 기반 골드 보상
     }
     store.getState().stop()
   })
@@ -199,11 +238,11 @@ describe('commissionStore — 제안 세션 모델', () => {
     const target = store.getState().active[0]
     useGameStore.setState({
       currentSwordId: null,
-      items: [{ itemId: costItemId(target.cost), count: 1 }],
+      items: [{ itemId: costItemId(target), count: 1 }],
       gold: 0,
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
-    expect(useGameStore.getState().gold).toBe(goldOf(target.reward))
+    expect(useGameStore.getState().gold).toBe(goldOf(target))
     expect(store.getState().active).toHaveLength(0) // 세션 전체 종료
     store.getState().stop()
   })
@@ -213,14 +252,14 @@ describe('commissionStore — 제안 세션 모델', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     const target = store.getState().active[0]
-    expect(costItemId(target.cost)).toBe('iron_scrap')
+    expect(costItemId(target)).toBe('iron_scrap')
     useGameStore.setState({
       currentSwordId: 'sword_1',
       items: [{ itemId: 'iron_scrap', count: 3 }],
       gold: 1_500_000,
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
-    expect(useGameStore.getState().gold).toBe(1_500_000 + goldOf(target.reward))
+    expect(useGameStore.getState().gold).toBe(1_500_000 + goldOf(target))
     expect(
       useGameStore.getState().items.find((i) => i.itemId === 'iron_scrap')
         ?.count,
@@ -235,11 +274,11 @@ describe('commissionStore — 제안 세션 모델', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     const target = store.getState().active[0]
-    const frozenReward = goldOf(target.reward)
+    const frozenReward = goldOf(target)
     // 발급 후 고골드로 올려도(버킷 B) 이미 떠 있는 의뢰의 보상은 freeze 값을 유지한다.
     useGameStore.setState({
       currentSwordId: null,
-      items: [{ itemId: costItemId(target.cost), count: 1 }],
+      items: [{ itemId: costItemId(target), count: 1 }],
       gold: 600_000,
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
@@ -272,6 +311,7 @@ describe('commissionStore — 제안 세션 모델', () => {
         spawnIntervalMaxMs: 10_000,
       },
     ],
+    gamble: null,
   }
 
   it('fulfill: 물물교환 — 재료 requiredCount 개 소모하고 아이템 보상을 지급한다', () => {
@@ -283,9 +323,10 @@ describe('commissionStore — 제안 세션 모델', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: BARTER })
     store.getState().start()
     const target = store.getState().active[0]
-    expect(costItemId(target.cost)).toBe('faded_fluorescent')
-    expect(target.cost).toEqual({ kind: 'item', itemId: 'faded_fluorescent', count: 2 })
-    expect(target.reward).toEqual({ kind: 'item', itemId: 'sword_12', count: 1 })
+    expect(costItemId(target)).toBe('faded_fluorescent')
+    const t = asTrade(target)
+    expect(t.cost).toEqual({ kind: 'item', itemId: 'faded_fluorescent', count: 2 })
+    expect(t.reward).toEqual({ kind: 'item', itemId: 'sword_12', count: 1 })
     expect(store.getState().fulfill(target.id)).toBe(true)
     const items = useGameStore.getState().items
     expect(items.find((i) => i.itemId === 'faded_fluorescent')?.count).toBe(1) // 3→1 (2 소모)
@@ -370,6 +411,66 @@ describe('commissionStore — 제안 활성화 잠금(unlockAtLevel)', () => {
     useGameStore.setState({ maxLevelReached: 10 })
     vi.advanceTimersByTime(250)
     expect(store.getState().active).toHaveLength(3)
+    store.getState().stop()
+  })
+})
+
+describe('commissionStore — 수상한 상인(도박) 출제 게이트', () => {
+  // weight 를 크게 줘 거의 확실히 출제되게 한 뒤 "현재 장착 검 레벨" 게이트만 검증한다.
+  const withGamble = (minSwordLevel: number): CommissionConfig => ({
+    ...CONFIG,
+    gamble: {
+      minSwordLevel,
+      successChance: 0.5,
+      winDelta: 1,
+      loseDelta: 3,
+      maxRounds: 3,
+      weight: 1000,
+    },
+  })
+
+  it('현재 검 레벨이 minSwordLevel 미만이면 도박이 출제되지 않는다', () => {
+    // sword_5(레벨 5) < 15 → 게이트 미통과. 풀에 도박이 없어 전부 거래.
+    useGameStore.setState({ currentSwordId: 'sword_5', gold: 1000 })
+    const store = createCommissionStore({ rng: () => 0.5, config: withGamble(15) })
+    store.getState().start()
+    expect(store.getState().active.length).toBeGreaterThan(0)
+    expect(store.getState().active.every((c) => c.kind === 'trade')).toBe(true)
+    store.getState().stop()
+  })
+
+  it('현재 검 레벨이 minSwordLevel 이상이면 도박이 출제된다(세션당 최대 1개)', () => {
+    // sword_20(레벨 20) >= 15 → 게이트 통과. pickDistinct 가 항목 단위로 dedup 하므로 세션당 최대 1개.
+    useGameStore.setState({ currentSwordId: 'sword_20', gold: 1000 })
+    const store = createCommissionStore({ rng: () => 0.5, config: withGamble(15) })
+    store.getState().start()
+    const gambles = store.getState().active.filter((c) => c.kind === 'gamble')
+    expect(gambles).toHaveLength(1)
+    store.getState().stop()
+  })
+
+  it('최종 검에서는 도박이 출제되지 않는다(상한 게이트)', () => {
+    // 최종 검(레벨 = 최고)에선 승리가 상한에 클램프돼 순수 손해이므로 제외(하한 게이트의 거울상).
+    const maxLevel = dataManager.getMaxSwordLevel()
+    const topSword = dataManager.getSwordByLevel(maxLevel)!
+    useGameStore.setState({ currentSwordId: topSword.id, gold: 1000 })
+    const store = createCommissionStore({ rng: () => 0.5, config: withGamble(15) })
+    store.getState().start()
+    expect(store.getState().active.length).toBeGreaterThan(0)
+    expect(store.getState().active.every((c) => c.kind === 'trade')).toBe(true)
+    store.getState().stop()
+  })
+
+  it('도박 fulfill 은 press 세션을 열고 카드 세션을 끝낸다(검은 에스크로 — 아직 안 바뀜)', () => {
+    useGameStore.setState({ currentSwordId: 'sword_20', gold: 1000 })
+    const store = createCommissionStore({ rng: () => 0.5, config: withGamble(15) })
+    store.getState().start()
+    const g = store.getState().active.find((c) => c.kind === 'gamble')!
+    expect(store.getState().fulfill(g.id)).toBe(true)
+    expect(store.getState().active).toHaveLength(0) // 카드 세션 종료(complete)
+    // press 세션이 열렸고 검은 아직 그대로 — 확정은 모달에서(에스크로).
+    expect(useGameStore.getState().gambleSession).not.toBeNull()
+    expect(useGameStore.getState().currentSwordId).toBe('sword_20')
     store.getState().stop()
   })
 })

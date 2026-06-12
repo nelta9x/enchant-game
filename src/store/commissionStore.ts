@@ -5,6 +5,7 @@ import {
   bootstrapCommissionQueue,
   commissionPool,
   complete,
+  gamblePoolEntry,
   tick,
   type CommissionQueueState,
   type BucketSettings,
@@ -47,7 +48,9 @@ type CommissionActions = {
   stop: () => void
   // 내부: 시간 전진 1회 — 설정·풀·보유 골드를 읽어 tick 에 주입.
   _tick: () => void
-  // 의뢰 완료 시도: gameStore 가 검 소모+보상을 수락하면 complete 적용 후 true. 미보유면 false(무변화).
+  // 의뢰 완료 시도. 거래(trade)는 gameStore 가 검 소모+보상을 수락하면 complete 적용 후 true(미보유면 false).
+  // 도박(gamble)은 검이 있으면 press-your-luck 세션을 열고(startGamble) 카드 세션을 종료한 뒤 true — 실제
+  // 결과는 모달에서 라운드별로 정해진다. 검이 없으면 false(무변화). 어느 쪽이든 boolean 만 돌려준다.
   fulfill: (id: number) => boolean
 }
 
@@ -92,8 +95,32 @@ export function createCommissionStore(opts: CreateOpts = {}) {
   }
 
   // 출제 풀 조립: 현재 버킷의 items[] 에 basePrice 를 붙여 PoolEntry[] 로. start(부트스트랩)·_tick 이 공유.
-  const buildPool = (bucket: GoldBucket): PoolEntry[] =>
-    commissionPool(bucket.items, (id) => dataManager.getItemBasePrice(id))
+  // 수상한 상인(도박)은 글로벌 설정이라 버킷 풀에 합류시킨다 — 단 "현재 장착 검 레벨 >= minSwordLevel" 게이트를
+  // 통과할 때만(maxLevelReached 가 아니라 현재 검 레벨 — 파괴로 낮아지면 다음 세션부터 사라진다). 골드 버킷이
+  // "다음 세션부터" 반영되는 패턴과 동일하게, 검 레벨 변동은 다음 풀 조립(= 다음 세션)부터 반영된다.
+  const buildPool = (
+    bucket: GoldBucket,
+    config: CommissionConfig,
+  ): PoolEntry[] => {
+    const pool = commissionPool(bucket.items, (id) =>
+      dataManager.getItemBasePrice(id),
+    )
+    const g = config.gamble
+    if (g) {
+      const curId = useGameStore.getState().currentSwordId
+      const curLevel = curId
+        ? (dataManager.getSwordById(curId)?.level ?? 0)
+        : 0
+      // 하한(minSwordLevel)과 상한(최고 검 미만) 사이에서만 출제한다. 최종 검에선 승리가 상한에 클램프돼
+      // 무의미(또는 클리어 모달 재발화)하고 패배만 남아 순수 손해가 되므로 제외한다(하한 게이트의 거울상).
+      if (
+        curLevel >= g.minSwordLevel &&
+        curLevel < dataManager.getMaxSwordLevel()
+      )
+        pool.push(gamblePoolEntry(g))
+    }
+    return pool
+  }
 
   return create<CommissionStore>((set, get) => ({
     // 초기 상태는 빈 큐(정지) — start()에서 bootstrapCommissionQueue 로 채우고 타이머를 켠다(모듈 평가 시 load 전이라 config 미접근).
@@ -114,7 +141,7 @@ export function createCommissionStore(opts: CreateOpts = {}) {
           bootstrapCommissionQueue(
             now(),
             rng,
-            buildPool(bucket),
+            buildPool(bucket, config),
             settingsOf(bucket),
             config.maxCommissions,
           ),
@@ -138,6 +165,9 @@ export function createCommissionStore(opts: CreateOpts = {}) {
       // 잠금 중이면 아무것도 하지 않는다 — 초기 빈 상태(active:[], nextSpawnAt:null)를 그대로 두므로
       // set 호출이 없어 구독자 리렌더가 발생하지 않는다(잠금 구간이 길어도 비용 0). 풀 조립도 건너뛴다.
       if (!isUnlocked(config)) return
+      // 도박 세션 중엔 큐를 동결한다 — 새 제안을 스폰·만료시키지 않아 클릭 시 비워진 바에 도박 패널만 남는다
+      // ("수상한 상인 제안만 남고"). 세션이 확정/실패로 비워지면 다음 tick 부터 동결이 풀려 쿨다운 뒤 재스폰.
+      if (useGameStore.getState().gambleSession !== null) return
       const bucket = currentBucket(config)
       if (!bootstrapped) {
         // 해제 직후 첫 tick — start 가 잠금 상태로 켜졌던 경로의 진입점. 즉시 첫 세션을 채운다(start 부트스트랩과 동일).
@@ -145,7 +175,7 @@ export function createCommissionStore(opts: CreateOpts = {}) {
           bootstrapCommissionQueue(
             now(),
             rng,
-            buildPool(bucket),
+            buildPool(bucket, config),
             settingsOf(bucket),
             config.maxCommissions,
           ),
@@ -157,7 +187,7 @@ export function createCommissionStore(opts: CreateOpts = {}) {
         get(),
         now(),
         rng,
-        buildPool(bucket),
+        buildPool(bucket, config),
         settingsOf(bucket),
         config.maxCommissions,
       )
@@ -168,6 +198,24 @@ export function createCommissionStore(opts: CreateOpts = {}) {
     fulfill: (id) => {
       const c = get().active.find((x) => x.id === id)
       if (!c) return false
+      // 도박: 검을 걸어 press-your-luck 세션을 연다(검은 에스크로 — 확정 전까지 안 바뀜). 검이 있어야 시작된다.
+      // 세션이 열리면 카드 세션을 종료(complete)하고 GameScreen 이 gambleSession 을 구독해 모달을 띄운다.
+      // 카드 만료(expiresAt)를 모달이 이어받아 카운트다운·만료 자동 확정에 쓴다(타이머는 유지된다).
+      if (c.kind === 'gamble') {
+        const game = useGameStore.getState()
+        if (game.currentSwordId === null) return false // 검 없음(파산) — 세션 유지
+        game.startGamble(
+          {
+            successChance: c.successChance,
+            winDelta: c.winDelta,
+            loseDelta: c.loseDelta,
+            maxRounds: c.maxRounds,
+          },
+          c.expiresAt,
+        )
+        set((s) => complete(s, id))
+        return true
+      }
       // PlayerState 변경(검 소모+골드)은 gameStore 소유 — 수락(true)일 때만 생명주기에서 제거한다.
       const ok = useGameStore.getState().fulfillCommission(c.cost, c.reward)
       if (!ok) return false

@@ -44,6 +44,18 @@ export const ko = {
   'commission.fulfill': '거래 수락',
   'commission.arrived': '새 거래 제안!',
 
+  // 수상한 상인(도박) — 의뢰 세션에 가끔 끼는 "검을 거는" 일회성 갈림길.
+  'commission.gamble.title': '수상한 상인',
+  'commission.gamble.stake': '검을 걸기',
+  // press-your-luck 진행 카드. 'roll'(한 번 더)은 진행 카드의 스크린리더 aria-label 에만 쓴다(화면엔 미표시).
+  'commission.gamble.roll': '한 번 더',
+  // 도박 도달 레벨 표시 — 성공/실패 시 검이 몇 강화가 되는지(+N).
+  'commission.gamble.next': '성공',
+  'commission.gamble.bustTo': '실패',
+  // sr-only 결과 안내(시각 연출은 aria-hidden) — 도박은 파괴가 아니라 ±레벨 교체다.
+  'commission.gamble.announceWin': '도박 성공 — 검이 강화되었습니다',
+  'commission.gamble.announceLose': '도박 실패 — 검이 약화되었습니다',
+
   // 강화 결과 토스트
   'toast.success': '강화 성공',
   'toast.protected': '파괴보호장치로 보호',

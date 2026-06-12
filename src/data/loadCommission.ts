@@ -1,5 +1,10 @@
 import commissionRaw from './sources/commission.json'
-import type { CommissionConfig, CommissionItemEntry, GoldBucket } from './types'
+import type {
+  CommissionConfig,
+  CommissionItemEntry,
+  GambleConfig,
+  GoldBucket,
+} from './types'
 import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(commission.json)을 검증해 CommissionConfig 로 만드는 로더(loadShop 패턴 미러링).
@@ -197,6 +202,41 @@ function parseBucket(
   }
 }
 
+// 수상한 상인(도박) 글로벌 설정 검증. 누락/null 이면 null(도박 비활성) — 선택적 설정이라 없어도 로드는 성공한다.
+// 있으면 형태·의미(확률 0~1, 레벨/델타 정수 >= 1, weight > 0)를 강제해 잘못 편집된 JSON 이 조용히 새지 않게 한다.
+function parseGambleConfig(raw: unknown): GambleConfig | null {
+  if (raw === undefined || raw === null) return null
+  if (!isRecord(raw))
+    fail('gamble must be an object (or null/omitted to disable)')
+
+  // gamble. 컨텍스트를 붙인 정수(>= min) 헬퍼 — 어느 필드인지 에러 메시지로 즉시 알 수 있게(parseBucket 패턴).
+  const gint = (key: string, min: number): number => {
+    const v = raw[key]
+    if (typeof v !== 'number' || !Number.isFinite(v))
+      fail(`gamble.${key} must be a finite number`)
+    if (!Number.isInteger(v)) fail(`gamble.${key} must be an integer`)
+    if (v < min) fail(`gamble.${key} must be >= ${min}`)
+    return v
+  }
+
+  const minSwordLevel = gint('minSwordLevel', 1)
+  const winDelta = gint('winDelta', 1)
+  const loseDelta = gint('loseDelta', 1)
+  const maxRounds = gint('maxRounds', 1)
+
+  const successChance = raw.successChance
+  if (typeof successChance !== 'number' || !Number.isFinite(successChance))
+    fail('gamble.successChance must be a finite number')
+  if (successChance < 0 || successChance > 1)
+    fail('gamble.successChance must be in [0, 1]')
+
+  const weight = raw.weight
+  if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0)
+    fail(`gamble.weight must be a finite number > 0 (got ${String(weight)})`)
+
+  return { minSwordLevel, winDelta, loseDelta, maxRounds, successChance, weight }
+}
+
 // 순수 검증기: 임의 입력(unknown)을 검증된 CommissionConfig 로 변환한다.
 // 글로벌 시스템 파라미터(maxCommissions=세션 크기 / tickIntervalMs) + 골드 버킷 정의(buckets[])를 검증한다.
 // knownItemIds: 출제 가능 itemId 집합(판매 가능 검 ∪ 아이템 카탈로그) — 버킷 itemId 무결성 검증에 쓴다.
@@ -239,7 +279,10 @@ export function parseCommissionConfig(
   if (buckets[buckets.length - 1].maxGold !== null)
     fail('the last bucket maxGold must be null (spans to infinity)')
 
-  return { maxCommissions, tickIntervalMs, unlockAtLevel, buckets }
+  // 도박 설정(선택적 — 누락/null 이면 비활성). 버킷과 무관한 글로벌이라 parseBucket 밖에서 검증한다.
+  const gamble = parseGambleConfig(raw.gamble)
+
+  return { maxCommissions, tickIntervalMs, unlockAtLevel, buckets, gamble }
 }
 
 // 게임 시작 시 호출되는 로드 진입점. 번들된 데이터 파일을 검증해 CommissionConfig 로 만든다.

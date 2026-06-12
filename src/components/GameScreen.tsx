@@ -19,7 +19,7 @@ import {
   runningEventsOf,
   type Effect,
 } from '../store/effectQueue'
-import { useGameStore } from '../store/gameStore'
+import { useGameStore, type GambleOutcome } from '../store/gameStore'
 import { useCommissionStore } from '../store/commissionStore'
 import type { Commission } from '../store/commissionQueue'
 import { useUiStore } from '../store/uiStore'
@@ -130,6 +130,9 @@ export function GameScreen() {
   const canStoreFn = useGameStore((s) => s.canStore)
   const collectDrop = useGameStore((s) => s.collectDrop)
   const flushDrops = useGameStore((s) => s.flushDrops)
+  // 도박(press-your-luck) 세션 — 진행 중이면 의뢰 바가 인라인 패널로 접힌다(roll/만료는 CommissionBar 가 구동).
+  // 여기선 단축키 게이트(에스크로 검 보호)·상점 가드에만 쓰므로 세션 존재 여부만 구독한다.
+  const gambleSession = useGameStore((s) => s.gambleSession)
 
   const protectionArmed = useUiStore((s) => s.protectionArmed)
   const toggleProtection = useUiStore((s) => s.toggleProtection)
@@ -175,9 +178,12 @@ export function GameScreen() {
   // 따로 게이팅한다(클릭은 handleEnhance 의 잠금 가드가 막는다).
   const enhanceDisabled = !canEnhance || enhanceLocked
 
-  // 상점 팝업 열림 상태.
+  // 상점 팝업 열림 상태. 도박 세션 중엔 열지 않는다 — 모달 백드롭이 막던 같은 클래스(에스크로 보호 방어).
   const [shopOpen, setShopOpen] = useState(false)
-  const openShop = useCallback(() => setShopOpen(true), [])
+  const openShop = useCallback(() => {
+    if (useGameStore.getState().gambleSession !== null) return
+    setShopOpen(true)
+  }, [])
   const closeShop = useCallback(() => setShopOpen(false), [])
 
   // 게임 클리어(승리) — 최종 검(다음 단계 없음)에 도달하면 축하 모달을 띄운다.
@@ -280,15 +286,102 @@ export function GameScreen() {
     [],
   )
 
+  // 수상한 상인(도박) 한 라운드 결과 연출 — 강화 success/destruction 안무를 재사용한다(시각 언어 동일:
+  // 승=상승 버스트, 패=하락 폭발). rollGamble 이 이미 currentSwordId 를 교체했으므로(non-escrow), 변하기 전
+  // 검(fromId)을 떨림 동안 잔상·이름으로 유지했다가 버스트 시점에 결과 검(toId)으로 공개한다.
+  // 망치(강화 동작)는 생략한다 — 도박은 "강화"가 아니라 상인이 검을 바꾸는 것이라 망치 없이 변신만 보인다.
+  const playGambleOutcome = (res: GambleOutcome) => {
+    const fromSword = dataManager.getSwordById(res.fromId)
+    const toSword = dataManager.getSwordById(res.toId)
+    // 떨림 길이는 강화와 동일하게 "변하기 전" 검 레벨대 밴드에서 뽑는다(연출 타임라인 단일 출처).
+    const shakeRange = shakeRangeForLevel(anim.shakeBands, fromSword?.level ?? 1)
+    const tl = computeEnhanceTimeline(anim, rollShakeMs(shakeRange))
+    const burstAtSec = tl.burstAtMs / 1000
+    const won = res.won
+    // 결과음 — 승은 임팩트 앵커, 패는 폭발 시점(burstAt)에 맞춘다(강화 성공/파괴와 동일 앵커).
+    sound.playSfx(won ? 'enhance' : 'enchant_destroyed', {
+      delayMs: won ? tl.impactMs : tl.burstAtMs,
+    })
+    // 잔상 떨림 → 버스트(승=황금 분출 / 패=폭발) + 새 검 등장 억제. 강화 성공/파괴와 동일한 한 쌍을 enqueue 한다
+    // (toBurstEvents 가 같은 kind 로 렌더). 잔상은 변하기 전 검(fromId), 파티클 수는 결과 검(toId) 단계에 비례.
+    if (fromSword) {
+      enqueueEffect({
+        kind: won ? 'successBurst' : 'destruction',
+        exclusive: false,
+        locksEnhance: false,
+        durationMs: tl.burstLifetimeMs,
+        payload: {
+          spriteUrl: swordSpriteUrl(fromSword.sprite),
+          particleCount: particleCount(toSword?.level ?? fromSword.level),
+          impactMs: tl.impactMs,
+          shakeMs: tl.shakeMs,
+          // 도박 표식 — 같은 버스트 연출을 재사용하되 sr-only 안내만 "도박 성공/실패"로 분기(검은 파괴가 아님).
+          gamble: true,
+        },
+      })
+      enqueueEffect({
+        kind: 'entranceSuppress',
+        exclusive: false,
+        locksEnhance: false,
+        durationMs: tl.suppressMs,
+        payload: { entranceDelaySec: burstAtSec },
+      })
+    }
+    // 강화 잠금 — 연출 중(검 전환) 강화 입력을 막는다(강화와 동일하게 lockMs 동안). 버튼 충전 오버레이도 동기.
+    setLastLockMs(tl.lockMs)
+    enqueueEffect({
+      kind: 'enhanceLock',
+      exclusive: false,
+      locksEnhance: true,
+      durationMs: tl.lockMs,
+    })
+    // 이름·판매가·스탯 공개 지연 — 변하기 전 검을 떨림 동안 유지하다 버스트(=revealAt)에 결과 검으로 전환한다
+    // (강화 scheduleReveal 과 동일 메커니즘 — heldSwordId/revealTimer 공유). 도박으로 최종 검 도달 시 클리어.
+    setHeldSwordId(res.fromId)
+    if (revealTimer.current !== null) clearTimeout(revealTimer.current)
+    revealTimer.current = window.setTimeout(() => {
+      revealTimer.current = null
+      setHeldSwordId(null)
+      if (toSword && toSword.nextId === null) setCleared(true)
+    }, tl.revealAtMs)
+  }
+
+  // 도박 한 라운드 굴림 + 그 판정의 강화 성공/실패 연출 — 수상한 상인 카드 클릭(과 첫 굴림)이 호출한다.
+  // store 굴림은 non-escrow 라 검을 즉시 바꾸므로, 굴림 직전 레벨(from)과 굴림 후 레벨(to)을 검으로 해석해
+  // playGambleOutcome(승=상승 버스트 / 패=하락 폭발)에 넘긴다 — 매 라운드가 곧 한 번의 강화 성공/실패다.
+  // 레벨 무변화(승리가 상한에 클램프되거나 패배가 하한이라 같은 검)면 연출을 생략한다(멱등 가드도 store 에 있음).
+  const rollGambleAndAnimate = () => {
+    const session = useGameStore.getState().gambleSession
+    if (!session || session.press.status !== 'rolling') return
+    const prevLevel = session.press.currentLevel
+    const next = useGameStore.getState().rollGamble()
+    if (!next) return
+    const fromSword = dataManager.getSwordByLevel(prevLevel)
+    const toSword = dataManager.getSwordByLevel(next.press.currentLevel)
+    if (!fromSword || !toSword || fromSword.id === toSword.id) return
+    playGambleOutcome({
+      won: next.press.status !== 'busted', // busted=패배(하락), 그 외(rolling 성공·banked 확정)=성공(상승)
+      fromId: fromSword.id,
+      toId: toSword.id,
+    })
+  }
+
   // originEl 은 코인 비행의 "출발점"(연출 전용·선택)이다 — 납품(검 소모·보상·생명주기)은 store 가 소유하며
   // 엘리먼트 유무와 무관하게 진행된다. 연출 엘리먼트에 게임 액션을 묶지 않는다(키보드 납품이 막히던 버그의 근본 차단).
   const handleFulfill = (
     commission: Commission,
     originEl: HTMLElement | null,
   ) => {
-    // 생명주기·검 소모는 store 가 소유 — 수락(true)일 때만 연출을 띄운다.
-    if (!useCommissionStore.getState().fulfill(commission.id)) return
-    // 보상 획득 '짤랑' 효과음 — 판매와 동일(검·재료를 내주고 보상을 받는 순간).
+    // 생명주기·검 소모/교체는 store 가 소유 — 성사(true)일 때만 연출을 띄운다. false = 성사 불가(미보유/검 없음).
+    const ok = useCommissionStore.getState().fulfill(commission.id)
+    if (!ok) return
+    // 도박: fulfill 이 press 세션을 열었다(gambleSession) — 의뢰 바가 진행 카드로 바뀐다. 누르면 즉시 1회
+    // 판정되도록 여기서 곧바로 첫 굴림을 굴린다(이후 라운드는 진행 카드 클릭이 같은 핸들러를 부른다).
+    if (commission.kind === 'gamble') {
+      rollGambleAndAnimate()
+      return
+    }
+    // 거래(trade) — 보상 획득 '짤랑' 효과음(판매와 동일: 검·재료를 내주고 보상을 받는 순간).
     sound.playSfx('item_sold')
     // 골드 보상일 때만 코인 비행·골드 펄스·획득 텍스트 연출. 아이템 보상(물물교환)은 인벤토리로
     // 들어가므로 골드 연출을 띄우지 않는다(reward.kind 로 분기 — reward 는 Material).
@@ -547,17 +640,20 @@ export function GameScreen() {
     }
   }
 
-  // 데스크탑에서 스페이스바 = 강화(상점이 닫혀 있을 때만, 강화 버튼과 동일한 게이트를 따른다).
+  // 데스크탑에서 스페이스바 = 강화(상점·도박 세션이 닫혀 있을 때만). 도박 중엔 검이 에스크로라 강화를 막는다.
+  // 인라인 패널엔 모달 백드롭이 없어 store 게이트(canEnhance→false)가 1차 차단점이지만, 단축키는 그와 별개로
+  // window 레벨이라 여기서도 gambleSession 으로 게이팅해 둔다(이중 방어 — 버튼 비활성과 단축키 차단을 일치시킴).
   useEnhanceHotkey({
-    enabled: !shopOpen,
+    enabled: !shopOpen && gambleSession === null,
     disabled: enhanceDisabled,
     onEnhance: handleEnhance,
   })
 
   // 데스크탑 액션 단축키: Ctrl 탭 = 판매, Alt 탭 = 보관(단독 탭만 — 조합키 오발 방지), S = 상점 열기.
-  // 상점이 닫혀 있을 때만 부착한다(모달 내부 입력 보존). 판매·보관 가능 여부는 핸들러가 self-gate.
+  // 상점이 닫혀 있고 도박 세션이 없을 때만 부착한다(에스크로 검 보호). 판매·보관·상점도 store 게이트로
+  // 막히지만(canSell/canStore→false, openShop self-gate) 단축키 차단을 버튼 상태와 일치시켜 이중 방어한다.
   useActionHotkeys({
-    enabled: !shopOpen,
+    enabled: !shopOpen && gambleSession === null,
     onSell: handleSell,
     onStore: handleStore,
     onOpenShop: openShop,
@@ -619,12 +715,22 @@ export function GameScreen() {
       shakeRangeForLevel(anim.shakeBands, sword?.level ?? 1).minMs) / 1000
 
   // 결과를 스크린리더에 알린다(시각 연출은 aria-hidden). 가장 최근 알림 대상 효과의 문구.
-  let announceFx: { id: number; kind: string } | null = null
+  // 도박(payload.gamble)은 같은 successBurst/destruction 연출을 재사용하므로, 안내는 "강화 성공/검 파괴"가
+  // 아니라 "도박 성공/실패"로 분기한다 — 도박 패배는 파괴가 아니라 ±레벨 강등이라 "검 파괴"는 부정확하다.
+  let announceFx: Effect | null = null
   for (const e of running) {
     if (e.kind in ANNOUNCE_KEY && (announceFx === null || e.id > announceFx.id))
       announceFx = e
   }
-  const announcement = announceFx ? t(ANNOUNCE_KEY[announceFx.kind]) : ''
+  const announcement = announceFx
+    ? t(
+        announceFx.payload?.gamble
+          ? announceFx.kind === 'successBurst'
+            ? 'commission.gamble.announceWin'
+            : 'commission.gamble.announceLose'
+          : ANNOUNCE_KEY[announceFx.kind],
+      )
+    : ''
 
   // lg+(데스크탑)에선 바깥 패딩을 없애 카드가 브라우저를 꽉 채우게 한다 — 베젤(검정) 여백 제거.
   // <lg(세로형)에선 베젤 프레임을 유지한다.
@@ -646,8 +752,15 @@ export function GameScreen() {
           <TopControls onOpenShop={openShop} />
         </div>
 
-        {/* 상단 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
-        <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={!shopOpen} />
+        {/* 상단 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다.
+            도박 카드 클릭 시 바가 인라인 press-your-luck 패널로 접힌다(onGambleResolved 가 확정 연출을 띄운다).
+            도박 중엔 단축키(1·2·3·스페이스·Ctrl/Alt/S)를 끈다 — 에스크로 검을 강화/판매/보관하지 못하게. */}
+        <CommissionBar
+          onFulfill={handleFulfill}
+          hotkeysEnabled={!shopOpen && gambleSession === null}
+          onGambleRoll={rollGambleAndAnimate}
+          gambleRollDisabled={enhanceLocked}
+        />
 
         {/* 좁은 화면(<lg)은 단일 컬럼으로 세로 스택 — 3열은 고정폭 검 스테이지(검 박스 240·이름 배너 320)가
             들어갈 만큼 넓을 때만 쓴다. sm(640) 기준이면 640~1024 구간에서 가운데 트랙이 눌려 좌우 패널과

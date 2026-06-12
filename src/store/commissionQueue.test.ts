@@ -62,6 +62,7 @@ function entry(
   } = over
   return {
     weight,
+    kind: 'trade',
     cost: { kind: 'item', itemId, count: requiredCount },
     rewardKind: 'gold',
     basePrice,
@@ -82,11 +83,19 @@ const POOL3: PoolEntry[] = [
   entry({ itemId: 'c' }),
 ]
 
-// 비용 아이템 id(헬퍼) — PoolEntry/cost 의 납품 itemId(골드 비용이면 'gold').
+// 비용 아이템 id(헬퍼) — PoolEntry/cost 의 납품 itemId(골드 비용이거나 도박이면 'gold').
 const costEntryId = (e: PoolEntry): string =>
-  e.cost.kind === 'item' ? e.cost.itemId : 'gold'
-const costId = (cost: Commission['cost']): string =>
-  cost.kind === 'item' ? cost.itemId : 'gold'
+  e.kind === 'trade' && e.cost.kind === 'item' ? e.cost.itemId : 'gold'
+const costId = (c: Commission): string =>
+  c.kind === 'trade' && c.cost.kind === 'item' ? c.cost.itemId : 'gold'
+
+// 거래(trade) 제안임을 확정하고 그 타입으로 좁힌다 — 이 파일의 테스트는 모두 거래 풀만 다룬다(도박은 별도).
+function asTrade<T extends { kind: 'trade' | 'gamble' }>(
+  c: T,
+): Extract<T, { kind: 'trade' }> {
+  if (c.kind !== 'trade') throw new Error('expected a trade offer')
+  return c as Extract<T, { kind: 'trade' }>
+}
 
 function tickState(
   state: CommissionQueueState,
@@ -115,7 +124,7 @@ describe('bootstrapCommissionQueue — 시작 즉시 첫 세션', () => {
   it('첫 세션을 즉시 채운다(서로 다른 제안 SESSION 개) + 타이머 정지(null)', () => {
     const s = bootstrapCommissionQueue(0, RNG, POOL3, SETTINGS, SESSION)
     expect(s.active).toHaveLength(3)
-    expect(new Set(s.active.map((c) => costId(c.cost))).size).toBe(3) // 중복 없음
+    expect(new Set(s.active.map((c) => costId(c))).size).toBe(3) // 중복 없음
     expect(s.nextSpawnAt).toBeNull() // 세션이 떠 있음
     expect(s.nextId).toBe(4)
     expect(checkInvariant(s)).toBe(true)
@@ -167,7 +176,7 @@ describe('spawnSession — 한 세션 배치 출제', () => {
     expect(offers).toHaveLength(3)
     expect(offers.map((o) => o.id)).toEqual([5, 6, 7])
     expect(nextId).toBe(8)
-    expect(new Set(offers.map((o) => costId(o.cost))).size).toBe(3) // 중복 없음
+    expect(new Set(offers.map((o) => costId(o))).size).toBe(3) // 중복 없음
     for (const o of offers) {
       expect(o.createdAt).toBe(0)
       expect(o.expiresAt).toBe(100_000) // now + duration(min==max)
@@ -194,7 +203,7 @@ describe('spawnSession — 한 세션 배치 출제', () => {
     const twoPool = [entry({ itemId: 'a' }), entry({ itemId: 'b' })]
     const { offers } = spawnSession(0, RNG, twoPool, SETTINGS, 3, 1)
     expect(offers).toHaveLength(2)
-    expect(new Set(offers.map((o) => costId(o.cost))).size).toBe(2)
+    expect(new Set(offers.map((o) => costId(o))).size).toBe(2)
   })
 
   it('풀이 비면 빈 세션', () => {
@@ -212,7 +221,7 @@ describe('generateOne — 결정적 단건 생성 + 보상 공식(세션 내부 
 
   it('reward = round((basePrice + additive) * incentive), 만료 시각', () => {
     const now = 1_000
-    const c = generateOne(POOL, now, mulberry32(42), SETTINGS)!
+    const c = asTrade(generateOne(POOL, now, mulberry32(42), SETTINGS)!)
     expect(c.cost).toEqual({ kind: 'item', itemId: 'sword_5', count: 1 })
     // incentive 2.0, additive 0 (min==max) → (1000 + 0) * 2 = 2000 (Material 골드)
     expect(c.reward).toEqual({ kind: 'gold', amount: 2000 })
@@ -222,7 +231,7 @@ describe('generateOne — 결정적 단건 생성 + 보상 공식(세션 내부 
 
   it('additive 가 incentive 곱하기 전에 더해진다((base+additive)*incentive)', () => {
     const pool = [entry({ additiveMin: 100, additiveMax: 100 })]
-    const c = generateOne(pool, 0, mulberry32(7), SETTINGS)!
+    const c = asTrade(generateOne(pool, 0, mulberry32(7), SETTINGS)!)
     expect(c.reward).toEqual({ kind: 'gold', amount: 2200 }) // (1000 + 100) * 2
   })
 
@@ -242,12 +251,14 @@ describe('generateOne — 결정적 단건 생성 + 보상 공식(세션 내부 
       incentiveMax: 3,
     })
     // rng=0 → 'a' 선택 → (100+0)*1 = 100
-    expect(generateOne([a, b], 0, () => 0, SETTINGS)!.reward).toEqual({
+    expect(asTrade(generateOne([a, b], 0, () => 0, SETTINGS)!).reward).toEqual({
       kind: 'gold',
       amount: 100,
     })
     // rng=0.6 → r=1.2 → 'b' 선택 → (100+0)*3 = 300
-    expect(generateOne([a, b], 0, () => 0.6, SETTINGS)!.reward).toEqual({
+    expect(
+      asTrade(generateOne([a, b], 0, () => 0.6, SETTINGS)!).reward,
+    ).toEqual({
       kind: 'gold',
       amount: 300,
     })
@@ -256,6 +267,7 @@ describe('generateOne — 결정적 단건 생성 + 보상 공식(세션 내부 
   it('아이템 보상(물물교환): 고정 아이템을 freeze 하고 requiredCount 를 싣는다', () => {
     const itemPool: PoolEntry[] = [
       {
+        kind: 'trade',
         cost: { kind: 'item', itemId: 'faded_fluorescent', count: 2 },
         weight: 1,
         rewardKind: 'item',
@@ -263,7 +275,7 @@ describe('generateOne — 결정적 단건 생성 + 보상 공식(세션 내부 
         rewardItemCount: 1,
       },
     ]
-    const c = generateOne(itemPool, 1_000, mulberry32(42), SETTINGS)!
+    const c = asTrade(generateOne(itemPool, 1_000, mulberry32(42), SETTINGS)!)
     expect(c.cost).toEqual({ kind: 'item', itemId: 'faded_fluorescent', count: 2 })
     expect(c.reward).toEqual({ kind: 'item', itemId: 'sword_12', count: 1 })
     expect(c.expiresAt).toBe(1_000 + SETTINGS.durationMinMs) // min==max
@@ -299,12 +311,14 @@ describe('commissionPool — entries + basePrice 결합', () => {
     ).toEqual([
       {
         weight: 2,
+        kind: 'trade',
         cost: { kind: 'item', itemId: 'sword_5', count: 1 },
         basePrice: 1000,
         ...inReward,
       },
       {
         weight: 3,
+        kind: 'trade',
         cost: { kind: 'item', itemId: 'iron_scrap', count: 1 },
         basePrice: 50,
         ...inReward,
@@ -324,6 +338,7 @@ describe('commissionPool — entries + basePrice 결합', () => {
     ).toEqual([
       {
         weight: 2,
+        kind: 'trade',
         cost: { kind: 'item', itemId: 'sword_5', count: 1 },
         basePrice: 1000,
         ...inReward,
@@ -349,6 +364,7 @@ describe('commissionPool — entries + basePrice 결합', () => {
     ).toEqual([
       {
         weight: 1,
+        kind: 'trade',
         cost: { kind: 'gold', amount: 50_000 },
         rewardKind: 'item',
         rewardItemId: 'sword_12',

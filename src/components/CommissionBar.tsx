@@ -10,6 +10,7 @@ import { useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
 import { useOfferFxStore } from '../store/offerFxStore'
 import type { Commission } from '../store/commissionQueue'
+import type { GambleSession } from '../store/gameStore'
 import { ItemIcon } from './ItemIcon'
 import { OfferArrivalFx } from './OfferArrivalFx'
 
@@ -24,23 +25,38 @@ type CommissionBarProps = {
   onFulfill: (commission: Commission, originEl: HTMLElement | null) => void
   // 숫자 1·2·3 납품 단축키 활성 여부(상점 열림 등에서 끈다).
   hotkeysEnabled: boolean
+  // 도박 한 라운드 굴림 — store 굴림 + 메인 스테이지 강화 성공/실패 연출을 GameScreen 이 한 곳에서 처리한다.
+  onGambleRoll: () => void
+  // 굴림 비활성(직전 판정 연출 중 = 강화 잠금) — 연출 한 번이 끝난 뒤 다음 굴림이 가능하게 한다.
+  gambleRollDisabled: boolean
 }
 
 export function CommissionBar({
   onFulfill,
   hotkeysEnabled,
+  onGambleRoll,
+  gambleRollDisabled,
 }: CommissionBarProps) {
   const t = useT()
   const active = useCommissionStore((s) => s.active)
+  // 도박(press-your-luck) 세션 — 진행 중이면 카드 행을 수상한 상인 진행 카드로 대체한다(누르면 1라운드 굴림,
+  // 만료 시 자동 멈춤). 굴림 자체는 onGambleRoll(GameScreen)이, 만료 자동 멈춤은 여기서 bankGamble 로 한다.
+  const gambleSession = useGameStore((s) => s.gambleSession)
+  const bankGamble = useGameStore((s) => s.bankGamble)
   // items/currentSwordId 를 구독해 보유 상태가 바뀌면 카드 활성/비활성이 갱신되게 한다.
   const items = useGameStore((s) => s.items)
   const currentSwordId = useGameStore((s) => s.currentSwordId)
-  const canFulfill = useGameStore((s) => s.canFulfill)
+  // 거래·도박 공통 게이트(Commission 전체를 받는다) — 거래는 비용 충족, 도박은 검 보유 여부.
+  const canFulfillCommission = useGameStore((s) => s.canFulfillCommission)
   // gold 도 구독한다 — 골드 비용 거래는 보유 골드가 비용을 넘는 순간 카드가 활성(초록)으로 바뀌어야 한다.
   const gold = useGameStore((s) => s.gold)
   void items
-  void currentSwordId
   void gold
+  // 도박 제안 카드의 성공/실패 도달 레벨 계산용 — 현재 장착 검 레벨(없으면 0). currentSwordId 구독이라
+  // 검이 바뀌면(강화·도박 등) 카드 표시도 갱신된다.
+  const curSwordLevel = currentSwordId
+    ? (dataManager.getSwordById(currentSwordId)?.level ?? 0)
+    : 0
 
   // 새 거래 제안이 슬롯에 들어오면 도착 연출을 1회 재생한다(연출 본체는 OfferArrivalFx).
   // active 의 id 집합을 직전과 비교해 처음 보는 id 가 있으면 발화. 단조 증가 id 라 재사용 충돌 없음.
@@ -80,8 +96,8 @@ export function CommissionBar({
   const onSlot = useCallback(
     (slot: number) => {
       const c = active[slot]
-      // 슬롯에 의뢰가 있고 납품 가능할 때만 — 빈 슬롯/미보유 키 입력은 무시.
-      if (!c || !canFulfill(c.cost)) return
+      // 슬롯에 의뢰가 있고 성사 가능할 때만 — 빈 슬롯/미보유 키 입력은 무시(거래·도박 공통 게이트).
+      if (!c || !canFulfillCommission(c)) return
       // 코인 연출의 출발점이 될 카드 DOM 을 슬롯 인덱스로 찾아 넘긴다(연출 전용·선택). 못 찾아도 onFulfill 이
       // 출발점을 옵션으로 받아 납품은 그대로 진행한다 — 마우스(currentTarget)와 동일하게 동작.
       const originEl =
@@ -90,7 +106,7 @@ export function CommissionBar({
         ) ?? null
       onFulfill(c, originEl)
     },
-    [active, canFulfill, onFulfill],
+    [active, canFulfillCommission, onFulfill],
   )
   useCommissionHotkey({ enabled: hotkeysEnabled, onSlot })
 
@@ -118,29 +134,53 @@ export function CommissionBar({
       <div className="mx-auto flex w-full flex-col gap-1.5 lg:max-w-[62rem]">
         <div className="relative">
           <OfferArrivalFx />
-          <div ref={slotsRef} className="flex gap-2">
-            {slots.map((c, i) =>
-              c ? (
-                <CommissionCard
-                  key={c.id}
-                  slotIndex={i}
-                  commission={c}
-                  fulfillable={canFulfill(c.cost)}
-                  onFulfill={onFulfill}
-                />
-              ) : (
-                <EmptySlot key={`empty-${i}`} />
-              ),
-            )}
-          </div>
+          {/* 도박 세션 중엔 카드 행을 "수상한 상인 진행 카드" 하나만 남긴다("제안만 남고"). 클릭 순간 fulfill 이
+              complete 로 다른 제안을 비워 active 는 이미 [] 라, 진행 카드 + 빈 슬롯만 남는다. 누를 때마다 1라운드
+              굴려 메인 스테이지에 강화 성공/실패가 나오고, 검이 실제로 상승/하락한다(non-escrow). */}
+          {gambleSession !== null ? (
+            <div className="flex gap-2">
+              <ActiveGambleCard
+                session={gambleSession}
+                disabled={gambleRollDisabled}
+                onRoll={onGambleRoll}
+                onExpire={bankGamble}
+              />
+              {Array.from({ length: Math.max(0, maxCommissions - 1) }, (_, i) => (
+                <EmptySlot key={`gamble-empty-${i}`} />
+              ))}
+            </div>
+          ) : (
+            <div ref={slotsRef} className="flex gap-2">
+              {slots.map((c, i) =>
+                c ? (
+                  <CommissionCard
+                    key={c.id}
+                    slotIndex={i}
+                    commission={c}
+                    fulfillable={canFulfillCommission(c)}
+                    currentLevel={curSwordLevel}
+                    onFulfill={onFulfill}
+                  />
+                ) : (
+                  <EmptySlot key={`empty-${i}`} />
+                ),
+              )}
+            </div>
+          )}
         </div>
-        {session && (
+        {/* 통합 타이머 바 — 도박 중엔 세션 deadline 까지, 평소엔 의뢰 세션 만료까지 줄어든다. */}
+        {gambleSession !== null ? (
+          <GambleTimerBar
+            key={`gamble-${gambleSession.deadline}`}
+            deadline={gambleSession.deadline}
+          />
+        ) : session ? (
           <SessionTimerBar
             key={session.id}
             createdAt={session.createdAt}
             expiresAt={session.expiresAt}
           />
-        )}
+        ) : null}
       </div>
     </div>
   )
@@ -150,14 +190,29 @@ function CommissionCard({
   slotIndex,
   commission,
   fulfillable,
+  currentLevel,
   onFulfill,
 }: {
   slotIndex: number
   commission: Commission
   fulfillable: boolean
+  // 도박 카드의 성공/실패 도달 레벨 계산용(현재 장착 검 레벨). 거래 카드는 쓰지 않는다.
+  currentLevel: number
   onFulfill: (commission: Commission, cardEl: HTMLElement) => void
 }) {
   const t = useT()
+  // 도박(수상한 상인)은 비용/보상 구조가 없어 별도 카드로 렌더한다(검을 걸어 ±레벨 — kind 로 분기).
+  if (commission.kind === 'gamble') {
+    return (
+      <GambleCard
+        slotIndex={slotIndex}
+        commission={commission}
+        fulfillable={fulfillable}
+        currentLevel={currentLevel}
+        onFulfill={onFulfill}
+      />
+    )
+  }
   const key = slotIndex + 1 // 납품 단축키(1·2·3)
   // 거래는 "지불(cost) → 보상(reward)". 둘 다 골드 또는 아이템(Material)이다.
   // 헤드라인 = 지불할 것(큰 아이콘), 보조줄 = 받는 것(→ 표기). 골드 비용 거래는 코인이 헤드라인이 된다.
@@ -262,6 +317,214 @@ function CommissionCard({
   )
 }
 
+// 수상한 상인(도박) 카드 — 거래와 달리 비용/보상이 없고 "검을 걸어" 성공(+winDelta)/실패(−loseDelta)로 갈린다.
+// 즉시 실행(확인 모달 없음 — 디자인 결정)이라 거래 카드와 똑같이 클릭/숫자키로 바로 onFulfill 한다(판정은 셸).
+// 위험을 시각으로 구분하기 위해 강조색을 거래(success=초록) 대신 danger(적색) 계열로 둔다.
+function GambleCard({
+  slotIndex,
+  commission,
+  fulfillable,
+  currentLevel,
+  onFulfill,
+}: {
+  slotIndex: number
+  commission: Extract<Commission, { kind: 'gamble' }>
+  fulfillable: boolean
+  // 현재 장착 검 레벨 — 클릭(첫 굴림)의 성공/실패 도달 레벨을 카드에 미리 보여 주는 데 쓴다(base = 현재 검).
+  currentLevel: number
+  onFulfill: (commission: Commission, cardEl: HTMLElement) => void
+}) {
+  const t = useT()
+  const key = slotIndex + 1 // 실행 단축키(1·2·3) — 거래와 동일
+  return (
+    <motion.button
+      type="button"
+      data-commission-slot={slotIndex}
+      initial={{ opacity: 0, scale: 0.85, y: -8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      disabled={!fulfillable}
+      onClick={(e) => onFulfill(commission, e.currentTarget)}
+      // 진입점임을 스크린리더에 알린다 — 누르면 다른 제안이 사라지고 진행 카드로 바뀌어 라운드를 굴린다.
+      aria-label={`${t('commission.gamble.title')}: ${t('commission.gamble.stake')}`}
+      aria-keyshortcuts={`${key}`}
+      // 성사 가능(검 보유)하면 적색으로 강조(위험), 불가하면 흐리게.
+      className={`relative flex flex-1 items-center justify-center gap-3 overflow-hidden rounded-lg border px-3 py-4 text-left transition-opacity ${
+        fulfillable
+          ? 'cursor-pointer border-danger bg-panel ring-1 ring-danger/60 shadow-[0_0_12px_-2px_var(--color-danger)] hover:opacity-90'
+          : 'cursor-not-allowed border-frame/40 bg-panel-soft opacity-60'
+      }`}
+    >
+      <KeyHint slot={key} active={fulfillable} />
+      {/* 헤드라인 = 주사위(도박 상징). */}
+      <span
+        className="grid h-12 w-12 shrink-0 place-items-center text-danger"
+        aria-hidden
+      >
+        <DiceIcon className="h-9 w-9" />
+      </span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate text-xs font-semibold text-on-dark">
+          {t('commission.gamble.title')}
+        </span>
+        {/* 정보만 보여 준다 — 클릭(첫 굴림) 성공 시 도달 검(+N) / 실패 시 도달 검(+M) / 성공 확률(%).
+            base = 현재 검 레벨이라, 그 한 번이 검을 어디로 보낼지 미리 알 수 있다. */}
+        <GambleOdds
+          winLevel={gambleWinLevel(currentLevel, commission.winDelta)}
+          loseLevel={gambleLoseLevel(currentLevel, commission.loseDelta)}
+          chance={commission.successChance}
+        />
+      </span>
+    </motion.button>
+  )
+}
+
+// 도박 도달 레벨 — 성공은 상한(최고 검)에서, 실패는 하한(시작 검 +1)에서 클램프한다(순수 코어 pressRound 와 동일
+// 규칙). 진입 카드는 현재 검 레벨을 base 로, 진행 카드는 누적/시작 레벨을 넘긴다(실패는 항상 시작 base 기준 — 모델 A).
+function gambleWinLevel(fromLevel: number, winDelta: number): number {
+  return Math.min(dataManager.getMaxSwordLevel(), fromLevel + winDelta)
+}
+function gambleLoseLevel(baseLevel: number, loseDelta: number): number {
+  return Math.max(1, baseLevel - loseDelta)
+}
+
+// 도박 정보 표시(성공/실패 도달 레벨 + 성공 확률) — 제안 카드·진행 카드가 공유한다. 성공=초록(상승), 실패=적색
+// (하락), 확률은 중립. "검을 걸기" 같은 안내 문구 없이 "몇 강화가 되는지"만 보여 준다(요구사항).
+function GambleOdds({
+  winLevel,
+  loseLevel,
+  chance,
+}: {
+  winLevel: number
+  loseLevel: number
+  chance: number
+}) {
+  const t = useT()
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold tabular-nums">
+      <span className="text-success">
+        {t('commission.gamble.next')} +{winLevel}
+      </span>
+      <span className="text-on-dark-soft">{Math.round(chance * 100)}%</span>
+      <span className="text-danger">
+        {t('commission.gamble.bustTo')} +{loseLevel}
+      </span>
+    </span>
+  )
+}
+
+// 수상한 상인(도박) 진행 카드 — 세션이 열려 있는 동안 카드 행에서 다른 제안 자리를 대신한다(다른 제안은 사라지고
+// 이 카드만 남는다). 누를 때마다 1라운드 굴린다(onRoll = GameScreen 의 굴림+연출). 성공이면 검이 실제로 강화되어
+// (메인 스테이지 강화 성공 연출) 다음 라운드를 또 누를 수 있고, 실패면 검이 하락하며 종료, 최대 maxRounds. 별도
+// 패널 없이 "검을 강화/약화"하는 카드일 뿐 — 누적 진행은 스테이지의 검 레벨로 보인다. 굴림 연출 중(disabled)엔
+// 막아 한 번이 끝난 뒤 다음 굴림이 가능하게 한다(강화 버튼과 동일 박자). 만료(deadline) 시 자동으로 멈춰 현재
+// 누적을 지킨다(onExpire = bankGamble — 만료는 패배가 아니다).
+function ActiveGambleCard({
+  session,
+  disabled,
+  onRoll,
+  onExpire,
+}: {
+  session: GambleSession
+  disabled: boolean
+  onRoll: () => void
+  onExpire: () => void
+}) {
+  const t = useT()
+  // 만료 자동 멈춤 — deadline(세션 내내 불변) 도달 시 1회. 라운드로 session 참조가 바뀌어도 같은 절대 시각까지만 센다.
+  useEffect(() => {
+    const ms = session.deadline - Date.now()
+    if (ms <= 0) {
+      onExpire()
+      return
+    }
+    const timer = window.setTimeout(onExpire, ms)
+    return () => clearTimeout(timer)
+  }, [session, onExpire])
+
+  return (
+    <motion.button
+      type="button"
+      initial={{ opacity: 0, scale: 0.85, y: -8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      disabled={disabled}
+      onClick={onRoll}
+      // 누를 때마다 1라운드 굴림. 진행(누적·라운드)은 스테이지 검과 라운드 점으로 보인다.
+      aria-label={`${t('commission.gamble.title')}: ${t('commission.gamble.roll')}`}
+      className={`relative flex flex-1 items-center justify-center gap-3 overflow-hidden rounded-lg border px-3 py-4 text-left transition-opacity ${
+        disabled
+          ? 'cursor-wait border-danger/40 bg-panel-soft opacity-60' // 연출 중 — 다음 굴림 대기
+          : 'cursor-pointer border-danger bg-panel ring-1 ring-danger/60 shadow-[0_0_12px_-2px_var(--color-danger)] hover:opacity-90'
+      }`}
+    >
+      <span
+        className="grid h-12 w-12 shrink-0 place-items-center text-danger"
+        aria-hidden
+      >
+        <DiceIcon className="h-9 w-9" />
+      </span>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="truncate text-xs font-semibold text-on-dark">
+          {t('commission.gamble.title')}
+        </span>
+        {/* 이번 굴림의 성공/실패 도달 레벨 + 성공 확률 — 제안 카드와 동일 정보. 성공은 현재 누적(press.currentLevel)
+            기준 +winDelta, 실패는 시작(press.baseLevel) 기준 -loseDelta(모델 A — 쌓을수록 실패 손실이 커진다). */}
+        <GambleOdds
+          winLevel={gambleWinLevel(
+            session.press.currentLevel,
+            session.params.winDelta,
+          )}
+          loseLevel={gambleLoseLevel(
+            session.press.baseLevel,
+            session.params.loseDelta,
+          )}
+          chance={session.params.successChance}
+        />
+        {/* 라운드 진행(●●○) — maxRounds 한도를 보여 준다. */}
+        <RoundDots done={session.press.round} total={session.params.maxRounds} />
+      </span>
+    </motion.button>
+  )
+}
+
+// 라운드 진행 점 — 완료한 승리 라운드(done)는 채워지고 남은 칸은 빈 점. total = maxRounds.
+function RoundDots({ done, total }: { done: number; total: number }) {
+  return (
+    <span className="mt-0.5 flex gap-1" aria-hidden>
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          key={i}
+          className={`h-1.5 w-1.5 rounded-full ${
+            i < done ? 'bg-danger' : 'bg-frame/40'
+          }`}
+        />
+      ))}
+    </span>
+  )
+}
+
+// 수상한 상인 카드의 주사위 아이콘(도박 상징) — 5눈 단순 표현. 색은 부모가 currentColor 로 정한다.
+function DiceIcon({ className = 'h-3.5 w-3.5' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`${className} shrink-0`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
+      <rect x="3" y="3" width="18" height="18" rx="4" />
+      <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="8" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="16" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
 // 슬롯 단축키(1·2·3) 힌트 — 카드 우상단 작은 배지. 납품 가능하면 초록으로 또렷하게.
 function KeyHint({ slot, active }: { slot: number; active: boolean }) {
   return (
@@ -312,6 +575,26 @@ function SessionTimerBar({
           ease: 'linear',
           backgroundColor: { duration: totalSec, times: [0, 0.6, 1] },
         }}
+      />
+    </span>
+  )
+}
+
+// 도박 진행 타이머 바 — 세션 deadline(절대 시각)까지 scaleX 1→0(SessionTimerBar 와 동일 철학, 컴포지터 처리).
+// deadline 으로 key 되어 세션마다 마운트/언마운트되고, 마운트 시점의 남은 시간을 전체 길이로 잡는다. 도박은 항상
+// 위험(적색) 강조라 색 보간 없이 단색 danger 로 둔다(임박 경고는 색이 아니라 길이로).
+function GambleTimerBar({ deadline }: { deadline: number }) {
+  const totalSec = Math.max(0, deadline - Date.now()) / 1000
+  return (
+    <span
+      className="relative block h-1.5 w-full overflow-hidden rounded-full bg-black/25"
+      aria-hidden
+    >
+      <motion.span
+        className="block h-full origin-left rounded-full bg-danger"
+        initial={{ scaleX: 1 }}
+        animate={{ scaleX: 0 }}
+        transition={{ duration: totalSec, ease: 'linear' }}
       />
     </span>
   )

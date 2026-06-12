@@ -91,6 +91,7 @@ describe('parseCommissionConfig — 구조 검증', () => {
           spawnIntervalMaxMs: 30_000,
         },
       ],
+      gamble: null,
     })
   })
 
@@ -436,5 +437,37 @@ describe('loadCommission — 번들 데이터 진입점', () => {
       expect(b.durationMinMs).toBeLessThanOrEqual(b.durationMaxMs)
       expect(b.spawnIntervalMinMs).toBeLessThanOrEqual(b.spawnIntervalMaxMs)
     }
+  })
+})
+
+describe('parseGambleConfig — 수상한 상인(도박) 설정', () => {
+  const parse = (over: Record<string, unknown> = {}) =>
+    parseCommissionConfig(cfg(over), KNOWN)
+  const G = {
+    minSwordLevel: 15,
+    successChance: 0.5,
+    winDelta: 1,
+    loseDelta: 3,
+    maxRounds: 3,
+    weight: 1,
+  }
+
+  it('미지정/null 이면 gamble 은 null(도박 비활성)', () => {
+    expect(parse().gamble).toBeNull()
+    expect(parse({ gamble: null }).gamble).toBeNull()
+  })
+
+  it('유효한 gamble 을 그대로 싣는다', () => {
+    expect(parse({ gamble: G }).gamble).toEqual(G)
+  })
+
+  it('잘못된 gamble 값은 throw(범위·정수·양수)', () => {
+    expect(() => parse({ gamble: { ...G, successChance: 1.5 } })).toThrow() // 0~1 밖
+    expect(() => parse({ gamble: { ...G, successChance: -0.1 } })).toThrow()
+    expect(() => parse({ gamble: { ...G, minSwordLevel: 0 } })).toThrow() // < 1
+    expect(() => parse({ gamble: { ...G, winDelta: 0 } })).toThrow() // < 1
+    expect(() => parse({ gamble: { ...G, loseDelta: 1.5 } })).toThrow() // 비정수
+    expect(() => parse({ gamble: { ...G, maxRounds: 0 } })).toThrow() // < 1
+    expect(() => parse({ gamble: { ...G, weight: 0 } })).toThrow() // <= 0
   })
 })

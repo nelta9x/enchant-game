@@ -139,6 +139,31 @@ export type GoldBucket = {
   spawnIntervalMaxMs: number
 }
 
+// 수상한 상인(도박) 설정(언어 중립). 의뢰 세션에 가끔 끼어 출제되는 "검을 거는" press-your-luck 미니게임이다.
+// 골드 구간(버킷)과 무관한 글로벌 설정이라 buckets[] 밖에 둔다 — 버킷마다 복제하지 않는다.
+// null(또는 누락) = 도박 비활성(상인이 전혀 출제되지 않음).
+//
+// 진행: 시작 검(base)을 걸고 매 라운드 `rng() < successChance` 판정한다. 승리하면 누적 레벨이 winDelta 만큼
+// 오르고 "멈출까(bank)/한 번 더(roll)"를 다시 고른다. 멈추면 누적 레벨로 확정. 패배하면 즉시 종료하고
+// base - loseDelta 로 추락한다(쌓은 것 전부 + 추가 페널티 — "쌓을수록 잃을 게 커진다"). maxRounds 도달 또는
+// 최고 검 도달 시 자동 확정(bank). 레벨은 하한(시작 검)·상한(최고 검)으로 클램프.
+//  - minSwordLevel: 등장 게이트. "현재 장착 검"의 레벨이 이 값 이상일 때만 출제 풀에 들어간다(maxLevelReached
+//    가 아니라 현재 검 레벨 — 파괴로 검이 낮아지면 다음 세션부터 사라진다). 낮은 검에서의 "공짜 굴림"(패배가
+//    하한에 클램프돼 무손실) 익스플로잇을 막는다. 데이터로 조절(코드 상수 아님).
+//  - successChance: 라운드별 승리 확률(0~1, 고정). 판정은 pressRound 의 `rng() < successChance`.
+//  - winDelta: 라운드 승리당 누적 레벨 상승폭(정수 >= 1).
+//  - loseDelta: 패배 시 base 에서 내려가는 하락폭(정수 >= 1). 누적분이 아니라 base 기준이라 쌓을수록 손실이 커진다.
+//  - maxRounds: 한 도박에서 굴릴 수 있는 최대 라운드 수(정수 >= 1). 도달하면 자동 확정(더 못 굴림).
+//  - weight: 출제 풀에서의 등장 가중치(> 0). 거래 항목들과 같은 풀에서 경쟁한다(낮게 두면 가끔 등장).
+export type GambleConfig = {
+  minSwordLevel: number
+  successChance: number
+  winDelta: number
+  loseDelta: number
+  maxRounds: number
+  weight: number
+}
+
 // 의뢰(Commission) 시스템 튜닝 설정(언어 중립). 코드 상수가 아니라 데이터 파일(commission.json)에 두고
 // DataManager 가 로드 시 검증한다. 순수 reducer(commissionQueue)는 이 값을 인자로 주입받아 쓴다.
 // 시스템 파라미터(아래 2개)는 버킷과 무관한 글로벌이고, 나머지 튜닝값은 전부 buckets[] 안에 골드 구간별로 둔다.
@@ -151,11 +176,13 @@ export type GoldBucket = {
 //    maxLevelReached 는 파괴·판매로 내려가지 않으므로(달성=영구) 한 번 해제되면 다시 잠기지 않는다. 0 = 처음부터 활성.
 //    데이터 파일(commission.json)에서 조절한다(코드 상수 아님).
 //  - buckets: 보유 골드 구간별 정의([0,∞) 를 덮는 연속 버킷 — buckets[0] 이 골드 0 구간).
+//  - gamble: 수상한 상인(도박) 설정. null = 비활성(상인 미출제).
 export type CommissionConfig = {
   maxCommissions: number
   tickIntervalMs: number
   unlockAtLevel: number
   buckets: GoldBucket[]
+  gamble: GambleConfig | null
 }
 
 // 검의 특수 플래그(언어 중립 태그). 표시가 필요하면 i18n에서 해석한다.

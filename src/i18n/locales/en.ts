@@ -45,6 +45,14 @@ export const en: Record<TranslationKey, string> = {
   'commission.fulfill': 'Accept',
   'commission.arrived': 'New trade offers!',
 
+  'commission.gamble.title': 'Suspicious Merchant',
+  'commission.gamble.stake': 'Stake your sword',
+  'commission.gamble.roll': 'Roll again',
+  'commission.gamble.next': 'Win',
+  'commission.gamble.bustTo': 'Fail',
+  'commission.gamble.announceWin': 'Gamble won — sword upgraded',
+  'commission.gamble.announceLose': 'Gamble lost — sword downgraded',
+
   // 강화 결과 토스트
   'toast.success': 'Enchanted',
   'toast.protected': 'Protected',

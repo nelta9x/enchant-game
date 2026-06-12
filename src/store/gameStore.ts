@@ -2,8 +2,30 @@ import { create } from 'zustand'
 import { dataManager } from '../data/DataManager'
 import type { Material, ShopItem } from '../data/types'
 import { Enhancer, type EnhanceInput } from '../game/enhancer'
+import {
+  startPress,
+  pressRound,
+  pressBank,
+  type GambleParams,
+  type PressState,
+} from '../game/gamble'
 import type { EnhanceResult, ItemStack, PlayerState } from '../game/types'
+import type { Commission } from './commissionQueue'
 import { countOf } from '../lib/items'
+
+// 수상한 상인(도박) 확정 결과(연출용). 셸이 base/최종 레벨의 검 id 를 해석해 돌려준다 — 뷰(GameScreen)가
+// won(=banked)으로 연출(승=상승 버스트 / 패=하락 폭발)을 고르고, fromId/toId 로 잔상·등장 검을 그린다.
+export type GambleOutcome = { won: boolean; fromId: string; toId: string }
+
+// 진행 중인 press-your-luck 세션(셸 상태). 순수 진행 상태(press)에 셸 관심사(만료 시각·튜닝값)를 더한다.
+//  - press: 순수 코어 상태(레벨·라운드·status). 라운드 진행의 단일 출처.
+//  - params: 발급 시 freeze 된 도박 튜닝값(라운드마다 동일하게 적용).
+//  - deadline: 절대 만료 시각(의뢰 카드의 expiresAt 을 이어받음). 카드 타이머 카운트다운 + 만료 시 자동 확정(bank)용.
+export type GambleSession = {
+  press: PressState
+  params: GambleParams
+  deadline: number
+}
 
 // 시작 자금 / 시작 검. 시작 자금은 사용자 지정값(10만) — 새 플레이어가 의뢰 첫 골드 버킷(보유 50만 미만)에서
 // 시작하도록 한다. 시작 검 획득 방식 등 나머지 '게임 시작 설정'은 디자인 미확정이며 조정될 수 있다.
@@ -47,6 +69,18 @@ type GameActions = {
   flushDrops: () => void
   // 거래 성사 가능 여부(비용을 지불할 수 있는가). 비용이 골드면 보유 골드, 아이템이면 가방 수량(또는 검이면 장착 중·수량 1). 카드 게이팅용.
   canFulfill: (cost: Material) => boolean
+  // 의뢰 카드 게이팅(거래 또는 도박 공통). 거래는 canFulfill(cost), 도박은 비용이 없어 "검 보유"만 본다.
+  // (canFulfill 은 Material 만 받아 도박을 게이팅할 수 없으므로 Commission 전체를 받는 진입점을 둔다.)
+  canFulfillCommission: (commission: Commission) => boolean
+  // 도박 시작: 현재 검 레벨을 base 로 press-your-luck 세션을 연다(아직 안 굴림 — currentSwordId 불변).
+  // deadline 은 의뢰 카드의 만료(expiresAt)를 이어받는다(카드 타이머·만료 자동 확정용). 검이 없으면 무변화.
+  startGamble: (params: GambleParams, deadline: number) => void
+  // 한 라운드 굴림. rolling 일 때만 동작(아니면 무변화 — 멱등 가드). 매 판정마다 검을 즉시 교체한다(non-escrow):
+  // 성공이면 누적 레벨 검으로 바꾸고 세션 유지, 확정/실패면 최종 레벨 검으로 바꾸고 세션을 비운다. 갱신된 세션을
+  // 돌려준다(뷰가 from→to 강화 성공/실패 연출에 사용).
+  rollGamble: () => GambleSession | null
+  // 멈춤/만료 확정. rolling 일 때만 현재 누적 레벨로 확정하고 세션을 비운다(검은 직전 성공이 이미 그 레벨로 바꿔 둠).
+  bankGamble: () => GambleSession | null
   // 거래 성사: 비용(cost)을 지불하고 보상(reward)을 지급한다. 비용이 골드면 골드 차감, 아이템이면 가방 우선(→ 검이면 장착 검) 소모.
   // cost·reward 는 거래 생성 시 freeze 한 Material — store 에서 재계산하지 않는다(단일 출처).
   // 성사 성공이면 true, 지불 불가면 false(아무 변화 없음).
@@ -56,11 +90,19 @@ type GameActions = {
   syncRecordToCurrent: () => void
 }
 
-export type GameState = PlayerState & GameActions
+export type GameState = PlayerState &
+  GameActions & {
+    // 진행 중인 도박(press-your-luck) 세션. null = 진행 중 아님. 의뢰 바가 구독해 수상한 상인 카드를 그리고,
+    // 누를 때마다 1라운드씩 굴린다. 매 판정이 검을 실제로 교체하지만(non-escrow), 세션 중엔 강화·판매·보관을
+    // 막아(canX→false) 진행 중 검을 다른 데 못 쓰게 한다(골드 복제 등 차단).
+    gambleSession: GambleSession | null
+  }
 
 type CreateOpts = {
   // 확률 판정 엔진(테스트에서 결정적 rng 주입). 미지정 시 Math.random 기반.
   enhancer?: Enhancer
+  // 도박(takeGamble) 판정용 rng(테스트에서 결정적 주입). 미지정 시 Math.random. enhancer 의 rng 와 독립이다.
+  gambleRng?: () => number
   gold?: number
   currentSwordId?: string | null
   items?: ItemStack[]
@@ -145,6 +187,7 @@ function bankOutgoing(
 // 테스트는 결정적 enhancer와 초기 상태를 주입해 독립 store를 만든다.
 export function createGameStore(opts: CreateOpts = {}) {
   const enhancer = opts.enhancer ?? new Enhancer()
+  const gambleRng = opts.gambleRng ?? Math.random
 
   return create<GameState>((rawSet, get) => {
     // 검 id → 레벨(검 없음/미상은 0). maxLevelReached 초기화·갱신이 공유한다.
@@ -185,6 +228,20 @@ export function createGameStore(opts: CreateOpts = {}) {
       }
     }
 
+    // 도박 매 라운드 검 교체 — 누적 레벨(press.currentLevel)의 검으로 currentSwordId 를 즉시 바꾼다(non-escrow).
+    // 도박은 "강화의 변형"이라 매 판정이 실제 검을 강화(성공=레벨 상승)/약화(실패=base-loseDelta 하락)시키고,
+    // 메인 스테이지가 그 변화를 강화 성공/실패 연출로 그린다(별도 패널 없음). 레벨↔검 1:1 이므로 클램프된 레벨의
+    // 검은 항상 존재해야 한다(없으면 데이터 이상 — 방어적으로 검을 유지). set 래퍼가 상승을 잡아 maxLevelReached 를
+    // 갱신하므로 중간 누적(잠정 +N)도 "실제 도달"로 기록된다 — 강화처럼 그 레벨 검을 실제로 손에 쥐었기 때문.
+    // ends=true 면 세션을 비운다(확정/실패), false 면 세션은 유지하고 검만 갱신한다(성공 후 다음 라운드 대기).
+    const applyLevel = (level: number, ends: boolean, next?: GambleSession): void => {
+      const toSword = dataManager.getSwordByLevel(level)
+      set((s) => ({
+        currentSwordId: toSword ? toSword.id : s.currentSwordId,
+        gambleSession: ends ? null : (next ?? s.gambleSession),
+      }))
+    }
+
     return {
       gold: opts.gold ?? INITIAL_GOLD,
       currentSwordId:
@@ -199,13 +256,19 @@ export function createGameStore(opts: CreateOpts = {}) {
       // 테스트처럼 currentSwordId 를 지정하면(load 이후 생성) 그 검 레벨에서 시작한다.
       // 이후 상승은 위 set 래퍼가 단일 지점에서 반영한다.
       maxLevelReached: levelOf(opts.currentSwordId ?? null),
+      // 진행 중인 도박 세션(시작 시 없음). startGamble 에서 열고 roll/bank/만료에서 비운다.
+      gambleSession: null,
 
       canEnhance: (useProtection) => {
+        // 도박 세션 중엔 검이 에스크로라 강화 불가 — canX 가 false 면 버튼이 자동 비활성된다.
+        if (get().gambleSession !== null) return false
         const input = buildInput(useProtection)
         return input !== null && enhancer.canEnhance(input)
       },
 
       enhance: (useProtection) => {
+        // 에스크로 보호 — 도박 확정 전 검을 강화하지 못하게 단일 차단점에서 막는다(마우스·키보드·향후 경로 공통).
+        if (get().gambleSession !== null) return null
         const input = buildInput(useProtection)
         if (input === null || !enhancer.canEnhance(input)) return null
 
@@ -238,6 +301,8 @@ export function createGameStore(opts: CreateOpts = {}) {
       },
 
       canSell: () => {
+        // 도박 세션 중엔 검이 에스크로 — 판매 불가(에스크로 검 판매 후 확정이 복원하는 골드 복제 차단).
+        if (get().gambleSession !== null) return false
         const id = get().currentSwordId
         if (id === null) return false
         const sword = dataManager.getSwordById(id)
@@ -245,6 +310,7 @@ export function createGameStore(opts: CreateOpts = {}) {
       },
 
       sell: () => {
+        if (get().gambleSession !== null) return null
         const id = get().currentSwordId
         if (id === null) return null
         const sword = dataManager.getSwordById(id)
@@ -290,11 +356,14 @@ export function createGameStore(opts: CreateOpts = {}) {
       },
 
       canStore: () => {
+        // 도박 세션 중엔 검이 에스크로 — 보관 불가(확정 전까지 currentSwordId 를 옮기지 못하게).
+        if (get().gambleSession !== null) return false
         const id = get().currentSwordId
         return id !== null && id !== INITIAL_SWORD_ID
       },
 
       store: () => {
+        if (get().gambleSession !== null) return
         const id = get().currentSwordId
         // 게이트는 canStore 와 동일 조건(시작 검·검 없음이면 보관할 게 없음).
         if (id === null || id === INITIAL_SWORD_ID) return
@@ -404,6 +473,55 @@ export function createGameStore(opts: CreateOpts = {}) {
           }
         }
         return false // 지불 불가 — 변화 없음
+      },
+
+      canFulfillCommission: (commission) => {
+        // 도박은 비용이 없다 — "검을 건다"가 전제이므로 검 보유만 본다(레벨 게이트는 출제 단계에서 이미 적용).
+        if (commission.kind === 'gamble') return get().currentSwordId !== null
+        return get().canFulfill(commission.cost)
+      },
+
+      startGamble: (params, deadline) => {
+        const id = get().currentSwordId
+        if (id === null) return
+        const sword = dataManager.getSwordById(id)
+        if (!sword) return
+        // 세션만 연다(아직 굴리지 않음 — currentLevel=base). 첫 굴림은 곧바로 rollGamble 이 한다(카드 클릭 = 즉시 1회 판정).
+        // 검을 거는 도박이라 인벤토리·골드는 건드리지 않는다.
+        set({
+          gambleSession: { press: startPress(sword.level), params, deadline },
+        })
+      },
+
+      rollGamble: () => {
+        const session = get().gambleSession
+        // 멱등 가드: rolling 이 아니면 무변화 — 만료 타이머와 입력의 경합을 "먼저 끝낸 쪽이 이긴다"로 해소한다.
+        if (!session || session.press.status !== 'rolling') return session
+        // 하한=시작 검 레벨, 상한=최고 검 레벨 — 순수 코어(pressRound)에 주입한다(검 데이터 해석은 셸 몫).
+        const floorLevel = levelOf(INITIAL_SWORD_ID)
+        const ceilLevel = dataManager.getMaxSwordLevel()
+        const press = pressRound(
+          session.press,
+          session.params,
+          { floorLevel, ceilLevel },
+          gambleRng,
+        )
+        const next: GambleSession = { ...session, press }
+        // 매 판정마다 검을 즉시 교체한다(non-escrow). 성공(rolling)이면 누적 레벨 검으로 바꾸고 세션 유지(다음 라운드
+        // 대기), 확정(banked)·실패(busted)면 최종 레벨 검으로 바꾸고 세션을 비운다. 반환값(next)은 뷰의 결과 연출용.
+        applyLevel(press.currentLevel, press.status !== 'rolling', next)
+        return next
+      },
+
+      bankGamble: () => {
+        const session = get().gambleSession
+        if (!session || session.press.status !== 'rolling') return session
+        // 멈춤/만료 확정 — 현재 누적 레벨 그대로 확정하고 세션을 비운다. non-escrow 라 검은 이미 그 레벨이지만
+        // (직전 성공 굴림이 교체했다) applyLevel 로 idempotent 하게 맞춘다(굴림 0회 만료면 base 그대로).
+        const press = pressBank(session.press)
+        const next: GambleSession = { ...session, press }
+        applyLevel(press.currentLevel, true)
+        return next
       },
 
       // 데이터 적재 후(main) 전역 store 의 최고 도달치를 현재 검 레벨로 보정한다. 현재 검을 그대로

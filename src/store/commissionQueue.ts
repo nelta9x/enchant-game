@@ -19,43 +19,69 @@
 //    active 가 비면 spawnInterval 쿨다운을 세고, 쿨다운이 지나면 다음 세션이 시작된다.
 //  - 절대 타임스탬프만 쓰고 카운트다운 감산은 하지 않는다 — 탭 throttle·드리프트에 강하고 now 주입으로 결정적.
 
-import type { CommissionItemEntry, Material } from '../data/types'
+import type { CommissionItemEntry, GambleConfig, Material } from '../data/types'
 import { weightedIndex } from '../lib/weightedPick'
+
+// 판별 유니온에 분배되는 Omit — 기본 Omit 은 유니온의 "공통 키"만 남겨 variant 전용 키(cost/successChance 등)를
+// 떨군다. T extends any 로 각 멤버에 따로 Omit 을 적용해 발급 직전(id 미부여) 제안 타입을 유지한다.
+type DistributiveOmit<T, K extends keyof T> = T extends unknown
+  ? Omit<T, K>
+  : never
 
 // 거래 비용은 골드 또는 아이템뿐이다('free' 는 강화 비용 전용 — 거래엔 쓰지 않는다).
 export type CommissionCost = Exclude<Material, { kind: 'free' }>
 
-// 화면에 떠 있는 거래 1건. 비용·보상·만료는 생성 시점 기준으로 정해져 freeze 된다.
-// (생성 후 보유 골드가 바뀌어 다른 버킷이 되어도, 발급된 거래의 비용/보상/만료는 발급 시점 값을 유지한다 → freeze.)
-//  - cost: 지불(납품)할 것 — Material(골드 또는 아이템). shop price 와 동일 타입 재사용.
-//  - reward: 지불 시 받는 것 — Material(골드 계산값 또는 아이템).
+// 화면에 떠 있는 제안 1건. 만료는 생성 시점 기준으로 정해져 freeze 되고, 내용은 종류(kind)로 갈린다.
+// (생성 후 보유 골드가 바뀌어 다른 버킷이 되어도, 발급된 제안의 내용/만료는 발급 시점 값을 유지한다 → freeze.)
+//  - kind 'trade': 결정적 거래. cost 를 지불하면 reward 를 받는다(둘 다 Material — 골드/아이템).
+//  - kind 'gamble': 수상한 상인(도박). 검을 걸어 successChance 로 승리(레벨 +winDelta)·패배(레벨 -loseDelta).
+//    비용·보상이 없고(검 자체를 건다) 결과가 확률적이라 거래와 다른 payload 다 — 판정은 gameStore.takeGamble.
 export type Commission = {
   id: number
-  cost: CommissionCost
-  reward: Material
   createdAt: number // 생성 시각(now 기준). 타이머 막대 비율 = (expiresAt - now) / (expiresAt - createdAt).
   expiresAt: number // 절대 만료 시각(now 기준)
-}
+} & (
+  | { kind: 'trade'; cost: CommissionCost; reward: Material }
+  | {
+      kind: 'gamble'
+      successChance: number
+      winDelta: number
+      loseDelta: number
+      maxRounds: number
+    }
+)
 
 // 출제 풀 1항목 — 셸이 버킷 items[] 의 비용(cost)을 해석하고 (골드 보상이면) basePrice 를 붙여 만든다.
 // 비용/보상 산정값이 아이템별이라 PoolEntry 가 그 값을 들고 다닌다(코어는 DataManager 비의존 유지).
 // 시간 제한은 항목별이 아니라 세션 공통(BucketSettings.duration)이다 — 세션의 모든 제안이 같은 만료를 공유한다.
+// kind 'trade' = 거래(비용/보상), kind 'gamble' = 수상한 상인(셸이 현재 검 레벨 게이트를 통과하면 풀에 1개 주입).
 export type PoolEntry = {
   weight: number
-  cost: CommissionCost // 해석된 비용(골드 또는 아이템) — 항목별 고정
 } & (
+  | ({
+      kind: 'trade'
+      cost: CommissionCost // 해석된 비용(골드 또는 아이템) — 항목별 고정
+    } & (
+      | {
+          rewardKind: 'gold'
+          basePrice: number
+          incentiveMin: number
+          incentiveMax: number
+          additiveMin: number
+          additiveMax: number
+        }
+      | {
+          rewardKind: 'item'
+          rewardItemId: string
+          rewardItemCount: number
+        }
+    ))
   | {
-      rewardKind: 'gold'
-      basePrice: number
-      incentiveMin: number
-      incentiveMax: number
-      additiveMin: number
-      additiveMax: number
-    }
-  | {
-      rewardKind: 'item'
-      rewardItemId: string
-      rewardItemCount: number
+      kind: 'gamble'
+      successChance: number
+      winDelta: number
+      loseDelta: number
+      maxRounds: number
     }
 )
 
@@ -133,6 +159,7 @@ export function commissionPool(
       // 아이템 보상은 basePrice 가 필요 없다 — 고정 아이템을 그대로 싣는다(비용은 골드/아이템 무엇이든).
       pool.push({
         weight: e.weight,
+        kind: 'trade',
         cost,
         rewardKind: 'item',
         rewardItemId: e.rewardItemId,
@@ -147,6 +174,7 @@ export function commissionPool(
     if (basePrice === undefined) continue
     pool.push({
       weight: e.weight,
+      kind: 'trade',
       cost,
       rewardKind: 'gold',
       basePrice,
@@ -157,6 +185,20 @@ export function commissionPool(
     })
   }
   return pool
+}
+
+// 수상한 상인(도박) 풀 항목 1개를 만든다. 셸(commissionStore)이 "현재 장착 검 레벨 >= minSwordLevel" 게이트를
+// 통과할 때만 호출해 거래 풀에 합류시킨다(weight 로 거래 항목과 경쟁). pickDistinctEntries 가 항목 단위로
+// 비복원 추출하므로 한 세션에 상인은 최대 1개만 들어간다(별도 가드 불필요).
+export function gamblePoolEntry(cfg: GambleConfig): PoolEntry {
+  return {
+    weight: cfg.weight,
+    kind: 'gamble',
+    successChance: cfg.successChance,
+    winDelta: cfg.winDelta,
+    loseDelta: cfg.loseDelta,
+    maxRounds: cfg.maxRounds,
+  }
 }
 
 // 가중치 선택 1회(weightedIndex 공유 구현). rng 1회 소비. 빈 풀이면 null(rng 소비 없음).
@@ -184,14 +226,26 @@ function rollExpiry(
 
 // 주어진 항목으로 제안 1건의 내용(id 제외 — 발급은 호출자가 한다)을 만든다. 선택·만료 뽑기는 하지 않는다
 // (항목은 이미 고른 것, expiresAt 는 세션 공통이라 호출자가 rollExpiry 로 한 번 뽑아 주입한다).
-// rng 소비(결정성): 골드 보상이면 1) incentive  2) additive (총 2회), 아이템 보상이면 0회(보상 고정).
-// 골드 보상 = round((basePrice + additive) * incentive), 아이템 보상 = 고정 아이템. 발급 시점에 freeze.
+// rng 소비(결정성): 거래·골드 보상이면 1) incentive  2) additive (총 2회), 거래·아이템 보상이면 0회(보상 고정),
+// 도박(gamble)이면 0회(검을 걸어 확률 판정 — 보상 산정 없음). 발급 시점에 내용을 freeze 한다.
 function makeOffer(
   entry: PoolEntry,
   now: number,
   rng: () => number,
   expiresAt: number,
-): Omit<Commission, 'id'> {
+): DistributiveOmit<Commission, 'id'> {
+  if (entry.kind === 'gamble') {
+    // 도박: 비용·보상이 없고(검 자체를 건다) 결과는 fulfill 후 press-your-luck 모달에서 라운드별로 정해진다.
+    return {
+      kind: 'gamble',
+      successChance: entry.successChance,
+      winDelta: entry.winDelta,
+      loseDelta: entry.loseDelta,
+      maxRounds: entry.maxRounds,
+      createdAt: now,
+      expiresAt,
+    }
+  }
   let reward: Material
   if (entry.rewardKind === 'gold') {
     // 1) incentive(보상 배수)  2) additive(보상 가산) — 선택된 아이템의 범위.
@@ -210,7 +264,7 @@ function makeOffer(
       count: entry.rewardItemCount,
     }
   }
-  return { cost: entry.cost, reward, createdAt: now, expiresAt }
+  return { kind: 'trade', cost: entry.cost, reward, createdAt: now, expiresAt }
 }
 
 // 제안 1건의 내용 생성(id 제외) — 가중치 선택 + 만료 + 내용. 풀이 비면 null. (단건 생성 진입점 — 테스트·내부용.)
@@ -221,7 +275,7 @@ export function generateOne(
   now: number,
   rng: () => number,
   settings: BucketSettings,
-): Omit<Commission, 'id'> | null {
+): DistributiveOmit<Commission, 'id'> | null {
   const chosen = selectEntry(pool, rng)
   if (chosen === null) return null
   const expiresAt = rollExpiry(now, rng, settings)

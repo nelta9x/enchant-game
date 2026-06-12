@@ -20,6 +20,8 @@ export type EffectPayload = {
   shakeMs?: number // 이번 강화의 무작위 떨림 길이 — 버스트·방지 떨림
   appearDelaySec?: number // 드롭 재료가 떨어지기 시작하는 시각(초, 버스트 후) — drop
   entranceDelaySec?: number // 새 검 스프라이트 등장 지연(초, = burstAt) — entranceSuppress
+  gamble?: boolean // 수상한 상인(도박) 결과 버스트 표식 — 같은 successBurst/destruction 연출을 재사용하되
+  // sr-only 안내는 "강화 성공/검 파괴"가 아니라 "도박 성공/실패"로 분기시킨다(검은 파괴가 아니라 ±레벨 교체).
 }
 
 // 효과 명세(호출 측이 enqueue 에 넘기는 것 — id 는 시스템이 부여).

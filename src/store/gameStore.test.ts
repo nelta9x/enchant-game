@@ -713,3 +713,113 @@ describe('gameStore — 최고 도달 강화(maxLevelReached)', () => {
   })
 })
 
+describe('gameStore — 수상한 상인(press-your-luck) 세션', () => {
+  // 도박 파라미터는 합성 입력(데이터 튜닝값 비의존). 승패는 gambleRng 로 결정한다(WIN/LOSE 경계).
+  const PARAMS = { successChance: 0.5, winDelta: 1, loseDelta: 3, maxRounds: 3 }
+  const WIN = () => 0
+  const LOSE = () => 0.99
+  const DEADLINE = 999_999 // 만료 타이머는 모달(뷰) 관심사 — store 단위 테스트엔 무관, 큰 값만 둔다.
+  const levelOf = (store: ReturnType<typeof createGameStore>): number =>
+    dataManager.getSwordById(store.getState().currentSwordId!)!.level
+
+  it('startGamble: 세션만 열고 아직 안 굴림(currentSwordId 불변)', () => {
+    const store = createGameStore({ currentSwordId: 'sword_15' })
+    store.getState().startGamble(PARAMS, DEADLINE)
+    const session = store.getState().gambleSession
+    expect(session).not.toBeNull()
+    expect(session?.press.baseLevel).toBe(
+      dataManager.getSwordById('sword_15')!.level,
+    )
+    expect(store.getState().currentSwordId).toBe('sword_15') // 아직 안 굴림 — 검 그대로
+  })
+
+  it('rollGamble 승리: 누적 레벨이 오르고 검이 즉시 그 레벨로 교체된다(non-escrow)', () => {
+    const store = createGameStore({ gambleRng: WIN, currentSwordId: 'sword_15' })
+    store.getState().startGamble(PARAMS, DEADLINE)
+    const next = store.getState().rollGamble()
+    expect(next?.press.status).toBe('rolling')
+    expect(next!.press.currentLevel).toBeGreaterThan(next!.press.baseLevel)
+    // non-escrow: 검이 누적 레벨로 즉시 바뀐다(스테이지가 강화 성공 연출을 그리도록). 검 id 는 파생값이라 단언 가능.
+    expect(store.getState().currentSwordId).toBe(
+      dataManager.getSwordByLevel(next!.press.currentLevel)!.id,
+    )
+  })
+
+  it('rollGamble 패배: 검이 base-loseDelta 로 교체되고 세션 종료', () => {
+    const store = createGameStore({ gambleRng: LOSE, currentSwordId: 'sword_15' })
+    const base = dataManager.getSwordById('sword_15')!.level
+    store.getState().startGamble(PARAMS, DEADLINE)
+    const next = store.getState().rollGamble()
+    expect(next?.press.status).toBe('busted')
+    expect(store.getState().gambleSession).toBeNull() // 세션 종료
+    expect(levelOf(store)).toBe(base - PARAMS.loseDelta) // base 기준 추락(모델 A)
+  })
+
+  it('bankGamble: 현재 누적 레벨 검으로 확정 + 세션 종료', () => {
+    const store = createGameStore({ gambleRng: WIN, currentSwordId: 'sword_15' })
+    const base = dataManager.getSwordById('sword_15')!.level
+    store.getState().startGamble(PARAMS, DEADLINE)
+    store.getState().rollGamble() // 승 → base+winDelta
+    const next = store.getState().bankGamble()
+    expect(next?.press.status).toBe('banked')
+    expect(store.getState().gambleSession).toBeNull()
+    expect(levelOf(store)).toBe(base + PARAMS.winDelta)
+  })
+
+  it('maxRounds 연승 시 자동 확정(검 교체 + 세션 종료)', () => {
+    const store = createGameStore({ gambleRng: WIN, currentSwordId: 'sword_15' })
+    store.getState().startGamble(PARAMS, DEADLINE)
+    let last
+    for (let i = 0; i < PARAMS.maxRounds; i += 1)
+      last = store.getState().rollGamble()
+    expect(last?.press.status).toBe('banked')
+    expect(store.getState().gambleSession).toBeNull()
+  })
+
+  it('승리 확정으로 더 높은 검 도달 시 maxLevelReached 가 오른다(확정만 기록)', () => {
+    const store = createGameStore({ gambleRng: WIN, currentSwordId: 'sword_15' })
+    const before = store.getState().maxLevelReached
+    store.getState().startGamble(PARAMS, DEADLINE)
+    store.getState().rollGamble()
+    store.getState().bankGamble()
+    expect(store.getState().maxLevelReached).toBeGreaterThan(before)
+  })
+
+  it('검이 없으면 startGamble 무변화(세션 안 열림)', () => {
+    const store = createGameStore({ currentSwordId: null })
+    store.getState().startGamble(PARAMS, DEADLINE)
+    expect(store.getState().gambleSession).toBeNull()
+  })
+
+  it('세션이 없으면 roll/bank 는 no-op(null 반환)', () => {
+    const store = createGameStore({ currentSwordId: 'sword_15' })
+    expect(store.getState().rollGamble()).toBeNull()
+    expect(store.getState().bankGamble()).toBeNull()
+  })
+
+  // 에스크로 보호: 도박 세션 중엔 검이 묶여 있어 강화·판매·보관이 막혀야 한다. 모달이 사라진 인라인
+  // 패널에선 이 store 게이트가 마우스·키보드 모든 경로를 막는 단일 차단점이다(검 판매 후 확정이 복원하는 골드 복제 차단).
+  it('도박 세션 중 강화·판매·보관 게이트가 모두 닫힌다(에스크로 보호)', () => {
+    const store = createGameStore({ currentSwordId: 'sword_15', gold: 1_000_000 })
+    // 세션 전엔 판매·보관 가능(시작 검이 아님).
+    expect(store.getState().canSell()).toBe(true)
+    expect(store.getState().canStore()).toBe(true)
+    store.getState().startGamble(PARAMS, DEADLINE)
+    expect(store.getState().canEnhance(false)).toBe(false)
+    expect(store.getState().canSell()).toBe(false)
+    expect(store.getState().canStore()).toBe(false)
+  })
+
+  it('도박 세션 중 sell()·enhance()·store() 본체가 무변화(no-op)', () => {
+    const store = createGameStore({ currentSwordId: 'sword_15', gold: 1_000_000 })
+    store.getState().startGamble(PARAMS, DEADLINE)
+    const goldBefore = store.getState().gold
+    expect(store.getState().sell()).toBeNull()
+    expect(store.getState().enhance(false)).toBeNull()
+    store.getState().store()
+    expect(store.getState().gold).toBe(goldBefore)
+    expect(store.getState().currentSwordId).toBe('sword_15') // 에스크로 — 검 그대로
+    expect(store.getState().gambleSession).not.toBeNull() // 세션 유지
+  })
+})
+
