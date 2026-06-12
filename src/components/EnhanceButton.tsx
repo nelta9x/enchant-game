@@ -135,13 +135,10 @@ export function EnhanceButton({
             : 'cursor-not-allowed border-panel-edge opacity-40 saturate-50' // 진짜 비활성 — 흐림
       }`}
     >
-      {/* 활성 시 천천히 번지는 펄스 링(카드 외곽) — 쿨다운·불가에는 끈다. */}
+      {/* 활성 시 천천히 번지는 펄스 링(카드 외곽) — 쿨다운·불가에는 끈다.
+          상시 펄스라 CSS(.fx-pulse-ring — index.css)가 소유한다(메인 스레드 0). */}
       {ready && (
-        <motion.span
-          className="pointer-events-none absolute inset-0 rounded-2xl border border-gold-glow"
-          animate={{ scale: [1, 1.04], opacity: [0.5, 0] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
-        />
+        <span className="fx-pulse-ring pointer-events-none absolute inset-0 rounded-2xl border border-gold-glow" />
       )}
       {/* "강화" 라벨은 강화 수치(검 +레벨 등)에 쓰는 UI 금색(text-gold)으로 통일해 일관된 느낌을 준다.
           진짜 비활성일 때만 흐린 색으로 둔다(쿨다운 중엔 켜진 금색 유지 — 곧 다시 가능하다는 인상). */}

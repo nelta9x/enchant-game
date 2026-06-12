@@ -121,23 +121,23 @@ export function SwordStage({
           }}
         />
         {/* 보호 결계 돔(발동 시) — 좌상단 결계 서클에서 흘러나온 마력이 검을 은은한 흰빛으로 감싼다.
-            천천히 숨 쉬듯 맥동(은은함)해, 무기만 보고 있어도 "보호 중"임이 읽힌다(검 뒤로 깔림). */}
+            천천히 숨 쉬듯 맥동(은은함)해, 무기만 보고 있어도 "보호 중"임이 읽힌다(검 뒤로 깔림).
+            상시 맥동이라 CSS(.fx-ward-breathe — index.css)가 소유한다(메인 스레드 0). */}
         {armed && (
-          <motion.div
+          <div
             aria-hidden
-            className="pointer-events-none absolute inset-0"
+            className="fx-ward-breathe pointer-events-none absolute inset-0"
             style={{
               background:
                 'radial-gradient(circle, color-mix(in srgb, white 45%, transparent) 0%, transparent 58%)',
             }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0.5, 0.85, 0.5] }}
-            transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
           />
         )}
-        {/* 천천히 도는 마법진 — 발동 시 결계로 승격돼 흰빛으로 점등하고 더 또렷이 빛난다. */}
-        <motion.div
-          className={`pointer-events-none absolute inset-3 rounded-full border ${
+        {/* 천천히 도는 마법진 — 발동 시 결계로 승격돼 흰빛으로 점등하고 더 또렷이 빛난다.
+            상시 회전이라 CSS(.fx-spin, 기본 48s)가 소유한다 — armed 전환은 클래스·boxShadow 만
+            바뀌므로 회전은 끊기지 않는다. */}
+        <div
+          className={`fx-spin pointer-events-none absolute inset-3 rounded-full border ${
             armed ? 'border-white/80' : 'border-frame/25'
           }`}
           style={
@@ -148,15 +148,13 @@ export function SwordStage({
                 }
               : undefined
           }
-          animate={{ rotate: 360 }}
-          transition={{ duration: 48, repeat: Infinity, ease: 'linear' }}
         >
           <div
             className={`absolute inset-2 rounded-full border border-dashed ${
               armed ? 'border-white/55' : 'border-frame/20'
             }`}
           />
-        </motion.div>
+        </div>
 
         {/* 떨림 레이어(방지 시 실제 검을 흔든다) — remount 하지 않고 shakeControls 로 제어한다.
             spriteOverlay(파괴 잔상·파티클)는 이 레이어 밖 형제라 함께 흔들리지 않는다. */}

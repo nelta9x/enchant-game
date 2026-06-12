@@ -122,3 +122,64 @@ button {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* ── 상시(무한 반복) 연출은 CSS 가 소유한다 ──────────────────────────────────────
+   motion(JS 주도)의 repeat: Infinity 는 idle 에도 매 프레임 메인 스레드에서 스타일을
+   쓴다 — 일정 속도 회전·맥동 같은 "상시" 연출을 CSS @keyframes 로 옮기면 컴포지터가
+   단독 구동해 메인 스레드 비용이 0이 된다(모바일 버벅거림·발열 개선). 1회성 연출
+   (망치 스윙·버스트 등 매회 달라지는 타임라인)은 그대로 motion 이 맡는다. */
+@keyframes fx-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes fx-ward-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+@keyframes fx-pulse-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1.04);
+    opacity: 0;
+  }
+}
+
+/* 일정 속도 회전 — 지속시간은 --fx-spin-dur(기본 48s = 검 스테이지 마법진)로 지정,
+   역회전은 .fx-spin-rev 를 함께. (마법진·결계 룬이 공유) */
+.fx-spin {
+  animation: fx-rotate var(--fx-spin-dur, 48s) linear infinite;
+}
+.fx-spin-rev {
+  animation-direction: reverse;
+}
+/* 보호 결계(armed) 글로우의 숨쉬는 맥동 — 정지 폴백(reduced-motion)에서도 보이도록 기본 투명도를 둔다. */
+.fx-ward-breathe {
+  opacity: 0.65;
+  animation: fx-ward-breathe 2.6s ease-in-out infinite;
+}
+/* 강화 가능 상태 펄스 링 — 버튼 외곽에서 천천히 번지며 사라진다. */
+.fx-pulse-ring {
+  animation: fx-pulse-ring 1.6s ease-out infinite;
+}
+
+/* 모션 민감 사용자: 상시 연출 정지(짧은 1회성 연출은 유지). 펄스 링은 정지 시 진한 테두리로
+   박혀 보이므로 숨긴다(원래도 사라지는 잔광이라 없는 게 의도에 가깝다). */
+@media (prefers-reduced-motion: reduce) {
+  .fx-spin,
+  .fx-ward-breathe {
+    animation: none;
+  }
+  .fx-pulse-ring {
+    animation: none;
+    opacity: 0;
+  }
+}
