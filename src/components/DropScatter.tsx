@@ -131,8 +131,9 @@ function DropPile({
 }
 
 // 재료 토큰 1개 — 검 위치에서 아래로 "툭" 떨어져(backOut 바운스) 흩어진 자리에 머문다. 마우스로 스치면
-// (onPointerEnter) 또는 autoCollect 신호가 오면 살짝 떠올랐다(rise) 인벤토리로 빨려 들어가며 작아진다.
-// 빨려드는 동안은 pointer-events-none — 커서가 쫓아와도 재트리거되지 않는다.
+// (onPointerEnter) 또는 터치로 탭하면(onPointerDown — 모바일은 호버가 없고, 터치는 암묵 포인터 캡처라
+// 드래그로 스쳐도 pointerenter 가 오지 않는다) 또는 autoCollect 신호가 오면 살짝 떠올랐다(rise)
+// 인벤토리로 빨려 들어가며 작아진다. 빨려드는 동안은 pointer-events-none — 커서가 쫓아와도 재트리거되지 않는다.
 function DropToken({
   spec,
   appearDelaySec,
@@ -166,6 +167,7 @@ function DropToken({
         cursor: 'pointer',
       }}
       onPointerEnter={() => setHovered(true)}
+      onPointerDown={() => setHovered(true)}
       // 검 중심에서 시작해(파괴 지점) 아래 rest 로 떨어진다.
       initial={{ x: source.x, y: source.y, scale: 0.4, opacity: 0 }}
       animate={

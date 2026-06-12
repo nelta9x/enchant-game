@@ -98,6 +98,13 @@ body,
   min-height: 100svh;
 }
 
+html {
+  /* 모바일 터치: 더블탭 줌을 끈다(핀치 줌·팬 스크롤은 유지) — 게임 버튼 연타가 줌 제스처로
+     소비되어 click 이 사라지는 것을 막고, 구형 브라우저의 300ms 탭 지연도 제거한다.
+     제스처 판정은 터치 지점~루트 조상 체인을 보므로 여기 한 곳이면 문서 전체에 적용된다. */
+  touch-action: manipulation;
+}
+
 body {
   margin: 0;
   background: var(--color-bezel);
@@ -105,4 +112,13 @@ body {
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  /* 모바일 long-press 가드: 게임 버튼을 꾹 눌러도(홀드 연사) iOS 의 텍스트 선택 루페·콜아웃이나
+     안드로이드 long-press 메뉴로 빠지지 않게 한다. 탭 하이라이트도 게임 연출과 겹쳐 거슬리므로 끈다. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
