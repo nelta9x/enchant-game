@@ -14,6 +14,8 @@ const ANIM: AnimationConfig = {
   hammerFadeoutMs: 120,
   hammerFaceOffset: { x: -40, y: -10 },
   reEnhanceGuardMs: 100,
+  enhanceParticlesEnabled: true,
+  hammerSmearEnabled: true,
   shakeBands: [{ maxLevel: null, minMs: 200, maxMs: 500 }],
 }
 

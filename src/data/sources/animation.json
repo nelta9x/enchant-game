@@ -5,6 +5,8 @@
   "hammerFadeoutMs": 100,
   "hammerFaceOffset": { "x": -56, "y": 14 },
   "reEnhanceGuardMs": 100,
+  "enhanceParticlesEnabled": false,
+  "hammerSmearEnabled": false,
   "shakeBands": [
     { "maxLevel": 10, "minMs": 100, "maxMs": 100 },
     { "maxLevel": 20, "minMs": 500, "maxMs": 500 },

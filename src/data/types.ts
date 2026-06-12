@@ -81,6 +81,13 @@ export type ShakeBand = {
 //    머리 블록이 이미지 좌상단이라 타격면은 음수 x(왼쪽)·음수 y(위) — 예: {x:-56, y:-16}.
 //  - reEnhanceGuardMs: 성공/실패 버스트 발생 후 다시 강화할 수 있기까지의 입력 잠금(ms, 정수 >= 0).
 //    UI 가드 전용(게임 로직 불변) — 0 = 버스트 즉시 재강화 가능.
+//  - enhanceParticlesEnabled / hammerSmearEnabled: 연출 on/off 플래그. false 면 해당 연출이 마운트조차
+//    되지 않는다(순수 프레젠테이션 게이트 — 게임 로직·타임라인·잠금·사운드는 영향 없음).
+//      · enhanceParticlesEnabled: 강화 파티클(임팩트 불꽃 캔버스 HitSparkCanvas + 성공/파괴 버스트 DOM 풀
+//        ParticlePool — 풀이 없으면 버스트 emit 은 자동 no-op).
+//      · hammerSmearEnabled: 망치 스윙 모션 블러 스미어(궤적 잔상 캔버스).
+//    ⚠️ 현재 둘 다 false 는 임시 — 모바일(iPhone Safari) 강화 순간 프레임 드랍의 원인 분리 테스트
+//    (2026-06-13). 테스트가 끝나면 true 로 되돌린다.
 //  - shakeBands: 망치가 닿은 뒤 무기가 떠는 시간(ms)의 검 레벨대별 범위. 강화 대상 검의 레벨로 밴드를 골라
 //    그 [min, max] 구간에서 매회 무작위로 뽑는다(레벨 [1, ∞) 를 덮는 연속 밴드 — shakeBands[0] 이 최저 레벨대).
 export type AnimationConfig = {
@@ -90,6 +97,8 @@ export type AnimationConfig = {
   hammerFadeoutMs: number
   hammerFaceOffset: { x: number; y: number }
   reEnhanceGuardMs: number
+  enhanceParticlesEnabled: boolean
+  hammerSmearEnabled: boolean
   shakeBands: ShakeBand[]
 }
 

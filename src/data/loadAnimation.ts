@@ -28,6 +28,14 @@ function intNonNeg(raw: Record<string, unknown>, key: string): number {
   return v as number
 }
 
+// 불리언 필드 1개를 검증해 반환한다(연출 on/off 플래그 — 누락도 실패: 플래그가 데이터에 항상 명시되게).
+function boolField(raw: Record<string, unknown>, key: string): boolean {
+  const v = raw[key]
+  if (typeof v !== 'boolean')
+    fail(`${key} must be a boolean (got ${String(v)})`)
+  return v
+}
+
 // 임팩트 접점(hammerFaceOffset) 검증 — 스프라이트 공간 px 오프셋이라 부호 제약 없는 유한 수 {x, y}.
 function parseFaceOffset(raw: unknown): { x: number; y: number } {
   if (!isRecord(raw)) fail('hammerFaceOffset must be an object { x, y }')
@@ -84,6 +92,9 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
   const hammerFadeoutMs = intNonNeg(raw, 'hammerFadeoutMs')
   const hammerFaceOffset = parseFaceOffset(raw.hammerFaceOffset)
   const reEnhanceGuardMs = intNonNeg(raw, 'reEnhanceGuardMs')
+  // 연출 on/off 플래그(types.ts 의 AnimationConfig 주석 참고 — 순수 프레젠테이션 게이트).
+  const enhanceParticlesEnabled = boolField(raw, 'enhanceParticlesEnabled')
+  const hammerSmearEnabled = boolField(raw, 'hammerSmearEnabled')
 
   // shakeBands: 비어있지 않은 배열. 각 밴드는 parseShakeBand 로 검증.
   const rawBands = raw.shakeBands
@@ -119,6 +130,8 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
     hammerFadeoutMs,
     hammerFaceOffset,
     reEnhanceGuardMs,
+    enhanceParticlesEnabled,
+    hammerSmearEnabled,
     shakeBands,
   }
 }

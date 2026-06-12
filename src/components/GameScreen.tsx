@@ -712,8 +712,10 @@ export function GameScreen() {
                 spriteOverlay={
                   <>
                     {/* 파티클 풀 — 성공/파괴 버스트와 Hit 불꽃의 모든 파티클을 재사용 노드로 그린다(맨 뒤에 둬
-                        검·잔상 위에 파티클이 얹히도록). 풀은 항상 마운트, 소비자가 emit 으로 재생을 요청한다. */}
-                    <ParticlePool />
+                        검·잔상 위에 파티클이 얹히도록). 풀은 항상 마운트, 소비자가 emit 으로 재생을 요청한다.
+                        데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 — 풀이 없으면 버스트 emit 은
+                        자동 no-op(particleEmit.ts). 잔상 떨림·교대(ShakeBurstEffect)는 영향 없음. */}
+                    {anim.enhanceParticlesEnabled && <ParticlePool />}
                     {/* 성공·파괴 버스트는 동시에 여러 개가 떠 있을 수 있다(재강화 시 옛 버스트 유지) —
                         각 효과를 id 로 키잉해 독립 재생한다(잔상 떨림·팝업; 파티클은 풀로 emit). */}
                     {destructionEvents.map((ev) => (
@@ -728,18 +730,23 @@ export function GameScreen() {
                       event={hammerStrikeEvent}
                       impactMs={anim.hammerImpactMs}
                       shape={hammerShape}
+                      // 모션 블러 스미어 on/off — 데이터 플래그(animation.json). 망치 본체 스윙은 유지.
+                      smearEnabled={anim.hammerSmearEnabled}
                     />
                     {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 불티·잉걸불·화구·불혀를 캔버스에 1회 폭발.
                         가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 DOM 풀).
                         ⚠️ 망치보다 "뒤"(DOM 아래)가 아니라 위에 둔다 — 불꽃의 화구·불혀는 임팩트 중심에서
                         피어나는데, 바로 그 자리에 망치 머리가 닿아 정지(holdAfter)하므로 망치 뒤에 깔면 핵심
                         연출이 통째로 가려진다. 임팩트 섬광이 잠깐(≤0.2s) 망치 머리를 삼키는 것이 의도된 강렬함.
-                        paint order 의존을 의도적으로 고정(HitSparkCanvas 가 나중 형제라 망치 위에 그려진다). */}
-                    <HitSparkCanvas
-                      event={hammerStrikeEvent}
-                      impactMs={anim.hammerImpactMs}
-                      faceOffset={anim.hammerFaceOffset}
-                    />
+                        paint order 의존을 의도적으로 고정(HitSparkCanvas 가 나중 형제라 망치 위에 그려진다).
+                        데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 — 마운트 자체를 차단. */}
+                    {anim.enhanceParticlesEnabled && (
+                      <HitSparkCanvas
+                        event={hammerStrikeEvent}
+                        impactMs={anim.hammerImpactMs}
+                        faceOffset={anim.hammerFaceOffset}
+                      />
+                    )}
                     {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
                     <FloatingTextEffect event={floatingText} />
                   </>

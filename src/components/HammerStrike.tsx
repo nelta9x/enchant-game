@@ -54,10 +54,12 @@ export function HammerStrike({
   event,
   impactMs,
   shape,
+  smearEnabled,
 }: {
   event: HammerStrikeEvent | null
   impactMs: number // 망치가 검에 닿기까지(데이터 hammerImpactMs) — 떨림·불꽃·타격음의 공통 앵커
   shape: HammerShape // 모션 모양(윈드업·정지·페이드아웃) — GameScreen 이 데이터에서 조립해 넘긴다
+  smearEnabled: boolean // 모션 블러 스미어 on/off(데이터 hammerSmearEnabled) — false 면 캔버스·시스템·push 전부 생략
 }) {
   const m = computeHammerMotion(impactMs / 1000, shape)
 
@@ -77,6 +79,9 @@ export function HammerStrike({
   const bodyRef = useRef<HTMLImageElement>(null)
   const smearRef = useRef<HammerSmearSystem | null>(null)
   useEffect(() => {
+    // 스미어가 데이터 플래그로 꺼져 있으면 캔버스가 렌더되지 않아(아래 조건부) 시스템도 만들지 않는다 —
+    // 이후 begin/push 는 옵셔널 체이닝으로 자동 no-op(궤적 계산 비용 0).
+    if (!smearEnabled) return
     if (canvasRef.current && !smearRef.current) {
       smearRef.current = new HammerSmearSystem(canvasRef.current, HAMMER_SPRITE)
       smearRef.current.warmup()
@@ -91,7 +96,7 @@ export function HammerStrike({
       smearRef.current?.dispose()
       smearRef.current = null
     }
-  }, [])
+  }, [smearEnabled])
 
   // 본체가 매 프레임 실제로 그린 변환을 스미어 펜에 흘린다 — 본체와 잔상이 구조적으로 같은 궤적(키프레임
   // 재구현 없음 → easing 이 바뀌어도 어긋날 수 없다). 자국을 남길지는 순수 코어의 속도 게이트가 정한다.
@@ -147,19 +152,21 @@ export function HammerStrike({
       className="pointer-events-none absolute inset-0 grid place-items-center overflow-visible"
       aria-hidden
     >
-      <canvas
-        ref={canvasRef}
-        className="pointer-events-none absolute left-1/2 top-1/2"
-        // blur(자국 경계를 녹여 한 덩어리 물감 스미어로)는 실루엣 베이크가 담당 — 여기 CSS filter 를
-        // 걸지 않는다(위 effect 의 ctx.filter 미지원 폴백만 예외). 머리의 또렷함은 위에 덮이는 본체가 담당.
-        // 크기는 스윙 호 전체(윈드업 x≈265px + 회전 스프라이트 반경)를 덮도록 ±368×±256px.
-        style={{
-          width: '46rem',
-          height: '32rem',
-          marginLeft: '-23rem',
-          marginTop: '-16rem',
-        }}
-      />
+      {smearEnabled && (
+        <canvas
+          ref={canvasRef}
+          className="pointer-events-none absolute left-1/2 top-1/2"
+          // blur(자국 경계를 녹여 한 덩어리 물감 스미어로)는 실루엣 베이크가 담당 — 여기 CSS filter 를
+          // 걸지 않는다(위 effect 의 ctx.filter 미지원 폴백만 예외). 머리의 또렷함은 위에 덮이는 본체가 담당.
+          // 크기는 스윙 호 전체(윈드업 x≈265px + 회전 스프라이트 반경)를 덮도록 ±368×±256px.
+          style={{
+            width: '46rem',
+            height: '32rem',
+            marginLeft: '-23rem',
+            marginTop: '-16rem',
+          }}
+        />
+      )}
       <motion.img
         ref={bodyRef}
         src={HAMMER_SPRITE}
@@ -169,7 +176,8 @@ export function HammerStrike({
         style={{ imageRendering: 'pixelated' }}
         initial={initial}
         animate={controls}
-        onUpdate={onBodyUpdate}
+        // 스미어가 꺼져 있으면 매 프레임 포즈 push(onUpdate) 자체를 달지 않는다 — 콜백·궤적 계산 비용 0.
+        onUpdate={smearEnabled ? onBodyUpdate : undefined}
       />
     </div>
   )
