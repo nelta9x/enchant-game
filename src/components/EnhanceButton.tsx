@@ -1,11 +1,5 @@
-import {
-  animate,
-  motion,
-  useMotionTemplate,
-  useMotionValue,
-  useTransform,
-} from 'motion/react'
-import { useEffect } from 'react'
+import { motion } from 'motion/react'
+import { useState } from 'react'
 import type { Material } from '../data/types'
 import { useHoldRepeat } from '../hooks/useHoldRepeat'
 import { useI18nStore, useT } from '../i18n'
@@ -56,32 +50,17 @@ export function EnhanceButton({
   })
 
   // 쿨다운 오버레이(게임 스킬 아이콘의 "쿨타임 스윕") — 검은 원뿔(conic) 마스크가 버튼을 덮고, 시계방향으로
-  // 투명 영역이 자라며 걷힌다. sweep: 0 = 가득 덮임(쿨다운 시작), 1 = 완전히 드러남(쿨다운 끝).
-  // 자바스크립트(Motion)가 매 프레임 sweep 을 갱신 → conic-gradient 의 각도가 매끄럽게 회전한다.
-  const sweep = useMotionValue(0)
-  const sweepAngle = useTransform(sweep, (v) => `${v * 360}deg`)
-  // 12시 방향(0deg)에서 시작해 시계방향으로: 0~각도 = 투명(드러남), 각도~360 = 검정(덮임). 같은 각도에
-  // 하드 스톱을 둬 경계가 또렷한 파이 조각이 된다. rgba 검정 0.55 = 게임 쿨타임 특유의 반투명 어둠.
-  const cooldownMask = useMotionTemplate`conic-gradient(from 0deg, transparent ${sweepAngle}, rgba(0,0,0,0.55) ${sweepAngle})`
-  const overlayOpacity = useMotionValue(0)
-  useEffect(() => {
-    if (charging) {
-      // 쿨다운 시작: 즉시 가득 덮고(게임처럼 바로 어두워짐) 한 바퀴 걷히도록 일정 속도로 회전.
-      sweep.set(0)
-      overlayOpacity.set(1)
-      const controls = animate(sweep, 1, {
-        duration: Math.max(chargeMs, 0) / 1000,
-        ease: 'linear',
-      })
-      return () => controls.stop()
-    }
-    // 쿨다운 종료: 남은 오버레이를 빠르게 거둬 평소 상태로 넘긴다.
-    const controls = animate(overlayOpacity, 0, {
-      duration: 0.15,
-      ease: 'easeOut',
-    })
-    return () => controls.stop()
-  }, [charging, chargeMs, sweep, overlayOpacity])
+  // 투명 영역이 자라며 걷힌다. 각도 보간은 CSS 가 소유한다(fx-cooldown-sweep + @property — index.css):
+  // JS(motion)로 매 프레임 배경 문자열을 갱신하면 연사 중(거의 항상 쿨다운) 60fps 스타일 리캘크가 계속
+  // 돌기 때문. charging 이 새로 켜질 때마다 사이클 키를 올려 오버레이를 재마운트 → CSS 애니메이션이
+  // 처음(0deg = 가득 덮임)부터 깨끗하게 재시작한다(연사의 true→false→true 토글마다).
+  // 전이 감지는 렌더 중 이전 값 비교(공식 "adjusting state during render" 패턴 — effect 의 set 회피).
+  const [cooldownCycle, setCooldownCycle] = useState(0)
+  const [prevCharging, setPrevCharging] = useState(charging)
+  if (charging !== prevCharging) {
+    setPrevCharging(charging)
+    if (charging) setCooldownCycle((c) => c + 1)
+  }
 
   // 강화 조건 칩 — 골드/아이템만 표시(무료·최종 단계는 null). 아이콘+수량만 시각화하고 aria-label 로 설명.
   const renderCost = () => {
@@ -151,12 +130,22 @@ export function EnhanceButton({
       </span>
       {renderCost()}
       {/* 쿨다운 스윕 오버레이 — 라벨/비용 위(z-10)에 얹어 게임 스킬 아이콘처럼 버튼 전체를 덮는다.
-          charging 동안에만 보이며(overlayOpacity), conic 마스크가 시계방향으로 걷힌다(sweep).
+          12시(0deg)부터 시계방향: 0~각도 = 투명(드러남), 각도~360 = 검정(덮임) — 같은 각도의 하드
+          스톱이 또렷한 파이 경계를 만든다(rgba 0.55 = 쿨타임 특유의 반투명 어둠). 각도는 CSS 애니메이션
+          (fx-cooldown-sweep, forwards)이 한 바퀴 걷고, 쿨다운이 끝나면 opacity 만 0.15s 로 거둔다
+          (정상 종료 땐 이미 전부 투명이라 안 보이고, 타이밍이 어긋나 잔여가 남아도 부드럽게 사라진다).
           overflow-hidden + rounded-2xl 가 버튼 모양대로 잘라 준다. */}
-      <motion.span
+      <span
+        key={cooldownCycle}
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-10 rounded-2xl"
-        style={{ background: cooldownMask, opacity: overlayOpacity }}
+        className={`pointer-events-none absolute inset-0 z-10 rounded-2xl transition-opacity duration-150 ease-out ${
+          charging ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          background:
+            'conic-gradient(from 0deg, transparent var(--cooldown-sweep), rgba(0,0,0,0.55) var(--cooldown-sweep))',
+          animation: `fx-cooldown-sweep ${Math.max(chargeMs, 0)}ms linear forwards`,
+        }}
       />
     </motion.button>
   )
