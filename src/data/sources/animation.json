@@ -3,6 +3,7 @@
   "hammerSnapMs": 60,
   "hammerHoldAfterMs": 370,
   "hammerFadeoutMs": 100,
+  "hammerFaceOffset": { "x": -56, "y": 14 },
   "reEnhanceGuardMs": 100,
   "shakeBands": [
     { "maxLevel": 10, "minMs": 100, "maxMs": 100 },

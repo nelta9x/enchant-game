@@ -75,6 +75,10 @@ export type ShakeBand = {
 //    데이터로 만지는 값(HammerShape 로 변환돼 흐른다).
 //  - hammerHoldAfterMs: 임팩트 직후 그 자세를 유지하는 정지 시간.
 //  - hammerFadeoutMs: 정지 후 제자리에서 사라지는 페이드아웃 길이.
+//  - hammerFaceOffset: 임팩트 폭발(Hit 불꽃)이 터지는 지점 — 망치 "스프라이트 공간"(회전 전, 본체
+//    96px 기준 px, x+ 오른쪽 · y+ 아래)에서 스프라이트 중심 기준 오프셋. 임팩트 자세로 회전돼 더해지므로
+//    (hammerSwing.impactTipOffset) 임팩트 각도를 튜닝해도 폭발이 같은 부위를 따라간다. 호라드릭 망치는
+//    머리 블록이 이미지 좌상단이라 타격면은 음수 x(왼쪽)·음수 y(위) — 예: {x:-56, y:-16}.
 //  - reEnhanceGuardMs: 성공/실패 버스트 발생 후 다시 강화할 수 있기까지의 입력 잠금(ms, 정수 >= 0).
 //    UI 가드 전용(게임 로직 불변) — 0 = 버스트 즉시 재강화 가능.
 //  - shakeBands: 망치가 닿은 뒤 무기가 떠는 시간(ms)의 검 레벨대별 범위. 강화 대상 검의 레벨로 밴드를 골라
@@ -84,6 +88,7 @@ export type AnimationConfig = {
   hammerSnapMs: number
   hammerHoldAfterMs: number
   hammerFadeoutMs: number
+  hammerFaceOffset: { x: number; y: number }
   reEnhanceGuardMs: number
   shakeBands: ShakeBand[]
 }

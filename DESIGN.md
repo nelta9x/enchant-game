@@ -76,10 +76,8 @@
 | 토큰                                                | 값                                      | 의미                                                                 |
 | --------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------- |
 | `floating-text`                                     | `#ffffff`                               | 강화 결과 플로팅 텍스트("아이구!…") 색                               |
-| `hit-arc` / `hit-arc-core` / `hit-arc-halo`         | `#dff0ff` `#ffffff` `#ffeeb4`           | 망치 임팩트 발화점(용접 아크 코어·중심 백색점·크림 헤일로)           |
-| `hit-flash` → `hit-core` → `hit-edge` → `hit-ember` | `#ffd24a` `#ff8c1a` `#ee3a0e` `#4d1003` | 불티가 비행하며 "식는" 4-stop 보간 팔레트                            |
-| `hit-head-hot` / `hit-head-warm`                    | `#ffeec8` `#ff8032`                     | 불티 머리 백열 하이라이트(뜨거움→식음)                               |
-| `hit-outline`                                       | `#2a0a01`                               | 밝은 배경 대비용 불티 테두리                                         |
+| `hit-arc-core`                                      | `#ffffff`                               | 화염 백열 중심색 — 화구·불혀 그라데이션의 가장 뜨거운 속             |
+| `hit-flash` → `hit-core` → `hit-edge` → `hit-ember` | `#ffc31f` `#ff7a10` `#f23d0a` `#4d1003` | 불티·잉걸불 "식는" 4-stop 보간 + 임팩트 화구·불혀 그라데이션         |
 | `hammer-trail`                                      | `#ffffff`                               | 망치 스윙 모션 블러 스미어(실루엣 자국 색) — `hammerSmear.ts` 캔버스 |
 
 `hit-*`·`hammer-trail`은 캔버스(`hitSparks.ts`/`hammerSmear.ts`) 전용 — 런타임에 1회 해석·캐시한다.

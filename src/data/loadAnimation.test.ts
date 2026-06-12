@@ -8,6 +8,7 @@ function valid() {
     hammerSnapMs: 140,
     hammerHoldAfterMs: 100,
     hammerFadeoutMs: 120,
+    hammerFaceOffset: { x: -40, y: -10 },
     reEnhanceGuardMs: 100,
     shakeBands: [
       { maxLevel: 10, minMs: 100, maxMs: 200 },
@@ -54,6 +55,23 @@ describe('parseAnimationConfig — 연출 타이밍 검증(순수)', () => {
       expect(() => parseAnimationConfig(bad(-1))).toThrow(field)
     })
   }
+
+  it('hammerFaceOffset 누락·비객체·비유한수 좌표면 실패(음수·소수는 허용 — px 오프셋)', () => {
+    const bad = (v: unknown) => ({ ...valid(), hammerFaceOffset: v })
+    expect(() => parseAnimationConfig(bad(undefined))).toThrow(
+      /hammerFaceOffset/,
+    )
+    expect(() => parseAnimationConfig(bad(-40))).toThrow(/hammerFaceOffset/)
+    expect(() => parseAnimationConfig(bad({ x: -40 }))).toThrow(
+      /hammerFaceOffset\.y/,
+    )
+    expect(() => parseAnimationConfig(bad({ x: Number.NaN, y: 0 }))).toThrow(
+      /hammerFaceOffset\.x/,
+    )
+    // 부호·소수 제약 없음 — 스프라이트 공간 px 오프셋(우하단 방향이면 양수도 유효).
+    const cfg = parseAnimationConfig(bad({ x: 12.5, y: 3 }))
+    expect(cfg.hammerFaceOffset).toEqual({ x: 12.5, y: 3 })
+  })
 
   it('0 은 허용(즉시 발생/딜레이 없음)', () => {
     const cfg = parseAnimationConfig({

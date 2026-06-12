@@ -23,7 +23,7 @@ import type { HammerMotion, SwingKeyframes } from './hammerTiming'
 // x·y(px): 검 박스 "중심"(0,0) 기준, x+ 오른쪽 · y− 위. 각도(deg): CSS rotate 와 같은 시계방향 +.
 // 팔 각도 0 = 망치가 피벗 바로 위(호 꼭대기), + 는 피벗 기준 오른쪽 · − 는 왼쪽.
 export const IMPACT = { x: 24, y: -3 } // 임팩트 앵커 — 망치 머리가 마법진(검 박스) 정중앙에 닿는 위치
-export const IMPACT_ROTATE = -56 // 임팩트 자세(팔+손목 합) — 머리=위(0) 기준, − 는 왼쪽으로 따라넘긴 기울기
+export const IMPACT_ROTATE = -36 // 임팩트 자세(팔+손목 합) — 머리=위(0) 기준, − 는 왼쪽으로 따라넘긴 기울기
 export const ARM_RADIUS_PX = 240 // 피벗(손)→망치 중심 거리 — 작을수록 호가 빡빡하게 휜다(곡률↑)
 export const ARM_IMPACT_DEG = -64 // 임팩트 순간 팔 각도 — 더 음수일수록 피벗이 오른쪽·위로 가고 내려찍는 방향이 수직에 가깝다
 export const ARM_START_DEG = -2 // 등장(치켜듦) 팔 각도 — 호 꼭대기 부근(높이 들어 올린 자세)
@@ -44,6 +44,24 @@ export const NARROW_RAISE_X_SCALE = 0.6
 const DEG = Math.PI / 180
 
 export type SwingPivot = { x: number; y: number }
+
+// 임팩트 순간 망치 머리의 "타격면" 위치 — 검 박스 중심(0,0) 기준 px. 폭발(Hit 불꽃)의 원점이 여기로
+// 온다. 접점 자체는 디자이너 데이터(animation.json 의 hammerFaceOffset — 망치 스프라이트 공간의
+// 중심 기준 오프셋, 의미는 data/types.ts 참고)에서 오고, 이 함수는 그 오프셋을 임팩트 자세
+// (IMPACT_ROTATE)로 회전해 IMPACT 에 더하는 기하만 담당한다 — 임팩트 자세를 튜닝해도 폭발이 같은
+// 부위(타격면)를 따라간다. 순수 모듈 규약대로 DataManager 를 모르며 호출자가 값을 주입한다.
+export function impactTipOffset(face: { x: number; y: number }): {
+  x: number
+  y: number
+} {
+  const rot = IMPACT_ROTATE * DEG
+  const cos = Math.cos(rot)
+  const sin = Math.sin(rot)
+  return {
+    x: IMPACT.x + face.x * cos - face.y * sin,
+    y: IMPACT.y + face.x * sin + face.y * cos,
+  }
+}
 
 // 피벗(대장장이의 손) 위치 — 임팩트 앵커에서 팔 방향(ARM_IMPACT_DEG)으로 반지름만큼 역산한다.
 // 손잡이가 피벗을 향하는 기하라, 피벗은 검 박스의 오른쪽 아래(화면 밖 어림)에 떨어진다.
