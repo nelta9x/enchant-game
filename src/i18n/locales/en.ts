@@ -61,7 +61,6 @@ export const en: Record<TranslationKey, string> = {
   // 아이템 표시명
   'item.protection_ticket': 'Protection Ticket',
   'item.iron_scrap': 'Iron Scrap',
-  'item.faded_fluorescent': 'Faded Fluorescent',
   'item.flame_sword_handle': 'Flame Sword Handle',
   'item.dark_matter': 'Dark Matter',
 

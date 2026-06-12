@@ -66,24 +66,6 @@
           "rewardKind": "item",
           "rewardItemId": "protection_ticket",
           "rewardItemCount": 5
-        },
-        {
-          "itemId": "faded_fluorescent",
-          "requiredCount": 1,
-          "weight": 1,
-          "rewardKind": "gold",
-          "incentiveMin": 1,
-          "incentiveMax": 2,
-          "additiveMin": 0,
-          "additiveMax": 0
-        },
-        {
-          "itemId": "faded_fluorescent",
-          "requiredCount": 1,
-          "weight": 1,
-          "rewardKind": "item",
-          "rewardItemId": "sword_12",
-          "rewardItemCount": 1
         }
       ],
       "durationMinMs": 10000,
@@ -118,14 +100,6 @@
           "rewardKind": "item",
           "rewardItemId": "protection_ticket",
           "rewardItemCount": 10
-        },
-        {
-          "itemId": "faded_fluorescent",
-          "requiredCount": 2,
-          "weight": 1,
-          "rewardKind": "item",
-          "rewardItemId": "sword_12",
-          "rewardItemCount": 1
         },
         {
           "itemId": "flame_sword_handle",
@@ -202,14 +176,6 @@
           "rewardKind": "item",
           "rewardItemId": "protection_ticket",
           "rewardItemCount": 20
-        },
-        {
-          "itemId": "faded_fluorescent",
-          "requiredCount": 2,
-          "weight": 1,
-          "rewardKind": "item",
-          "rewardItemId": "sword_12",
-          "rewardItemCount": 1
         },
         {
           "itemId": "flame_sword_handle",

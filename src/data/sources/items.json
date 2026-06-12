@@ -5,11 +5,6 @@
     "sprite": "iron_scrap.png" 
   },
   {
-    "id": "faded_fluorescent",
-    "basePrice": 100000,
-    "sprite": "faded_fluorescent.png"
-  },
-  {
     "id": "flame_sword_handle",
     "basePrice": 600000,
     "sprite": "flame_sword_handle.png"

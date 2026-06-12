@@ -61,7 +61,6 @@ export const ko = {
   // 재료로 쓰이는 검(sword_<level>)은 검 이름 키(sword.N.name)로 해석한다.
   'item.protection_ticket': '파괴보호장치',
   'item.iron_scrap': '철조각',
-  'item.faded_fluorescent': '빛 바랜 형광물질',
   'item.flame_sword_handle': '불꽃마검 손잡이',
   'item.dark_matter': '암흑 물질',
 
