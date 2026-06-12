@@ -22,7 +22,7 @@ export type TrailStamp = { pose: TrailPose; alpha: number }
 // 스냅 전체가 한 줄 스미어로 남고, 임팩트 후 이 시간 안에 꼬리가 망치 쪽으로 수축하며 사라진다.
 export const TRAIL_WINDOW_MS = 80
 // 머리(나이 0) 자국의 최대 알파 — 본체(1.0) 대비. 꼬리는 나이 곡선(stampAlpha)으로 0 까지 떨어진다.
-export const TRAIL_PEAK_ALPHA = 0.5
+export const TRAIL_PEAK_ALPHA = 0.4
 // 인접 자국 사이 최대 간격(px, poseDistance 기준) — 프레임 사이를 이 간격으로 보간해 점선이 아닌
 // 연속된 물감 자국을 만든다. 작을수록 매끈하고 스탬프 수가 는다(스냅 한 번에 대략 궤적길이/간격 개).
 export const STAMP_SPACING_PX = 7
@@ -37,7 +37,7 @@ export const HEAD_RADIUS_PX = 48
 export const TAIL_FALLOFF_PX = 380
 // 스미어 캔버스에 입히는 CSS blur(px) — 자국 경계를 녹여 한 덩어리 물감처럼. 머리의 또렷함은
 // 어차피 위에 덮이는 본체(컬러 망치)가 담당한다.
-export const TRAIL_BLUR_PX = 2
+export const TRAIL_BLUR_PX = 3
 
 // 포즈 사이 "겉보기 이동 거리"(px) — 중심 이동 + 회전이 쓸어내는 머리 호 길이. 보간 간격·속도 게이트
 // 공용 메트릭. scale 변화는 미세(0.9→1.08)해 무시한다.
