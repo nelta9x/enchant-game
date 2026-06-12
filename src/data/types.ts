@@ -69,8 +69,9 @@ export type ShakeBand = {
 // loadAnimation 주석 참고). 강화 1회의 연출 타임라인은 enhanceTimeline.ts 가 이 값 + 매회 랜덤 떨림
 // 시간으로 도출한다(단일 출처).
 //  - hammerImpactMs: 강화 시작(t=0)부터 망치가 검에 닿기까지(정수 >= 0). 떨림 시작·Hit 불꽃·'캉' 타격음의
-//    공통 앵커. 망치 윈드업은 고정이라 이 값은 매회 동일(랜덤이 아님).
-//  - hammerWindupMs: 닿기 직전 빠르게 내리꽂는 스냅 길이(holdUntil→impact). 모션의 "모양" 중 디자이너가
+//    공통 앵커. 망치 윈드업(대기)은 고정이라 이 값은 매회 동일(랜덤이 아님).
+//  - hammerSnapMs: 닿기 직전 빠르게 내리꽂는 스냅(내려치기) 길이(holdUntil→impact). 윈드업이 아니라
+//    "내려치는 동작" 자체의 길이다 — 이 값을 키우면 내려치기가 느려진다. 모션의 "모양" 중 디자이너가
 //    데이터로 만지는 값(HammerShape 로 변환돼 흐른다).
 //  - hammerHoldAfterMs: 임팩트 직후 그 자세를 유지하는 정지 시간.
 //  - hammerFadeoutMs: 정지 후 제자리에서 사라지는 페이드아웃 길이.
@@ -80,7 +81,7 @@ export type ShakeBand = {
 //    그 [min, max] 구간에서 매회 무작위로 뽑는다(레벨 [1, ∞) 를 덮는 연속 밴드 — shakeBands[0] 이 최저 레벨대).
 export type AnimationConfig = {
   hammerImpactMs: number
-  hammerWindupMs: number
+  hammerSnapMs: number
   hammerHoldAfterMs: number
   hammerFadeoutMs: number
   reEnhanceGuardMs: number

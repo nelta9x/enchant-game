@@ -9,7 +9,7 @@ import type { AnimationConfig, ShakeBand } from '../data/types'
 // 합성 픽스처(실제 데이터 값이 아님) — 떨림은 레벨 밴드로 분리됐으므로 timeline 은 임팩트·가드만 본다.
 const ANIM: AnimationConfig = {
   hammerImpactMs: 360,
-  hammerWindupMs: 140,
+  hammerSnapMs: 140,
   hammerHoldAfterMs: 100,
   hammerFadeoutMs: 120,
   reEnhanceGuardMs: 100,

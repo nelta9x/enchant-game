@@ -5,7 +5,7 @@ import { loadAnimation, parseAnimationConfig } from './loadAnimation'
 function valid() {
   return {
     hammerImpactMs: 360,
-    hammerWindupMs: 140,
+    hammerSnapMs: 140,
     hammerHoldAfterMs: 100,
     hammerFadeoutMs: 120,
     reEnhanceGuardMs: 100,
@@ -36,7 +36,7 @@ describe('parseAnimationConfig — 연출 타이밍 검증(순수)', () => {
   // 정수 >= 0 제약을 받는 모든 망치 타이밍 필드를 한 표로 검증한다(필드가 늘면 여기에 추가).
   const intFields = [
     'hammerImpactMs',
-    'hammerWindupMs',
+    'hammerSnapMs',
     'hammerHoldAfterMs',
     'hammerFadeoutMs',
     'reEnhanceGuardMs',
@@ -156,7 +156,7 @@ describe('loadAnimation — 번들 데이터 무결성', () => {
     const a = loadAnimation()
     for (const v of [
       a.hammerImpactMs,
-      a.hammerWindupMs,
+      a.hammerSnapMs,
       a.hammerHoldAfterMs,
       a.hammerFadeoutMs,
       a.reEnhanceGuardMs,
