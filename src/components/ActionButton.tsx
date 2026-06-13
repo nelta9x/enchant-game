@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react'
 
-// 우측 액션 열의 보조 액션 버튼(판매·보관 공용) — 단일 라벨 + 동일한 활성/비활성 스타일.
-// 판매와 보관이 같은 모양의 버튼을 각자 들고 있던 것을 하나로 합쳤다(라벨·핸들러만 다름).
-// 가능 여부 게이팅(disabled)은 호출 측(canSell/canStore)이 소유한다.
+// 우측 액션 열의 보조 액션 버튼(현재 판매) — 단일 라벨 + 활성/비활성 스타일.
+// 라벨·핸들러만 갈아끼우면 다른 보조 액션에도 재사용 가능한 일반 버튼이다.
+// 가능 여부 게이팅(disabled)은 호출 측(canSell)이 소유한다.
 type ActionButtonProps = {
   disabled: boolean
   onClick: () => void
