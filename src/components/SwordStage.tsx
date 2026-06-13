@@ -10,7 +10,11 @@ import { motion, useAnimationControls } from 'motion/react'
 import { useI18nStore, useT } from '../i18n'
 import type { SwordData } from '../data/types'
 import { formatAmount, formatGold } from '../lib/format'
-import { drawSpriteContain, spriteStore } from '../lib/spriteStore'
+import {
+  drawSpriteContain,
+  spriteStore,
+  FREEZE_SWORD_SPRITE,
+} from '../lib/spriteStore'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
 import { SuccessRateSigil } from './SuccessRateSigil'
@@ -133,13 +137,21 @@ export function SwordStage({
     }
     if (prevSpriteRef.current === spriteName) return
     prevSpriteRef.current = spriteName
-    entranceControls.set({ opacity: 0, scale: 0.8 })
+    // 진단(FREEZE_SWORD_SPRITE): 무기가 안 바뀌므로 등장 페이드(opacity 0→1, entranceDelay 만큼 숨김)를
+    // 건너뛰고 늘 보이게 둔다 — 강화마다 검이 없어졌다 다시 나오지 않게(첫 무기가 계속 떠 있게).
+    entranceControls.set(
+      FREEZE_SWORD_SPRITE
+        ? { opacity: 1, scale: 1 }
+        : { opacity: 0, scale: 0.8 },
+    )
     drawSprite(spriteName)
-    entranceControls.start({
-      opacity: 1,
-      scale: 1,
-      transition: { duration: 0.35, ease: 'easeOut', delay: entranceDelay },
-    })
+    if (!FREEZE_SWORD_SPRITE) {
+      entranceControls.start({
+        opacity: 1,
+        scale: 1,
+        transition: { duration: 0.35, ease: 'easeOut', delay: entranceDelay },
+      })
+    }
     // 첫 무기 안 보임 방지 — 스프라이트가 아직 풀에 없으면(첫 페인트가 시작검 적재를 앞질렀거나, 다음 검이
     // 백그라운드 적재 중) 위 drawSprite 는 default.png 폴백을 그린다. 적재되는 즉시 한 번 더 그려 빈/폴백
     // 검이 남지 않게 한다(그 사이 검이 또 바뀌지 않았을 때만). load 는 적재 완료/캐시 히트에 resolve 하고
@@ -231,7 +243,11 @@ export function SwordStage({
               key 재마운트를 쓰지 않는 이유: 매 교체마다 새 합성 레이어를 만들어(레이어 churn) 모바일에서 끊김을
               유발한다. 파괴 연출 중에는 entranceDelay(burstAt)로 등장을 미뤄 잔상 뒤로 새 검이 비치지 않게 한다. */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={
+              FREEZE_SWORD_SPRITE
+                ? { opacity: 1, scale: 1 }
+                : { opacity: 0, scale: 0.8 }
+            }
             animate={entranceControls}
             className="flex items-center justify-center"
           >

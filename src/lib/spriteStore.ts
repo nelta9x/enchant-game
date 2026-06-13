@@ -103,11 +103,11 @@ class SpriteStore {
 // 앱 전역 단일 스토어(DataManager 와 같은 싱글턴 관례).
 export const spriteStore = new SpriteStore()
 
-// ⚠️ 모바일 진단용 임시 플래그 — "강화 시 검 스프라이트(비트맵 소스) 교체"가 모바일(iOS WebKit) 프레임 저하의
-// 원인인지 격리하기 위한 것. true 면 drawSpriteContain 이 "처음 그린 스프라이트"로 고정해, 강화해도 검 본체
-// (SwordStage)와 잔상(ShakeBurstEffect)이 같은 ImageBitmap 만 블릿한다(= 교체 비용 0). 이름·레벨 뱃지·스탯·
-// 파티클·떨림 연출은 정상이다. 진단이 끝나면 false 로 되돌리거나 이 블록과 drawSpriteContain 의 가드를 지울 것.
-const FREEZE_SWORD_SPRITE = true
+// ⚠️ 모바일 진단용 임시 플래그(export — SwordStage 도 참조) — "강화 시 검 교체"가 모바일(iOS WebKit) 프레임
+// 저하 원인인지 격리. true 면 ① drawSpriteContain 이 "처음 그린 스프라이트"로 고정해 검 본체·잔상이 같은
+// ImageBitmap 만 블릿하고(= 교체 비용 0), ② SwordStage 가 등장 페이드(opacity 0→1)를 건너뛰어 검이 강화마다
+// 사라졌다 나오지 않고 늘 떠 있게 한다. 이름·레벨 뱃지·스탯은 정상. 진단이 끝나면 false 로 되돌리거나 제거할 것.
+export const FREEZE_SWORD_SPRITE = true
 let frozenSprite: string | null = null
 
 // 캔버스에 스프라이트를 object-contain 으로 그린다(뷰 경계 헬퍼) — SwordStage(검 본체)와 ShakeBurstEffect(잔상)가
