@@ -768,13 +768,13 @@ export function GameScreen() {
 
           {/* 우: 강화 카드(비용 포함) + 판매 버튼(세로 중앙). 판매가는 검 스테이지에 금색으로 표시.
               보관은 좌측 인벤토리의 장착 행 클릭으로 옮겼다(별도 보관 버튼 없음).
-              보유 골드는 좌측 인벤토리 목록 맨 위 골드 슬롯으로 옮겼다(별도 골드 띠 없음). */}
+              보유 골드는 좌측 인벤토리 헤더 우측 배지로 옮겼다(스크롤 영역 밖 고정). */}
           <div className="flex flex-col items-center justify-center">
             {/* 액션 패널 = 인벤토리 패널과 동일 크기. 폭은 컬럼(16rem)으로 이미 같고, 높이는 인벤토리
-                패널 높이(헤더+목록 21rem+패딩 ≈ 23.375rem)에 맞춘다. lg+ 에선 그 높이의 2행
-                그리드(강화 2 : 판매 1)로 버튼이 행을 채운다(items-stretch). 세로형(<lg)은
-                콘텐츠 높이의 일반 flex 스택. (인벤토리 목록 높이를 바꾸면 이 23.375rem 도 같이 고칠 것.) */}
-            <div className="flex w-full flex-col items-center gap-3 lg:grid lg:h-[23.375rem] lg:grid-rows-[2fr_1fr] lg:items-stretch">
+                패널 높이(헤더 2.3125rem + 목록 17.25rem + 테두리 0.125rem = 19.6875rem)에 맞춘다.
+                lg+ 에선 그 높이의 2행 그리드(강화 2 : 판매 1)로 버튼이 행을 채운다(items-stretch).
+                세로형(<lg)은 콘텐츠 높이의 일반 flex 스택. (인벤토리 목록 높이를 바꾸면 이 값도 같이 고칠 것.) */}
+            <div className="flex w-full flex-col items-center gap-3 lg:grid lg:h-[19.6875rem] lg:grid-rows-[2fr_1fr] lg:items-stretch">
               <EnhanceButton
                 disabled={!canEnhance}
                 charging={enhanceLocked}

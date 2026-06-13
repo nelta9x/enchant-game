@@ -8,13 +8,14 @@ import { swordSpriteUrl } from '../lib/sprites'
 import { GoldDisplay } from './GoldDisplay'
 import { ItemIcon } from './ItemIcon'
 
-// 보유 인벤토리 패널 = 무기 관리 표면: 목록 맨 위 골드 슬롯 + 장착 중인 검(금색 하이라이트 행) + 보유 아이템 행들.
-// 행 내용은 itemId 유형으로 분기한다 — 검 재료(sword_<level>)는 스프라이트+레벨이며 클릭하면 장착,
-// 그 외(파괴보호장치·잡템)는 아이콘+수량의 정적 행이다. (로직은 store에 있고 여기선 렌더+위임만 — 원칙 3)
+// 보유 인벤토리 패널 = 무기 관리 표면: 헤더(제목 + 우측 보유 골드 배지) + 그 아래 장착 중인 검
+// (금색 하이라이트 행) + 보유 아이템 행들. 행 내용은 itemId 유형으로 분기한다 — 검 재료(sword_<level>)는
+// 스프라이트+레벨이며 클릭하면 장착, 그 외(파괴보호장치·잡템)는 아이콘+수량의 정적 행이다.
+// (로직은 store에 있고 여기선 렌더+위임만 — 원칙 3)
 // 장착 중인 검은 금색 하이라이트로 표시하며, 그 행을 클릭하면 보관한다(별도 보관 버튼 없음 — 가방의
 // 검을 클릭해 장착 → 장착 행을 다시 클릭해 가방으로). 시작 검(+1) 등 보관 불가면 정적 행이다.
-// 보유 골드는 목록 맨 위 컴팩트 슬롯(장착 검 위)으로 둔다 — sticky 로 상단 고정해 스크롤해도 보이고,
-// 판매·의뢰 코인이 빨려드는 도착점이라 그 행 div 를 goldRef 로 측정한다(아이템 행과 같은 형태).
+// 보유 골드는 헤더 우측에 둔다(스크롤 영역 밖 고정이라 목록을 스크롤해도 비침/겹침 없음). 판매·의뢰
+// 코인이 빨려드는 도착점이라 그 골드 div 를 goldRef 로 측정한다.
 type InventoryPanelProps = {
   sword: SwordData | undefined
   level: number | null
@@ -28,7 +29,7 @@ type InventoryPanelProps = {
   gold: number
   goldPulseKey: number
   goldCoinCount: number
-  // 판매·의뢰 코인이 빨려드는 "도착점" 측정용 ref(목록 맨 위 골드 슬롯 행을 가리킨다).
+  // 판매·의뢰 코인이 빨려드는 "도착점" 측정용 ref(헤더 우측 골드 배지를 가리킨다).
   goldRef: Ref<HTMLDivElement>
 }
 
@@ -49,33 +50,29 @@ export function InventoryPanel({
 
   return (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-panel-edge bg-panel">
-      <div className="flex items-center border-b border-panel-edge px-3 py-2">
+      {/* 헤더 — 좌: 제목 / 우: 보유 골드(인라인 배지). 골드를 스크롤 영역 밖 고정 헤더에 두어
+          목록을 스크롤해도 비치거나 겹치지 않는다. 판매·의뢰 코인이 빨려드는 도착점이라 그 div 를
+          goldRef 로 측정한다(검 박스 → 헤더 골드로 코인이 날아온다). */}
+      <div className="flex items-center justify-between gap-2 border-b border-panel-edge px-3 py-2">
         <span className="text-sm font-bold text-on-dark">
           {t('inventory.title')}
         </span>
+        <div ref={goldRef} className="flex items-center">
+          <GoldDisplay
+            gold={gold}
+            pulseKey={goldPulseKey}
+            coinCount={goldCoinCount}
+          />
+        </div>
       </div>
 
       {/* 목록은 고정 높이 UI — 아이템 수와 무관하게 크기가 변하지 않아(추가해도 주변 UI가 안 밀린다),
-          화면 크기에 따라 기본 노출 갯수만 달라진다. 맨 위 골드 슬롯(sticky 고정) 1행 + 그 아래
-          세로형(<lg) 2.5행 / 데스크탑(lg 이상) 4.5행. 마지막 행을 절반만 노출해 "뒤에 더 있다"를
-          시각적으로 알린다(아이템이 적으면 하단에 빈 공간). 높이는 box-border 기준 행높이(h-14=56)·
-          갭(gap-1=4)·상단패딩(pt-2=8)에서 유도(골드 1행 포함):
-          3.5행 = 8 + 3×56 + 3×4 + 28(반행) = 216px = 13.5rem / 5.5행 = 8 + 5×56 + 5×4 + 28 = 336px = 21rem.
+          화면 크기에 따라 기본 노출 갯수만 달라진다: 세로형(<lg) 2.5행 / 데스크탑(lg 이상) 4.5행.
+          마지막 행을 절반만 노출해 "뒤에 더 있다"를 시각적으로 알린다(아이템이 적으면 하단에 빈 공간).
+          높이는 box-border 기준 행높이(h-14=56)·갭(gap-1=4)·상단패딩(pt-2=8)에서 유도:
+          2.5행 = 8 + 2×56 + 2×4 + 28(반행) = 156px = 9.75rem / 4.5행 = 276px = 17.25rem.
           (rem 단위라 데스크탑 루트 font-size 스케일과 함께 커진다 — px 고정이면 다른 rem 과 어긋남.) */}
-      <ul className="flex h-[13.5rem] flex-col gap-1 overflow-y-auto px-2 pb-2 pt-2 lg:h-[21rem]">
-        {/* 골드 슬롯 — 장착 검 위, 상단 sticky 고정(스크롤해도 보이고 코인 도착점이 화면 안). */}
-        <li className="sticky top-0 z-10 shrink-0">
-          <div
-            ref={goldRef}
-            className="flex h-14 items-center justify-center gap-2.5 rounded-md border border-gold/40 bg-gold/10 px-2.5"
-          >
-            <GoldDisplay
-              gold={gold}
-              pulseKey={goldPulseKey}
-              coinCount={goldCoinCount}
-            />
-          </div>
-        </li>
+      <ul className="flex h-[9.75rem] flex-col gap-1 overflow-y-auto px-2 pb-2 pt-2 lg:h-[17.25rem]">
         {equipped && (
           <EquippedRow
             sword={sword}

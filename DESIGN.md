@@ -102,7 +102,7 @@
 
 **수치 슬롯 고정 규칙**: 숫자에는 항상 `tabular-nums`를 쓰고, 자릿수가 변하는 금액·수량은
 `min-w-[..] whitespace-nowrap text-center`로 자리를 고정해 UI가 들썩이지 않게 한다
-(`GoldDisplay` `min-w-[7.5rem]`, `EnhanceButton` 비용 `min-w-[4.5rem]`, `SwordStage` 판매가 `min-w-[5rem]`).
+(`GoldDisplay` `min-w-[6rem]`(헤더 우측 배지, 우측 정렬), `EnhanceButton` 비용 `min-w-[4.5rem]`, `SwordStage` 판매가 `min-w-[5rem]`).
 
 ## 크기·radius·그림자
 
@@ -130,8 +130,8 @@
 | `16rem_28rem_16rem` + `gap-4` = **62rem** | 데스크탑 3컬럼 그리드 | `GameScreen`의 그리드·상단(TopControls) 밴드 래퍼 ↔ `CommissionBar` `lg:max-w-[62rem]` — 셋이 한 세트 |
 | `h-52 sm:h-60`                            | 검 박스               | 스프라이트 `h-36 sm:h-40`, 잔상(`ShakeBurstEffect`)도 동일 클래스                                     |
 | `h-20` · 오프셋 `±25%/-2%` · `opacity-45` · `ink-soft` 룬 | 검 코너 결계 3종 | `ProtectionWard`(좌상)·`HammerStation`(우상)·`SuccessRateSigil`(우하)가 크기·위치·투명도·색을 공유 — 하나만 바꾸면 셋이 어긋난다(망치 서클이 `opacity-50`이라 더 밝아 보였던 게 그 예). 중앙 마법진(frame)과 달리 코너는 `ink-soft`. 키울 땐 안쪽 모서리를 검 캔버스에서 떨어뜨린 채 오프셋을 바깥(코너)으로 민다 — 상한은 위쪽 인벤토리 패널과의 간격 |
-| `lg:h-[21rem]`                            | 인벤토리 목록(골드 슬롯 1 + 4.5행) | 우측 액션 패널 `lg:h-[23.375rem]`(목록+헤더+패딩 합산값) — 골드는 별도 띠가 아니라 목록 맨 위 슬롯 행 |
-| `h-14`                                    | 인벤토리 행(골드 슬롯 포함) | 목록 높이 계산(행수×56px+gap)의 기초                                                                  |
+| `lg:h-[17.25rem]`                         | 인벤토리 목록(4.5행)  | 우측 액션 패널 `lg:h-[19.6875rem]`(목록+헤더+테두리 합산값) — 골드는 목록이 아니라 헤더 우측 배지(스크롤 영역 밖) |
+| `h-14`                                    | 인벤토리 행           | 목록 높이 계산(행수×56px+gap)의 기초                                                                  |
 | clamp 분모 `66/48/72`                     | 루트 스케일 기준      | 콘텐츠 자연 치수(62rem 폭 등)에서 유도 — 레이아웃 치수 변경 시 재검토                                 |
 
 ## 반응형·스케일링

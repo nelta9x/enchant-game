@@ -5,14 +5,14 @@ import {
   useMotionValue,
   useTransform,
 } from 'motion/react'
-import { useI18nStore, useT } from '../i18n'
+import { useI18nStore } from '../i18n'
 import { formatAmount, formatGold } from '../lib/format'
 import { Coin } from './Coin'
 import { COIN_ARRIVAL_SEC, coinArrivalTimes } from './coins'
 
-// 보유 골드(우하단). 판매 코인이 빨려드는 "착지점" — 코인이 하나씩 도착할 때마다(coinArrivalTimes
-// 스케줄) UI 가 통! 튀고(통통통) 숫자가 그만큼 단계로 오른다. 코인 연출(CoinFlight)과는 콜백 없이
-// 같은 순수 스케줄로 동기화한다. 모든 타격·숫자 갱신은 명령형(setTimeout + controls/motionValue)이라
+// 보유 골드(인벤토리 헤더 우측 인라인 배지). 판매 코인이 빨려드는 "착지점" — 코인이 하나씩 도착할 때마다
+// (coinArrivalTimes 스케줄) UI 가 통! 튀고(통통통) 숫자가 그만큼 단계로 오른다. 코인 연출(CoinFlight)과는
+// 콜백 없이 같은 순수 스케줄로 동기화한다. 모든 타격·숫자 갱신은 명령형(setTimeout + controls/motionValue)이라
 // React 재렌더가 없다(가볍고 안전).
 export function GoldDisplay({
   gold,
@@ -24,7 +24,6 @@ export function GoldDisplay({
   coinCount?: number
 }) {
   const lang = useI18nStore((s) => s.lang)
-  const t = useT()
 
   // 표시 숫자(명령형으로만 갱신 — React 재렌더 없이 textContent 만 바뀐다).
   const display = useMotionValue(gold)
@@ -85,16 +84,16 @@ export function GoldDisplay({
     }
   }, [gold, display])
 
-  // 인벤토리 목록의 컴팩트 슬롯 콘텐츠 — 자체 박스(테두리·배경·그림자) 없이 아이템 행과 같은
-  // 구성(아이콘 + 이름 + 값)으로 그린다. 슬롯 외형(h-14·금색 테두리)은 감싸는 InventoryPanel 의
-  // 골드 행 div 가 제공하고, 코인 도착 측정 ref(goldRef)도 그 div 가 든다.
+  // 인벤토리 헤더 우측 인라인 배지 — 자체 박스 없이 코인 아이콘 + 금액만(콘텐츠 크기). 통화 맥락은
+  // 코인 아이콘과 루트 aria-label(formatGold)이 보존한다. 코인 도착 측정 ref(goldRef)는 헤더의
+  // 감싸는 div 가 든다(InventoryPanel).
   return (
     <motion.div
       animate={punch}
       aria-label={formatGold(gold, lang)}
-      className="relative flex h-full w-full items-center justify-center gap-2.5"
+      className="relative inline-flex items-center gap-1.5"
     >
-      {/* 도달 글로우 — 코인이 빨려 들어오는 동안 슬롯에서 황금빛이 번진다(스트림처럼 두 번 일렁). */}
+      {/* 도달 글로우 — 코인이 빨려 들어오는 동안 배지에서 황금빛이 번진다(스트림처럼 두 번 일렁). */}
       <motion.span
         key={pulseKey}
         className="pointer-events-none absolute inset-0 rounded-md"
@@ -105,12 +104,10 @@ export function GoldDisplay({
         }
         transition={{ delay: COIN_ARRIVAL_SEC, duration: 0.7, ease: 'easeOut' }}
       />
-      <Coin className="h-10 w-10" />
-      <span className="truncate text-sm font-medium text-on-dark">
-        {t('inventory.gold')}
-      </span>
-      {/* 금액(아이템 행의 수량 자리) — 카운트업·통통통이 여기에 반영된다(tabular-nums 로 자릿수 흔들림 방지). */}
-      <motion.span className="shrink-0 whitespace-nowrap text-sm font-bold tabular-nums text-gold">
+      <Coin className="h-5 w-5" />
+      {/* 금액 — 카운트업·통통통이 여기에 반영된다. 자릿수가 바뀌어도(예: 99,999→100,000) 코인이
+          밀리지 않게 min-w 로 슬롯 폭을 고정하고 우측 정렬한다(tabular-nums + 수치 슬롯 고정 규칙). */}
+      <motion.span className="min-w-[6rem] whitespace-nowrap text-right text-sm font-bold tabular-nums text-gold">
         {text}
       </motion.span>
     </motion.div>

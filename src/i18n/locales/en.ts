@@ -36,7 +36,6 @@ export const en: Record<TranslationKey, string> = {
 
   // 인벤토리
   'inventory.title': 'Inventory',
-  'inventory.gold': 'Gold',
 
   // 최고 도달 강화 게이지(상단바)
   'record.best': 'Best Record',
