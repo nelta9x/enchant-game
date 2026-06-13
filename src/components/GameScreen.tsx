@@ -727,7 +727,6 @@ export function GameScreen() {
                       <HitSparkCanvas
                         event={hammerStrikeEvent}
                         impactMs={anim.hammerImpactMs}
-                        faceOffset={anim.hammerFaceOffset}
                       />
                     )}
                     {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
