@@ -7,12 +7,15 @@ type ActionButtonProps = {
   disabled: boolean
   onClick: () => void
   children: ReactNode
+  // 호출 측에서 크기 등 보조 스타일을 덧붙인다(예: 세로형 판매 버튼 높이 키우기). min-h 류라 base 와 속성 충돌 없음.
+  className?: string
 }
 
 export function ActionButton({
   disabled,
   onClick,
   children,
+  className = '',
 }: ActionButtonProps) {
   return (
     <button
@@ -23,7 +26,7 @@ export function ActionButton({
         disabled
           ? 'cursor-not-allowed border-panel-edge bg-panel text-on-dark-soft opacity-40'
           : 'cursor-pointer border-frame/50 bg-panel text-on-dark hover:opacity-90'
-      }`}
+      } ${className}`}
     >
       {children}
     </button>
