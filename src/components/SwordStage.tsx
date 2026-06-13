@@ -14,6 +14,7 @@ import { drawSpriteContain } from '../lib/spriteStore'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
 import { SuccessRateSigil } from './SuccessRateSigil'
+import { HammerStation } from './HammerStation'
 import { Coin } from './Coin'
 
 // 중앙 검 스테이지: 글로우 + 마법진(결계) + 스프라이트 + 레벨 뱃지 + 이름 배너 + 스탯 바.
@@ -260,6 +261,10 @@ export function SwordStage({
           successRate={displaySword?.successRate ?? null}
           hasSword={hasDisplaySword}
         />
+
+        {/* 망치 거치대 — 검 우상단. 강화 도구(호라드릭 망치)를 상시 보여 주는 의식 코너 3종의 마지막 자리
+            (좌상단 보호 결계 · 우하단 성공률 결계와 한 세트). 향후 망치 업그레이드 기능의 시각 앵커. */}
+        <HammerStation />
       </div>
 
       {/* 판매가(외곽 없는 텍스트) — 검 바로 아래·이름 배너 위 흐름에 두어 모든 폭에서 가운데에 놓는다.
