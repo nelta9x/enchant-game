@@ -11,7 +11,8 @@ import { ItemIcon } from './ItemIcon'
 // 보유 인벤토리 패널 = 무기 관리 표면: 맨 위 장착 중인 검(금색 하이라이트 행) + 그 아래 보유 아이템 행들.
 // 행 내용은 itemId 유형으로 분기한다 — 검 재료(sword_<level>)는 스프라이트+레벨이며 클릭하면 장착,
 // 그 외(파괴보호장치·잡템)는 아이콘+수량의 정적 행이다. (로직은 store에 있고 여기선 렌더+위임만 — 원칙 3)
-// 장착 중인 검은 금색 하이라이트로만 표시한다(별도 배지 없음). 보관 동작은 우측 액션 열(보관 버튼)에 둔다.
+// 장착 중인 검은 금색 하이라이트로 표시하며, 그 행을 클릭하면 보관한다(별도 보관 버튼 없음 — 가방의
+// 검을 클릭해 장착 → 장착 행을 다시 클릭해 가방으로). 시작 검(+1) 등 보관 불가면 정적 행이다.
 // 보유 골드는 제목 바로 아래 별도 섹션으로 둔다(아이템과 구별 — 다른 게임의 인벤토리 화폐 분리와 동일).
 type InventoryPanelProps = {
   sword: SwordData | undefined
@@ -19,6 +20,9 @@ type InventoryPanelProps = {
   items: ItemStack[]
   // 가방의 검(itemId) 행을 클릭하면 장착한다.
   onEquip: (itemId: string) => void
+  // 장착 중인 검 행을 클릭하면 보관한다(보관 가능할 때만 클릭 가능 — canStoreEquipped 로 게이트).
+  onStoreEquipped: () => void
+  canStoreEquipped: boolean
   // 보유 골드 + 판매·의뢰 코인 연출 동기화(pulseKey/coinCount). GoldDisplay 로 그대로 넘긴다.
   gold: number
   goldPulseKey: number
@@ -32,6 +36,8 @@ export function InventoryPanel({
   level,
   items,
   onEquip,
+  onStoreEquipped,
+  canStoreEquipped,
   gold,
   goldPulseKey,
   goldCoinCount,
@@ -73,7 +79,14 @@ export function InventoryPanel({
           2.5행 = 8 + 2×56 + 2×4 + 28(반행) = 156px = 9.75rem / 4.5행 = 276px = 17.25rem.
           (rem 단위라 데스크탑 루트 font-size 스케일과 함께 커진다 — px 고정이면 다른 rem 과 어긋남.) */}
       <ul className="flex h-[9.75rem] flex-col gap-1 overflow-y-auto px-2 pb-2 pt-2 lg:h-[17.25rem]">
-        {equipped && <EquippedRow sword={sword} level={level} />}
+        {equipped && (
+          <EquippedRow
+            sword={sword}
+            level={level}
+            storable={canStoreEquipped}
+            onStore={onStoreEquipped}
+          />
+        )}
         {items.map((it) => (
           <ItemRow key={it.itemId} item={it} t={t} onEquip={onEquip} />
         ))}
@@ -82,11 +95,23 @@ export function InventoryPanel({
   )
 }
 
-// 장착 중인 검 — 금색 하이라이트가 곧 "장착 중" 표시다(별도 배지·버튼·성공률 없음).
-function EquippedRow({ sword, level }: { sword: SwordData; level: number }) {
+// 장착 중인 검 — 금색 하이라이트가 곧 "장착 중" 표시다(별도 배지·성공률 없음).
+// 보관 가능(storable)하면 행 전체가 버튼이 되어 클릭 시 보관한다(ItemRow 검 행의 장착 버튼과 동일
+// 패턴 — 키보드/스크린리더 접근성 유지, 호버가 클릭 가능 표시). 시작 검(+1) 등 보관 불가면 정적 행이다.
+function EquippedRow({
+  sword,
+  level,
+  storable,
+  onStore,
+}: {
+  sword: SwordData
+  level: number
+  storable: boolean
+  onStore: () => void
+}) {
   const t = useT()
-  return (
-    <li className="flex h-14 shrink-0 items-center justify-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5">
+  const body = (
+    <>
       <SpriteThumb src={swordSpriteUrl(sword.sprite)} alt={t(sword.nameKey)} />
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="truncate text-sm font-semibold text-on-dark">
@@ -96,6 +121,27 @@ function EquippedRow({ sword, level }: { sword: SwordData; level: number }) {
           +{level}
         </span>
       </div>
+    </>
+  )
+
+  if (storable) {
+    return (
+      <li className="shrink-0">
+        <button
+          type="button"
+          onClick={onStore}
+          aria-label={`${t('action.store')}: ${t(sword.nameKey)}`}
+          className="flex h-14 w-full cursor-pointer items-center justify-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5 hover:bg-gold/20"
+        >
+          {body}
+        </button>
+      </li>
+    )
+  }
+
+  return (
+    <li className="flex h-14 shrink-0 items-center justify-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5">
+      {body}
     </li>
   )
 }
