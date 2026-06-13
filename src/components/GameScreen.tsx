@@ -771,10 +771,10 @@ export function GameScreen() {
               보유 골드는 좌측 인벤토리 헤더 우측 배지로 옮겼다(스크롤 영역 밖 고정). */}
           <div className="flex flex-col items-center justify-center">
             {/* 액션 패널 = 인벤토리 패널과 동일 크기. 폭은 컬럼(16rem)으로 이미 같고, 높이는 인벤토리
-                패널 높이(헤더 2.3125rem + 목록 17.25rem + 테두리 0.125rem = 19.6875rem)에 맞춘다.
-                lg+ 에선 그 높이의 2행 그리드(강화 2 : 판매 1)로 버튼이 행을 채운다(items-stretch).
-                세로형(<lg)은 콘텐츠 높이의 일반 flex 스택. (인벤토리 목록 높이를 바꾸면 이 값도 같이 고칠 것.) */}
-            <div className="flex w-full flex-col items-center gap-3 lg:grid lg:h-[19.6875rem] lg:grid-rows-[2fr_1fr] lg:items-stretch">
+                패널 높이(헤더 2.8125rem[골드 알약 py-1 포함] + 목록 17.25rem + 테두리 0.125rem = 20.1875rem)에
+                맞춘다. lg+ 에선 그 높이의 2행 그리드(강화 2 : 판매 1)로 버튼이 행을 채운다(items-stretch).
+                세로형(<lg)은 콘텐츠 높이의 일반 flex 스택. (인벤토리 헤더/목록 높이를 바꾸면 이 값도 같이 고칠 것.) */}
+            <div className="flex w-full flex-col items-center gap-3 lg:grid lg:h-[20.1875rem] lg:grid-rows-[2fr_1fr] lg:items-stretch">
               <EnhanceButton
                 disabled={!canEnhance}
                 charging={enhanceLocked}

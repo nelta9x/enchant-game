@@ -84,19 +84,19 @@ export function GoldDisplay({
     }
   }, [gold, display])
 
-  // 인벤토리 헤더 우측 인라인 배지 — 자체 박스 없이 코인 아이콘 + 금액만(콘텐츠 크기). 통화 맥락은
-  // 코인 아이콘과 루트 aria-label(formatGold)이 보존한다. 코인 도착 측정 ref(goldRef)는 헤더의
-  // 감싸는 div 가 든다(InventoryPanel).
+  // 인벤토리 헤더 우측 인라인 배지 — 코인 아이콘 + 금액을 어두운 알약(bezel, 근사-검정) 배경으로
+  // 묶어 남색 헤더 위에서 금색 코인·수치가 또렷이 대비되게 한다. 통화 맥락은 코인 아이콘과 루트
+  // aria-label(formatGold)이 보존한다. 코인 도착 측정 ref(goldRef)는 헤더의 감싸는 div 가 든다.
   return (
     <motion.div
       animate={punch}
       aria-label={formatGold(gold, lang)}
-      className="relative inline-flex items-center gap-1.5"
+      className="relative inline-flex items-center gap-1.5 rounded-full bg-bezel px-2.5 py-1"
     >
-      {/* 도달 글로우 — 코인이 빨려 들어오는 동안 배지에서 황금빛이 번진다(스트림처럼 두 번 일렁). */}
+      {/* 도달 글로우 — 코인이 빨려 들어오는 동안 알약에서 황금빛이 번진다(스트림처럼 두 번 일렁). */}
       <motion.span
         key={pulseKey}
-        className="pointer-events-none absolute inset-0 rounded-md"
+        className="pointer-events-none absolute inset-0 rounded-full"
         style={{ boxShadow: '0 0 22px 3px var(--color-gold-glow)' }}
         initial={{ opacity: 0 }}
         animate={

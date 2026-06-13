@@ -50,7 +50,7 @@ export function InventoryPanel({
 
   return (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-panel-edge bg-panel">
-      {/* 헤더 — 좌: 제목 / 우: 보유 골드(인라인 배지). 골드를 스크롤 영역 밖 고정 헤더에 두어
+      {/* 헤더 — 좌: 제목 / 우: 보유 골드(어두운 알약 배지). 골드를 스크롤 영역 밖 고정 헤더에 두어
           목록을 스크롤해도 비치거나 겹치지 않는다. 판매·의뢰 코인이 빨려드는 도착점이라 그 div 를
           goldRef 로 측정한다(검 박스 → 헤더 골드로 코인이 날아온다). */}
       <div className="flex items-center justify-between gap-2 border-b border-panel-edge px-3 py-2">
