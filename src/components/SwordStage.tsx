@@ -1,9 +1,16 @@
-import { useEffect, type ReactNode, type Ref } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+  type Ref,
+} from 'react'
 import { motion, useAnimationControls } from 'motion/react'
 import { useI18nStore, useT } from '../i18n'
 import type { SwordData } from '../data/types'
 import { formatAmount, formatGold } from '../lib/format'
-import { swordSpriteUrl } from '../lib/sprites'
+import { spriteStore } from '../lib/spriteStore'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
 import { SuccessRateSigil } from './SuccessRateSigil'
@@ -98,6 +105,81 @@ export function SwordStage({
     }
   }, [pricePopKey, priceControls])
 
+  // ── 검 스프라이트 표시(canvas) ───────────────────────────────────────────────────
+  // <img> 대신 <canvas>로 SpriteStore 의 GPU 상주 ImageBitmap 을 그린다 — 강화 교체 프레임이 디코드·
+  // 업로드 없이 블릿만 하게 해 모바일 끊김을 없앤다. 캔버스는 영속(remount 없음) — key 재마운트는 매 교체마다
+  // 새 합성 레이어를 만들어(레이어 churn) 그 자체로 끊김을 유발하므로, 등장 애니메이션은 명령형으로 다시 튼다.
+  const spriteCanvasRef = useRef<HTMLCanvasElement>(null)
+  const entranceControls = useAnimationControls()
+  const spriteName = hasSword ? sword.sprite : null
+
+  // 캔버스에 sprite 를 object-contain 으로 그린다(stable — sprite 를 인자로 받아 ResizeObserver 재구독을 막는다).
+  // backing store 는 표시 크기×DPR(crisp), 보간은 nearest(픽셀아트 — <img> 의 imageRendering:pixelated 와 동일).
+  // spriteStore.get 은 never null(미로드·없는 경로면 default.png).
+  const drawSprite = useCallback((sprite: string) => {
+    const canvas = spriteCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const dpr = Math.min(3, window.devicePixelRatio || 1)
+    const rect = canvas.getBoundingClientRect()
+    const bw = Math.round(rect.width * dpr)
+    const bh = Math.round(rect.height * dpr)
+    if (bw <= 0 || bh <= 0) return
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw
+      canvas.height = bh
+    }
+    ctx.imageSmoothingEnabled = false
+    ctx.clearRect(0, 0, bw, bh)
+    const src = spriteStore.get(sprite)
+    // 고유(원본) 크기 — <img> 는 naturalWidth, ImageBitmap·canvas 는 width.
+    const sw = src instanceof HTMLImageElement ? src.naturalWidth : src.width
+    const sh = src instanceof HTMLImageElement ? src.naturalHeight : src.height
+    if (!sw || !sh) return
+    const scale = Math.min(bw / sw, bh / sh)
+    const dw = sw * scale
+    const dh = sh * scale
+    ctx.drawImage(src, (bw - dw) / 2, (bh - dh) / 2, dw, dh)
+  }, [])
+
+  // 스프라이트가 바뀌면(강화·장착 등) 보이기 전에(opacity 0) 캔버스를 새로 그리고 등장 애니메이션을 다시 튼다
+  // — useLayoutEffect(paint 전)라 새 검이 한 프레임 깜빡 비치지 않는다. remount 가 아니라 같은 캔버스를 재사용.
+  // entranceDelay 단독 변화엔 재생하지 않도록 직전 스프라이트(prevSprite)로 가드한다(ref 쓰기는 effect 안 — 규약).
+  const prevSpriteRef = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    if (spriteName === null) {
+      prevSpriteRef.current = null
+      return
+    }
+    if (prevSpriteRef.current === spriteName) return
+    prevSpriteRef.current = spriteName
+    entranceControls.set({ opacity: 0, scale: 0.8 })
+    drawSprite(spriteName)
+    entranceControls.start({
+      opacity: 1,
+      scale: 1,
+      transition: { duration: 0.35, ease: 'easeOut', delay: entranceDelay },
+    })
+  }, [spriteName, entranceDelay, entranceControls, drawSprite])
+
+  // rem 반응 스케일(뷰포트 변화)로 표시 크기가 바뀌면 backing store 를 맞춰 다시 그린다(현재 스프라이트 유지).
+  // 현재 스프라이트는 ref(effect 에서 갱신 — 규약)로 읽는다(ResizeObserver 콜백은 렌더 밖에서 돈다).
+  const spriteNameRef = useRef(spriteName)
+  useEffect(() => {
+    spriteNameRef.current = spriteName
+  })
+  useEffect(() => {
+    const canvas = spriteCanvasRef.current
+    if (!canvas || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      const s = spriteNameRef.current
+      if (s !== null) drawSprite(s)
+    })
+    ro.observe(canvas)
+    return () => ro.disconnect()
+  }, [drawSprite])
+
   // 판매가(검의 sellPrice) 표시 여부 — 검 없음/판매 불가(null·0)면 자리만 지키고 숨긴다.
   // 이름·스탯과 함께 지연 공개되는 displaySword 기준(강화 직후 새 가격이 먼저 새지 않게).
   const hasPrice =
@@ -162,29 +244,24 @@ export function SwordStage({
           animate={shakeControls}
           className="relative flex items-center justify-center"
         >
-          {/* 스프라이트 등장(레벨 변할 때마다 재생). 파괴 연출 중에는 entranceDelay 로 등장을
-              미뤄, 떨리는 잔상 뒤로 새 검이 비쳐 보이지 않게 한다(폭발 후 드러남). */}
+          {/* 스프라이트 등장(스프라이트 변할 때마다 재생) — 영속 캔버스에 명령형(entranceControls)으로 다시 튼다.
+              key 재마운트를 쓰지 않는 이유: 매 교체마다 새 합성 레이어를 만들어(레이어 churn) 모바일에서 끊김을
+              유발한다. 파괴 연출 중에는 entranceDelay(burstAt)로 등장을 미뤄 잔상 뒤로 새 검이 비치지 않게 한다. */}
           <motion.div
-            key={level ?? 'empty'}
             initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{
-              duration: 0.35,
-              ease: 'easeOut',
-              delay: entranceDelay,
-            }}
+            animate={entranceControls}
             className="flex items-center justify-center"
           >
             {hasSword ? (
-              <img
-                src={swordSpriteUrl(sword.sprite)}
-                alt={t(sword.nameKey)}
-                // async: 교체 프레임에서 동기 디코드로 래스터를 막지 않는다(다음 검은 프리디코드돼 있어
-                // 보통 즉시 그려진다 — GameScreen 의 preloadImage effect 참고).
-                decoding="async"
+              // SpriteStore 의 GPU 상주 ImageBitmap 을 그리는 캔버스(영속) — 교체는 디코드·업로드 없는 블릿.
+              // 크기/픽셀아트 보간/그림자는 기존 <img> 와 동일(h-36/40, pixelated, drop-shadow). 그리기·backing
+              // store 크기는 drawSprite 가 소유한다(아래 useLayoutEffect·ResizeObserver).
+              <canvas
+                ref={spriteCanvasRef}
+                role="img"
+                aria-label={t(sword.nameKey)}
                 className="h-36 w-36 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] sm:h-40 sm:w-40"
                 style={{ imageRendering: 'pixelated' }}
-                draggable={false}
               />
             ) : (
               <span className="text-5xl font-bold text-ink-soft/60" aria-hidden>

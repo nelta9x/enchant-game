@@ -12,7 +12,6 @@ import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useT, type TranslationKey } from '../i18n'
 import { countOf, PROTECTION_TICKET_ID } from '../lib/items'
 import { sound } from '../lib/sound'
-import { preloadImage } from '../lib/spritePreload'
 import { swordSpriteUrl } from '../lib/sprites'
 import { useEffectStore } from '../store/effectStore'
 import {
@@ -161,14 +160,7 @@ export function GameScreen() {
     [anim],
   )
 
-  // 다음 강화로 등장할 검 스프라이트를 미리 디코드해 둔다 — 강화 성공 순간 <img src> 교체가
-  // 동기 디코드로 프레임을 끊지 않게(검이 정해진 직후의 한가한 시점이라 임팩트와 겹치지 않는다).
-  const nextSwordId = sword?.nextId ?? null
-  useEffect(() => {
-    if (nextSwordId === null) return
-    const next = dataManager.getSwordById(nextSwordId)
-    if (next) preloadImage(swordSpriteUrl(next.sprite))
-  }, [nextSwordId])
+  // (검 스프라이트 프리로드는 SpriteStore 가 시작 시 전량 GPU 풀링하므로 여기서 따로 하지 않는다 — main.tsx 참고.)
 
   // 보호 결계 상태(보호불가/부족/대기/발동) — 흩어진 조건 대신 순수 코어 한 곳에서 계산한다.
   // 검이 없으면 'disabled'(이 단계 보호 불가)로 본다. 실제 강화 적용 여부는 armed 일 때만.
