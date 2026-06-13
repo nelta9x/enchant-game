@@ -15,6 +15,7 @@ import {
   spriteStore,
   FREEZE_SWORD_SPRITE,
 } from '../lib/spriteStore'
+import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
 import { SuccessRateSigil } from './SuccessRateSigil'
@@ -123,7 +124,8 @@ export function SwordStage({
   // 받아 ResizeObserver 재구독을 막는다.
   const drawSprite = useCallback((sprite: string) => {
     const canvas = spriteCanvasRef.current
-    if (canvas) drawSpriteContain(canvas, sprite)
+    // 검 본체는 freeze=true — FREEZE_SWORD_SPRITE 진단 시 처음 그린 검으로 고정(아이템 아이콘 SpriteCanvas 와 분리).
+    if (canvas) drawSpriteContain(canvas, swordSpriteUrl(sprite), true)
   }, [])
 
   // 스프라이트가 바뀌면(강화·장착 등) 보이기 전에(opacity 0) 캔버스를 새로 그리고 등장 애니메이션을 다시 튼다
@@ -156,9 +158,10 @@ export function SwordStage({
     // 백그라운드 적재 중) 위 drawSprite 는 default.png 폴백을 그린다. 적재되는 즉시 한 번 더 그려 빈/폴백
     // 검이 남지 않게 한다(그 사이 검이 또 바뀌지 않았을 때만). load 는 적재 완료/캐시 히트에 resolve 하고
     // 동시 호출을 합친다(중복 디코드 없음).
-    if (!spriteStore.has(spriteName)) {
+    const spriteUrl = swordSpriteUrl(spriteName)
+    if (!spriteStore.has(spriteUrl)) {
       let cancelled = false
-      void spriteStore.load(spriteName).then(() => {
+      void spriteStore.load(spriteUrl).then(() => {
         if (!cancelled && prevSpriteRef.current === spriteName) drawSprite(spriteName)
       })
       return () => {

@@ -1,18 +1,19 @@
-// 검 스프라이트 이미지 스토어(DOM·GPU 경계) — 게임 시작 시 모든 검 스프라이트를 한 번 디코드+업로드해
-// GPU 상주 ImageBitmap 으로 풀링하고, get() 으로 캐시본을 돌려준다. 교체(강화)마다 새로 로드/디코드/업로드
-// 하던 비용을 시작 시점으로 옮기고, 표시(SwordStage canvas)는 GPU 블릿만 하게 한다.
+// 스프라이트 이미지 스토어(DOM·GPU 경계) — 게임 시작 시 스프라이트(검·아이템)를 한 번 디코드+업로드해
+// GPU 상주 ImageBitmap 으로 풀링하고, get() 으로 캐시본을 돌려준다. 교체(강화·인벤토리 갱신)마다 새로
+// 로드/디코드/업로드 하던 비용을 시작 시점으로 옮기고, 표시(canvas)는 GPU 블릿만 하게 한다.
 //
 //  - 왜 ImageBitmap 인가: createImageBitmap 은 디코드+GPU 업로드를 끝낸 불변 비트맵을 만든다(오프메인).
 //    이후 canvas drawImage(bitmap) 은 재디코드·재업로드 없는 블릿이라, 모바일 WebKit 의 교체 프레임
 //    텍스처 업로드/레이어 churn 비용이 사라진다. HTMLImageElement 와 달리 오프스크린 디코드 증발도 없다.
+//  - 키는 스프라이트 URL 이다(검·아이템 무관) — 호출 측이 swordSpriteUrl/itemSpriteUrl 로 해석해 넘긴다.
 //  - get() 은 never null: 미로드/없는 경로면 default.png 폴백을 돌려준다(소비측은 분기 없이 항상 그린다).
 //    default.png 로드 전/실패 대비 동기 1x1 투명 캔버스를 최종 폴백으로 둔다(get 이 throw 하지 않게).
 //  - createImageBitmap 미지원(구형 WebKit)이면 디코드한 HTMLImageElement 를 그대로 캐시한다 — drawImage 가
 //    받으므로 표시는 되고(재페치·재디코드는 캐시로 회피) GPU 상주 이점만 없다(현행보다 나쁘지 않다).
 //  - DOM(Image/createImageBitmap/canvas)을 만지므로 순수 sprites.ts(URL 변환, vitest node 안전)와 분리한다.
-//  - 데이터 레이어 비의존: loadAll 은 스프라이트 파일명 목록을 받는다(DataManager 는 main 이 넘긴다).
+//  - 데이터 레이어 비의존: loadAll 은 URL 목록을 받는다(DataManager 는 main 이 넘긴다).
 
-import { defaultSpriteUrl, swordSpriteUrl } from './sprites'
+import { defaultSpriteUrl } from './sprites'
 
 // 캔버스에 그릴 수 있는 스프라이트 소스. ImageBitmap(상시 경로) · HTMLImageElement(createImageBitmap 미지원
 // 폴백) · HTMLCanvasElement(동기 투명 폴백)만 쓴다 — CanvasImageSource 보다 좁혀 width/height 접근을 보장한다.
@@ -45,9 +46,9 @@ async function decodeDrawable(url: string): Promise<DrawableSprite | null> {
 }
 
 class SpriteStore {
-  private cache = new Map<string, DrawableSprite>() // 검 sprite 파일명 → 그릴 수 있는 소스
+  private cache = new Map<string, DrawableSprite>() // 스프라이트 URL → 그릴 수 있는 소스
   private fallback: DrawableSprite // default.png(로드 후) 또는 1x1 투명(로드 전/실패)
-  // 같은 스프라이트의 동시 load 를 합쳐 중복 디코드를 막는다(loadAll 백그라운드 + 표시 재그리기 요청이 겹쳐도 1회).
+  // 같은 URL 의 동시 load 를 합쳐 중복 디코드를 막는다(loadAll 백그라운드 + 표시 재그리기 요청이 겹쳐도 1회).
   private inflight = new Map<string, Promise<void>>()
 
   constructor() {
@@ -66,37 +67,38 @@ class SpriteStore {
     else devWarn('failed to load default sprite (sprites/default.png)')
   }
 
-  // 스프라이트가 풀에 적재됐는지 — SwordStage 가 첫 페인트에 폴백을 그렸는지 판별해 로드 후 재그리기를 건다.
-  has(sprite: string): boolean {
-    return this.cache.has(sprite)
+  // 스프라이트가 풀에 적재됐는지 — 소비측(SpriteCanvas·SwordStage)이 첫 페인트에 폴백을 그렸는지 판별해
+  // 로드 후 재그리기를 건다.
+  has(url: string): boolean {
+    return this.cache.has(url)
   }
 
-  // 검 스프라이트 1장 적재(시작검 await·표시 재그리기 용). 캐시되면 즉시 resolve, 적재 중이면 같은 약속을
-  // 공유한다(중복 디코드 방지). 실패 시 캐시 미저장 → 다음 load 가 재시도하고 get() 은 그때까지 폴백.
-  load(sprite: string): Promise<void> {
-    if (this.cache.has(sprite)) return Promise.resolve()
-    const existing = this.inflight.get(sprite)
+  // 스프라이트 1장 적재(시작검 await·표시 재그리기·on-demand 용). 캐시되면 즉시 resolve, 적재 중이면 같은
+  // 약속을 공유한다(중복 디코드 방지). 실패 시 캐시 미저장 → 다음 load 가 재시도하고 get() 은 그때까지 폴백.
+  load(url: string): Promise<void> {
+    if (this.cache.has(url)) return Promise.resolve()
+    const existing = this.inflight.get(url)
     if (existing) return existing
     const p = (async () => {
-      const drawable = await decodeDrawable(swordSpriteUrl(sprite))
-      if (drawable) this.cache.set(sprite, drawable)
+      const drawable = await decodeDrawable(url)
+      if (drawable) this.cache.set(url, drawable)
       // 누락/오타 스프라이트를 조용히 삼키지 않게 알린다(실패 시 캐시 미저장 → get() 은 default.png 폴백).
-      else devWarn(`failed to load sprite "${sprite}"`)
-      this.inflight.delete(sprite)
+      else devWarn(`failed to load sprite "${url}"`)
+      this.inflight.delete(url)
     })()
-    this.inflight.set(sprite, p)
+    this.inflight.set(url, p)
     return p
   }
 
-  // 모든 검 스프라이트를 순차 적재한다(시작 후 백그라운드 발사 — 보통 await 하지 않는다). 데이터 레이어
-  // 비의존을 위해 파일명 목록을 받는다(main 이 DataManager 에서 뽑아 넘긴다).
-  async loadAll(sprites: readonly string[]): Promise<void> {
-    for (const sprite of sprites) await this.load(sprite)
+  // URL 목록을 순차 적재한다(시작 후 백그라운드 발사 — 보통 await 하지 않는다). 데이터 레이어 비의존을
+  // 위해 URL 목록을 받는다(main 이 DataManager 에서 뽑아 swordSpriteUrl/itemSpriteUrl 로 해석해 넘긴다).
+  async loadAll(urls: readonly string[]): Promise<void> {
+    for (const url of urls) await this.load(url)
   }
 
-  // 그릴 소스를 돌려준다(never null) — 캐시본, 없으면 default.png 폴백. SwordStage canvas 가 drawImage 한다.
-  get(sprite: string): DrawableSprite {
-    return this.cache.get(sprite) ?? this.fallback
+  // 그릴 소스를 돌려준다(never null) — 캐시본, 없으면 default.png 폴백. canvas 소비측이 drawImage 한다.
+  get(url: string): DrawableSprite {
+    return this.cache.get(url) ?? this.fallback
   }
 }
 
@@ -104,31 +106,36 @@ class SpriteStore {
 export const spriteStore = new SpriteStore()
 
 // ⚠️ 모바일 진단용 임시 플래그(export — SwordStage 도 참조) — "강화 시 검 교체"가 모바일(iOS WebKit) 프레임
-// 저하 원인인지 격리. true 면 ① drawSpriteContain 이 "처음 그린 스프라이트"로 고정해 검 본체·잔상이 같은
-// ImageBitmap 만 블릿하고(= 교체 비용 0), ② SwordStage 가 등장 페이드(opacity 0→1)를 건너뛰어 검이 강화마다
-// 사라졌다 나오지 않고 늘 떠 있게 한다. 이름·레벨 뱃지·스탯은 정상. 진단이 끝나면 false 로 되돌리거나 제거할 것.
+// 저하 원인인지 격리. true 면 ① drawSpriteContain(…, freeze=true) 호출(검 본체·잔상)이 "처음 그린 스프라이트"로
+// 고정돼 같은 ImageBitmap 만 블릿하고(= 교체 비용 0), ② SwordStage 가 등장 페이드(opacity 0→1)를 건너뛰어 검이
+// 강화마다 사라졌다 나오지 않고 늘 떠 있게 한다. freeze=false 인 아이템 아이콘(SpriteCanvas)에는 영향 없다.
+// 이름·레벨 뱃지·스탯은 정상. 진단이 끝나면 false 로 되돌리거나 제거할 것.
 export const FREEZE_SWORD_SPRITE = true
 let frozenSprite: string | null = null
 
-// 캔버스에 스프라이트를 object-contain 으로 그린다(뷰 경계 헬퍼) — SwordStage(검 본체)와 ShakeBurstEffect(잔상)가
-// 같은 블릿을 공유한다(구현 분기 방지). backing store 는 표시 크기×DPR(crisp), 보간은 nearest(픽셀아트 —
-// <img> 의 imageRendering:pixelated 와 동일), 미로드/없는 경로면 get 의 default.png 폴백(never null). 그릴 게
-// 없으면(컨텍스트 없음·0 크기·소스 0 크기) 조용히 반환한다.
+// 캔버스에 스프라이트를 object-contain 으로 그린다(뷰 경계 헬퍼) — 검 본체(SwordStage)·잔상(ShakeBurstEffect)·
+// 아이템 아이콘(SpriteCanvas)이 같은 블릿을 공유한다(구현 분기 방지). backing store 는 표시 크기×DPR(crisp),
+// 보간은 nearest(픽셀아트 — <img> 의 imageRendering:pixelated 와 동일), 미로드/없는 경로면 get 의 default.png
+// 폴백(never null). 그릴 게 없으면(컨텍스트 없음·0 크기·소스 0 크기) 조용히 반환한다.
+//   · freeze: 진단 플래그(FREEZE_SWORD_SPRITE)가 켜졌을 때만 의미 — true 면 "처음 그린 URL"로 고정한다(검 전용).
+//     아이템 아이콘은 false(기본)라 각자 실제 스프라이트를 그린다(진단과 무관).
 export function drawSpriteContain(
   canvas: HTMLCanvasElement,
-  sprite: string,
+  url: string,
+  freeze = false,
 ): void {
-  // ⚠️ 진단(FREEZE_SWORD_SPRITE) — 처음 그린 스프라이트로 고정해 강화 교체를 없앤다(정의부 주석 참고).
-  if (FREEZE_SWORD_SPRITE) {
-    if (frozenSprite === null) frozenSprite = sprite
-    sprite = frozenSprite ?? sprite
+  // ⚠️ 진단(FREEZE_SWORD_SPRITE) — freeze=true(검 본체·잔상)면 처음 그린 URL 로 고정해 강화 교체를 없앤다.
+  if (FREEZE_SWORD_SPRITE && freeze) {
+    if (frozenSprite === null) frozenSprite = url
+    url = frozenSprite ?? url
   }
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const dpr = Math.min(3, window.devicePixelRatio || 1)
-  const rect = canvas.getBoundingClientRect()
-  const bw = Math.round(rect.width * dpr)
-  const bh = Math.round(rect.height * dpr)
+  // backing 은 표시(레이아웃) 크기 × DPR. getBoundingClientRect 는 부모 transform(scale)에 영향받아
+  // (드롭·비행 아이콘은 scale 애니메이션 중) backing 이 작아져 흐려지므로, transform 무관한 offsetWidth/Height 를 쓴다.
+  const bw = Math.round(canvas.offsetWidth * dpr)
+  const bh = Math.round(canvas.offsetHeight * dpr)
   if (bw <= 0 || bh <= 0) return
   if (canvas.width !== bw || canvas.height !== bh) {
     canvas.width = bw
@@ -136,7 +143,7 @@ export function drawSpriteContain(
   }
   ctx.imageSmoothingEnabled = false
   ctx.clearRect(0, 0, bw, bh)
-  const src = spriteStore.get(sprite)
+  const src = spriteStore.get(url)
   // 고유(원본) 크기 — HTMLImageElement 는 naturalWidth, ImageBitmap·canvas 는 width.
   const sw = src instanceof HTMLImageElement ? src.naturalWidth : src.width
   const sh = src instanceof HTMLImageElement ? src.naturalHeight : src.height

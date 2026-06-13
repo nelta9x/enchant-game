@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { motion, useAnimationControls } from 'motion/react'
 import { drawSpriteContain } from '../lib/spriteStore'
+import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { makeParticles } from './particles'
 import { useParticleEmit } from './particleEmit'
@@ -90,7 +91,7 @@ export function ShakeAfterimage({ event }: { event: ShakeBurstEvent | null }) {
   useLayoutEffect(() => {
     if (evtId === null || !event) return
     const canvas = canvasRef.current
-    if (canvas) drawSpriteContain(canvas, event.sprite)
+    if (canvas) drawSpriteContain(canvas, swordSpriteUrl(event.sprite), true)
     // 떨림 — 망치가 닿는 순간(impact)부터 무작위 길이(shakeMs)만큼. delay 동안은 가만히 있는다(윈드업).
     shakeControls.set({ x: 0, rotate: 0 })
     shakeControls.start({

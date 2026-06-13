@@ -7,6 +7,7 @@ import { itemDisplayName } from '../lib/items'
 import { swordSpriteUrl } from '../lib/sprites'
 import { GoldDisplay } from './GoldDisplay'
 import { ItemIcon } from './ItemIcon'
+import { SpriteCanvas } from './SpriteCanvas'
 
 // 보유 인벤토리 패널 = 무기 관리 표면: 헤더(제목 + 우측 보유 골드 배지) + 그 아래 장착 중인 검
 // (금색 하이라이트 행) + 보유 아이템 행들. 행 내용은 itemId 유형으로 분기한다 — 검 재료(sword_<level>)는
@@ -202,13 +203,7 @@ function ItemRow({
 }
 
 function SpriteThumb({ src, alt }: { src: string; alt: string }) {
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className="h-10 w-10 shrink-0 object-contain"
-      style={{ imageRendering: 'pixelated' }}
-      draggable={false}
-    />
-  )
+  // 장착 검 썸네일 — canvas(SpriteCanvas)로 풀의 ImageBitmap 을 재사용한다(강화로 장착검이 바뀔 때 <img>
+  // 교체 디코드 회피). src 는 이미 해석된 URL(swordSpriteUrl).
+  return <SpriteCanvas url={src} alt={alt} className="h-10 w-10 shrink-0" />
 }

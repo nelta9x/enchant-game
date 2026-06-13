@@ -5,6 +5,8 @@ import App from './App.tsx'
 import { dataManager } from './data/DataManager'
 import { INITIAL_SWORD_ID, useGameStore } from './store/gameStore'
 import { spriteStore } from './lib/spriteStore'
+import { swordSpriteUrl, itemSpriteUrl } from './lib/sprites'
+import { itemSpriteName, PROTECTION_TICKET_ID } from './lib/items'
 
 // 게임 부팅 — 데이터 적재(동기) → 폴백·시작검 스프라이트 GPU 풀링(await) → 첫 렌더 → 나머지 검 백그라운드 로드.
 // 검 스프라이트를 시작 시 ImageBitmap 으로 미리 업로드해 두면 강화 교체 프레임이 GPU 블릿만 하면 된다
@@ -21,10 +23,18 @@ async function boot() {
   // 폴백(default.png)과 시작검만 첫 렌더 전에 보장한다 — 오프닝에 폴백이 비치지 않게(둘 다 빠름).
   await spriteStore.loadDefault()
   const startSword = dataManager.getSwordById(INITIAL_SWORD_ID)
-  if (startSword) await spriteStore.load(startSword.sprite)
+  if (startSword) await spriteStore.load(swordSpriteUrl(startSword.sprite))
 
-  // 나머지 검은 첫 페인트를 막지 않게 백그라운드로 채운다(await 안 함).
-  void spriteStore.loadAll(dataManager.getSwords().map((s) => s.sprite))
+  // 나머지 검 + 아이템 스프라이트를 첫 페인트를 막지 않게 백그라운드로 채운다(await 안 함). 아이템 아이콘
+  // (SpriteCanvas)도 같은 풀을 쓰므로 함께 풀링한다 — 미적재분은 표시 시 on-demand 로 채워진다(self-heal).
+  const ticketSprite = itemSpriteName(PROTECTION_TICKET_ID)
+  void spriteStore.loadAll([
+    ...dataManager.getSwords().map((s) => swordSpriteUrl(s.sprite)),
+    ...dataManager
+      .getItems()
+      .flatMap((i) => (i.sprite ? [itemSpriteUrl(i.sprite)] : [])),
+    ...(ticketSprite ? [itemSpriteUrl(ticketSprite)] : []),
+  ])
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
