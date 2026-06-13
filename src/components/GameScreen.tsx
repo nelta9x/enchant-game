@@ -12,7 +12,6 @@ import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useT, type TranslationKey } from '../i18n'
 import { countOf, PROTECTION_TICKET_ID } from '../lib/items'
 import { sound } from '../lib/sound'
-import { swordSpriteUrl } from '../lib/sprites'
 import { useEffectStore } from '../store/effectStore'
 import {
   latestRunning,
@@ -67,16 +66,16 @@ const ANNOUNCE_KEY: Record<string, TranslationKey> = {
 }
 
 // 실행 중 버스트 효과(성공·파괴)를 연출 이벤트(ShakeBurstEvent)로 투영한다 — 같은 kind 를 전부 뽑아
-// (runningEventsOf: 겹친 옛 버스트 유실 방지) payload 를 이벤트로 매핑한다. spriteUrl 없는 효과(자리만 있는
+// (runningEventsOf: 겹친 옛 버스트 유실 방지) payload 를 이벤트로 매핑한다. sprite 없는 효과(자리만 있는
 // 잠금 등)는 제외(빈 배열). 성공·파괴가 동일 형태(ShakeBurstEvent)라 한 곳에서 만든다 — 반환 타입을 그 명명
 // 타입으로 두어 payload 필드를 늘릴 때 투영 누락이 컴파일에서 잡히게 한다.
 function toBurstEvents(running: Effect[], kind: string): ShakeBurstEvent[] {
   return runningEventsOf(running, kind).flatMap((e) =>
-    e.payload?.spriteUrl
+    e.payload?.sprite
       ? [
           {
             id: e.id,
-            spriteUrl: e.payload.spriteUrl,
+            sprite: e.payload.sprite,
             particleCount: e.payload.particleCount ?? 0,
             // 떨림 시작(impact)·길이(shake)는 ShakeBurstEffect 가 잔상 떨림→버스트 시점을 정하는 데 쓴다.
             impactMs: e.payload.impactMs ?? 0,
@@ -447,13 +446,13 @@ export function GameScreen() {
         durationMs: tl.lockMs,
       })
 
-    // "떨림 후 분출 + 새 검 등장 억제"를 한 쌍으로 건다(성공·파괴 공통 안무). 잔상(spriteUrl) 떨림→버스트와
+    // "떨림 후 분출 + 새 검 등장 억제"를 한 쌍으로 건다(성공·파괴 공통 안무). 잔상(sprite) 떨림→버스트와
     // 새 검 등장(burstAt 까지 억제)이 항상 같은 타임라인 슬라이스를 쓰도록 한곳에서 enqueue 한다 — 두 분기가
     // 따로 작성하면 한쪽 payload(예: 등장 억제 지연)만 고쳐 잔상 소멸·새 검 등장이 어긋나는(강화 전/후 검 동시
     // 노출) 발산이 생길 수 있어 일반화한다. 파티클 수는 단계(level)에 비례 — 호출 측이 잔상/도달 검을 해석해 넘긴다.
     const enqueueShakeBurst = (
       kind: string,
-      spriteUrl: string,
+      sprite: string,
       level: number,
     ) => {
       enqueueEffect({
@@ -462,7 +461,7 @@ export function GameScreen() {
         locksEnhance: false,
         durationMs: tl.burstLifetimeMs,
         payload: {
-          spriteUrl,
+          sprite,
           particleCount: particleCount(level),
           impactMs: tl.impactMs,
           shakeMs: tl.shakeMs,
@@ -484,11 +483,7 @@ export function GameScreen() {
       const from = dataManager.getSwordById(result.fromId)
       const next = dataManager.getSwordById(result.toId)
       if (from) {
-        enqueueShakeBurst(
-          'successBurst',
-          swordSpriteUrl(from.sprite),
-          next?.level ?? 0,
-        )
+        enqueueShakeBurst('successBurst', from.sprite, next?.level ?? 0)
       }
       // 가치 상승 강조 — 도달 검(toId)이 강화 전(fromId)보다 비싸면 가격 표시를 한 번 통 튀게 한다.
       // "강화 성공으로 올랐다"는 사실은 이 분기에만 있으므로 여기서 판정한다(장착·판매와 구분).
@@ -514,11 +509,7 @@ export function GameScreen() {
       const destroyed = target ? dataManager.getSwordById(target.id) : undefined
       if (target && destroyed) {
         // 잔상은 파괴된 검(fromId), 등장 억제는 떨림 끝(burstAt)까지 — 성공과 동일 안무(enqueueShakeBurst).
-        enqueueShakeBurst(
-          'destruction',
-          swordSpriteUrl(destroyed.sprite),
-          destroyed.level,
-        )
+        enqueueShakeBurst('destruction', destroyed.sprite, destroyed.level)
       }
       // 드롭이 있으면 재료가 검 아래로 흩어져 떨어지는 연출(잠금X·병렬). 폭발(burstAt)이 드러난 직후
       // 떨어지도록 등장 시각을 타임라인에서 도출한다(무작위 떨림 길이만큼 함께 늦춰짐). 실제 인벤토리 수량은 store 반영됨.

@@ -87,3 +87,35 @@ class SpriteStore {
 
 // 앱 전역 단일 스토어(DataManager 와 같은 싱글턴 관례).
 export const spriteStore = new SpriteStore()
+
+// 캔버스에 스프라이트를 object-contain 으로 그린다(뷰 경계 헬퍼) — SwordStage(검 본체)와 ShakeBurstEffect(잔상)가
+// 같은 블릿을 공유한다(구현 분기 방지). backing store 는 표시 크기×DPR(crisp), 보간은 nearest(픽셀아트 —
+// <img> 의 imageRendering:pixelated 와 동일), 미로드/없는 경로면 get 의 default.png 폴백(never null). 그릴 게
+// 없으면(컨텍스트 없음·0 크기·소스 0 크기) 조용히 반환한다.
+export function drawSpriteContain(
+  canvas: HTMLCanvasElement,
+  sprite: string,
+): void {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const dpr = Math.min(3, window.devicePixelRatio || 1)
+  const rect = canvas.getBoundingClientRect()
+  const bw = Math.round(rect.width * dpr)
+  const bh = Math.round(rect.height * dpr)
+  if (bw <= 0 || bh <= 0) return
+  if (canvas.width !== bw || canvas.height !== bh) {
+    canvas.width = bw
+    canvas.height = bh
+  }
+  ctx.imageSmoothingEnabled = false
+  ctx.clearRect(0, 0, bw, bh)
+  const src = spriteStore.get(sprite)
+  // 고유(원본) 크기 — HTMLImageElement 는 naturalWidth, ImageBitmap·canvas 는 width.
+  const sw = src instanceof HTMLImageElement ? src.naturalWidth : src.width
+  const sh = src instanceof HTMLImageElement ? src.naturalHeight : src.height
+  if (!sw || !sh) return
+  const scale = Math.min(bw / sw, bh / sh)
+  const dw = sw * scale
+  const dh = sh * scale
+  ctx.drawImage(src, (bw - dw) / 2, (bh - dh) / 2, dw, dh)
+}

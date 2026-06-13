@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { motion } from 'motion/react'
+import { drawSpriteContain } from '../lib/spriteStore'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { makeParticles } from './particles'
 import { useParticleEmit } from './particleEmit'
@@ -25,7 +26,7 @@ import { OneShotOverlay } from './OneShotOverlay'
 
 export type ShakeBurstEvent = {
   id: number
-  spriteUrl: string
+  sprite: string // 잔상으로 그릴 검 스프라이트 파일명(spriteStore 풀에 이미 적재됨 — get 으로 블릿)
   particleCount: number
   impactMs: number // 망치가 닿는 시각(떨림 시작) — 데이터 기반 고정값
   shakeMs: number // 이번 강화의 떨림 길이(무작위) — burstAt = impact + shake
@@ -75,36 +76,66 @@ export function ShakeBurstEffect({
           // 연출 도중 새 시도로 교체되면 끊기지 않게 부드럽게 사라진다.
           exit={{ opacity: 0, transition: { duration: 0.15 } }}
         >
-          {/* 떨림 레이어 — 망치가 닿는 순간(impact)부터 무작위 길이(shakeMs)만큼 떤다. delay 로 윈드업
-              동안은 가만히 있는다(방지 시 실제 검과 동일한 공유 SHAKE 모양). */}
-          <motion.div
-            className="flex items-center justify-center"
-            animate={SHAKE_KEYFRAMES}
-            transition={makeShakeTransition(
-              active.shakeMs / 1000,
-              active.impactMs / 1000,
-            )}
-          >
-            {/* 잔상 — 실제 스프라이트(SwordStage <img>)와 클래스·그림자까지 같게 그려, burstAt 에 팝업 후
-                소멸한다(동일해야 소멸→새 검 노출이 튀지 않는다). 떨림 끝까지 opacity 1 로 가만히 있는다. */}
-            <motion.img
-              src={active.spriteUrl}
-              alt=""
-              draggable={false}
-              className="h-36 w-36 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] sm:h-40 sm:w-40"
-              style={{ imageRendering: 'pixelated' }}
-              initial={{ scale: 1, opacity: 1 }}
-              animate={{ scale: [1, 1.18, 0.5], opacity: [1, 1, 0] }}
-              transition={{
-                delay: (active.impactMs + active.shakeMs) / 1000, // 떨림 끝(burstAt)까지 가만, 이후 팝업+소멸
-                duration: 0.22,
-                times: [0, 0.45, 1],
-                ease: 'easeOut',
-              }}
-            />
-          </motion.div>
+          {/* 잔상 — 강화 전(성공)/파괴된 검 스프라이트. 떨림→팝업·소멸 안무를 가진 한 장. */}
+          <ShakeAfterimage
+            sprite={active.sprite}
+            impactMs={active.impactMs}
+            shakeMs={active.shakeMs}
+          />
         </motion.div>
       )}
     </OneShotOverlay>
+  )
+}
+
+// 잔상 한 장 — 검 스프라이트를 spriteStore 의 GPU 상주 ImageBitmap 으로 캔버스에 1회 블릿하고(디코드·재업로드
+// 없음), 떨림→팝업·소멸을 motion 으로 입힌다. <img src> 가 매 강화마다 256² 를 새로 디코드·텍스처 업로드하던
+// hot-frame 비용을 없앤다(검 본체 SwordStage 와 동일 방식 — 마이그레이션이 놓쳤던 잔여물). 잔상이 그리는 검은
+// 직전까지 무대에 떠 있던 검이라 풀에 이미 적재돼 있다(get 은 그 warm ImageBitmap 반환).
+//
+// 레이어 분리: 떨림(SHAKE_KEYFRAMES)은 바깥 div, 팝업·소멸(scale·opacity)은 캔버스 자신 — 서로 다른 transform
+// 키프레임이 한 엘리먼트에서 충돌하지 않게 나눈다. 크기·픽셀아트 보간·그림자는 실제 검(SwordStage)과 동일.
+function ShakeAfterimage({
+  sprite,
+  impactMs,
+  shakeMs,
+}: {
+  sprite: string
+  impactMs: number
+  shakeMs: number
+}) {
+  // 잔상 스프라이트는 마운트 동안 고정(이벤트 1개 = 검 1장)이라 paint 전(useLayoutEffect)에 1회만 그린다
+  // — 첫 프레임부터 잔상이 비어 보이지 않게(opacity 1 로 바로 노출되므로 깜빡임 방지).
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current
+    if (canvas) drawSpriteContain(canvas, sprite)
+  }, [sprite])
+
+  return (
+    // 떨림 레이어 — 망치가 닿는 순간(impact)부터 무작위 길이(shakeMs)만큼 떤다. delay 로 윈드업 동안은
+    // 가만히 있는다(방지 시 실제 검과 동일한 공유 SHAKE 모양).
+    <motion.div
+      className="flex items-center justify-center"
+      animate={SHAKE_KEYFRAMES}
+      transition={makeShakeTransition(shakeMs / 1000, impactMs / 1000)}
+    >
+      {/* 캔버스(잔상) — 실제 검(SwordStage)과 클래스·그림자까지 같게 그려, burstAt 에 팝업 후 소멸한다
+          (동일해야 소멸→새 검 노출이 튀지 않는다). 떨림 끝까지 opacity 1 로 가만히 있는다. */}
+      <motion.canvas
+        ref={canvasRef}
+        aria-hidden
+        className="h-36 w-36 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] sm:h-40 sm:w-40"
+        style={{ imageRendering: 'pixelated' }}
+        initial={{ scale: 1, opacity: 1 }}
+        animate={{ scale: [1, 1.18, 0.5], opacity: [1, 1, 0] }}
+        transition={{
+          delay: (impactMs + shakeMs) / 1000, // 떨림 끝(burstAt)까지 가만, 이후 팝업+소멸
+          duration: 0.22,
+          times: [0, 0.45, 1],
+          ease: 'easeOut',
+        }}
+      />
+    </motion.div>
   )
 }

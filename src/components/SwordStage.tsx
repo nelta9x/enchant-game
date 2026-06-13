@@ -10,7 +10,7 @@ import { motion, useAnimationControls } from 'motion/react'
 import { useI18nStore, useT } from '../i18n'
 import type { SwordData } from '../data/types'
 import { formatAmount, formatGold } from '../lib/format'
-import { spriteStore } from '../lib/spriteStore'
+import { drawSpriteContain } from '../lib/spriteStore'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
 import { SuccessRateSigil } from './SuccessRateSigil'
@@ -113,34 +113,12 @@ export function SwordStage({
   const entranceControls = useAnimationControls()
   const spriteName = hasSword ? sword.sprite : null
 
-  // 캔버스에 sprite 를 object-contain 으로 그린다(stable — sprite 를 인자로 받아 ResizeObserver 재구독을 막는다).
-  // backing store 는 표시 크기×DPR(crisp), 보간은 nearest(픽셀아트 — <img> 의 imageRendering:pixelated 와 동일).
-  // spriteStore.get 은 never null(미로드·없는 경로면 default.png).
+  // 캔버스에 sprite 를 그린다 — 블릿(DPR backing·object-contain·픽셀아트·default.png 폴백)은 공유 헬퍼
+  // drawSpriteContain 이 소유한다(잔상 ShakeBurstEffect 와 동일 구현). useCallback(stable)로 sprite 를 인자로
+  // 받아 ResizeObserver 재구독을 막는다.
   const drawSprite = useCallback((sprite: string) => {
     const canvas = spriteCanvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    const dpr = Math.min(3, window.devicePixelRatio || 1)
-    const rect = canvas.getBoundingClientRect()
-    const bw = Math.round(rect.width * dpr)
-    const bh = Math.round(rect.height * dpr)
-    if (bw <= 0 || bh <= 0) return
-    if (canvas.width !== bw || canvas.height !== bh) {
-      canvas.width = bw
-      canvas.height = bh
-    }
-    ctx.imageSmoothingEnabled = false
-    ctx.clearRect(0, 0, bw, bh)
-    const src = spriteStore.get(sprite)
-    // 고유(원본) 크기 — <img> 는 naturalWidth, ImageBitmap·canvas 는 width.
-    const sw = src instanceof HTMLImageElement ? src.naturalWidth : src.width
-    const sh = src instanceof HTMLImageElement ? src.naturalHeight : src.height
-    if (!sw || !sh) return
-    const scale = Math.min(bw / sw, bh / sh)
-    const dw = sw * scale
-    const dh = sh * scale
-    ctx.drawImage(src, (bw - dw) / 2, (bh - dh) / 2, dw, dh)
+    if (canvas) drawSpriteContain(canvas, sprite)
   }, [])
 
   // 스프라이트가 바뀌면(강화·장착 등) 보이기 전에(opacity 0) 캔버스를 새로 그리고 등장 애니메이션을 다시 튼다
