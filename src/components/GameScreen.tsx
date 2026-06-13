@@ -802,7 +802,13 @@ export function GameScreen() {
                 onEnhance={handleEnhance}
                 enchantCost={sword?.enchantCost ?? null}
               />
-              <ActionButton disabled={!canSell} onClick={handleSell}>
+              {/* 세로형(<lg)에선 판매 버튼 높이를 ~30% 키운다(min-h ≈ 2.92rem×1.3). 데스크탑은
+                  고정 높이 2fr:1fr 그리드가 높이를 정하므로 lg:min-h-0 으로 리셋(영향 없음). */}
+              <ActionButton
+                disabled={!canSell}
+                onClick={handleSell}
+                className="min-h-[3.8rem] lg:min-h-0"
+              >
                 {t('action.sell')}
               </ActionButton>
             </div>
