@@ -653,7 +653,7 @@ export function GameScreen() {
         <div className="mt-3 grid grid-cols-1 gap-4 lg:my-auto lg:min-h-[34rem] lg:justify-center lg:grid-cols-[16rem_28rem_16rem]">
           {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음).
               세로형(<lg)에선 강화 버튼처럼 컬럼 폭을 꽉 채우고, lg+(3열)에선 컬럼을 채운다. */}
-          <div className="flex w-full min-h-0 flex-col lg:justify-center">
+          <div className="order-last flex w-full min-h-0 flex-col lg:order-none lg:justify-center">
             {/* ref: 파괴 드롭이 빨려 들어갈 도착점 측정용 — 패널을 감싸 드롭이 보이는 인벤토리로 들어가게 한다.
                 lg+(데스크탑)에선 컬럼 높이에서 세로 중앙 정렬(고정 높이 박스, 꽉 채우지 않음). */}
             <div ref={inventoryRef}>
