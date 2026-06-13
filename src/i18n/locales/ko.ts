@@ -35,7 +35,6 @@ export const ko = {
 
   // 인벤토리
   'inventory.title': '인벤토리',
-  'inventory.gold': '골드',
 
   // 최고 도달 강화 게이지(상단바) — "최고 기록 [검 아이콘] +N" 라벨. 목표(+N/최고)는 hover/탭 카드에만 둔다.
   'record.best': '최고 기록',
