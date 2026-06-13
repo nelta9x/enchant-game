@@ -33,8 +33,8 @@ export const ko = {
   'sword.none': '검 없음',
   'sword.maxLevel': '최종 단계',
 
-  // 인벤토리
-  'inventory.title': '인벤토리',
+  // 인벤토리(표시명은 '가방' — 영어는 Inventory 유지)
+  'inventory.title': '가방',
 
   // 최고 도달 강화 게이지(상단바) — "최고 기록 [검 아이콘] +N" 라벨. 목표(+N/최고)는 hover/탭 카드에만 둔다.
   'record.best': '최고 기록',
