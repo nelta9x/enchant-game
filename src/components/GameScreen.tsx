@@ -65,6 +65,12 @@ const ANNOUNCE_KEY: Record<string, TranslationKey> = {
   protectedShake: 'toast.protected',
 }
 
+// ⚠️ 모바일 진단용 임시 플래그 — "강화 시 나오는 모든 파티클·이펙트"가 모바일 프레임 저하의 원인인지
+// 격리한다. true 면 검 스테이지 오버레이(파티클 풀·성공/파괴 버스트·잔상 떨림·망치 스윙/스미어·임팩트
+// 불꽃·결과 텍스트)와 파괴 드롭 흩어짐을 렌더하지 않는다. 게임 로직·타임라인·잠금·사운드·결과(레벨/골드)는
+// 그대로다(드롭 재료도 flushDrops 로 인벤토리에 그대로 회수). 진단이 끝나면 false 로 되돌리거나 게이트를 제거할 것.
+const DISABLE_ENHANCE_FX = true
+
 // 효과 1개를 버스트 이벤트(ShakeBurstEvent)로 투영한다 — sprite 없는 효과(자리만 있는 잠금 등)는 null.
 // 성공·파괴가 동일 형태라 투영을 한 곳에 둔다 — 반환 타입을 그 명명 타입으로 두어 payload 필드를 늘릴 때
 // 투영 누락이 컴파일에서 잡히게 한다. 파티클 emit(전부)·잔상(최신 1개) 양쪽이 이 투영을 공유한다.
@@ -710,6 +716,7 @@ export function GameScreen() {
                   flareDelaySec: anim.hammerImpactMs / 1000,
                 }}
                 spriteOverlay={
+                  DISABLE_ENHANCE_FX ? undefined : (
                   <>
                     {/* 파티클 풀 — 성공/파괴 버스트 도트를 캔버스 한 장에 그린다(Hit 불꽃은 별개 HitSparkCanvas — 맨 뒤에 둬
                         검·잔상 위에 파티클이 얹히도록). 풀은 항상 마운트, 소비자가 emit 으로 재생을 요청한다.
@@ -758,6 +765,7 @@ export function GameScreen() {
                     {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
                     <FloatingTextEffect event={floatingText} />
                   </>
+                  )
                 }
                 // 새 검 등장 지연 = 이번 강화의 burstAt(entranceSuppress payload). 잔상이 소멸하는 그 순간
                 // 드러나듯 등장한다(같은 burstAt 을 써 정확히 교대 → 강화 전/후 검 동시 노출 없음).
@@ -869,12 +877,14 @@ export function GameScreen() {
 
         {/* 파괴 드롭 수집 연출 — 카드 전체를 덮는 오버레이(검 아래 → 인벤토리창). 재료가 검 아래로
             흩어져 떨어진 뒤 마우스로 스칠 때마다(또는 일정 시간 후) 인벤토리로 빨려 든다. */}
-        <DropScatter
-          event={dropEvent}
-          sourceRef={swordBoxRef}
-          targetRef={inventoryRef}
-          onCollect={collectDrop}
-        />
+        {!DISABLE_ENHANCE_FX && (
+          <DropScatter
+            event={dropEvent}
+            sourceRef={swordBoxRef}
+            targetRef={inventoryRef}
+            onCollect={collectDrop}
+          />
+        )}
       </div>
 
       {/* 상점 팝업 (전체 화면 오버레이 — 열렸을 때만 렌더) */}
