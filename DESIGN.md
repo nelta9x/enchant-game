@@ -12,7 +12,8 @@
   Tailwind 유틸(`bg-panel`, `text-gold`, `border-frame/50` …)이나 `var(--color-*)`로 쓴다.
 - motion 색 키프레임처럼 `var()`를 보간하지 못하는 곳은 `lib/cssToken.ts`의 `cssColorToken()`으로
   토큰을 런타임 1회 해석해 쓴다(사용례: `CommissionBar.tsx`의 SessionTimerBar). 캔버스 연출은
-  `hitSparks.ts`처럼 토큰을 1회 rgb로 해석·캐시한다.
+  `hitSparks.ts`(망치 불꽃)·`dotParticles.ts`(성공/파괴 도트 버스트)처럼 색을 1회 rgb로 해석·캐시한다
+  (후자는 `coreVar`/`edgeVar`의 `var()`도 probe 엘리먼트의 computed color 로 정규화).
 - 크기는 **rem**으로 쓴다(아래 [반응형·스케일링](#반응형스케일링) — 루트 font-size가 동적이라 px는 전체 스케일과 어긋난다).
 
 ## 아트 디렉션
