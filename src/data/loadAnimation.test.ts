@@ -11,6 +11,7 @@ function valid() {
     hammerFaceOffset: { x: -40, y: -10 },
     reEnhanceGuardMs: 100,
     enhanceParticlesEnabled: true,
+    hammerSwingEnabled: true,
     hammerSmearEnabled: true,
     shakeBands: [
       { maxLevel: 10, minMs: 100, maxMs: 200 },
@@ -76,7 +77,11 @@ describe('parseAnimationConfig — 연출 타이밍 검증(순수)', () => {
   })
 
   // 연출 on/off 플래그(불리언) — 누락·비불리언이면 실패(플래그가 데이터에 항상 명시되게).
-  const boolFields = ['enhanceParticlesEnabled', 'hammerSmearEnabled'] as const
+  const boolFields = [
+    'enhanceParticlesEnabled',
+    'hammerSwingEnabled',
+    'hammerSmearEnabled',
+  ] as const
   for (const field of boolFields) {
     it(`${field} 누락·비불리언이면 실패, true/false 는 그대로 통과`, () => {
       const bad = (v: unknown) => ({ ...valid(), [field]: v })
@@ -199,6 +204,7 @@ describe('loadAnimation — 번들 데이터 무결성', () => {
     }
     // 연출 플래그: 값(켜짐/꺼짐)은 튜닝 영역이라 박지 않고 타입만 확인한다.
     expect(typeof a.enhanceParticlesEnabled).toBe('boolean')
+    expect(typeof a.hammerSwingEnabled).toBe('boolean')
     expect(typeof a.hammerSmearEnabled).toBe('boolean')
     // 떨림 밴드: 비어있지 않고, 각 밴드 min<=max·정수>=0, maxLevel 오름차순, 마지막만 null(∞).
     expect(a.shakeBands.length).toBeGreaterThan(0)

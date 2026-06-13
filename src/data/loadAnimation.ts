@@ -94,6 +94,7 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
   const reEnhanceGuardMs = intNonNeg(raw, 'reEnhanceGuardMs')
   // 연출 on/off 플래그(types.ts 의 AnimationConfig 주석 참고 — 순수 프레젠테이션 게이트).
   const enhanceParticlesEnabled = boolField(raw, 'enhanceParticlesEnabled')
+  const hammerSwingEnabled = boolField(raw, 'hammerSwingEnabled')
   const hammerSmearEnabled = boolField(raw, 'hammerSmearEnabled')
 
   // shakeBands: 비어있지 않은 배열. 각 밴드는 parseShakeBand 로 검증.
@@ -131,6 +132,7 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
     hammerFaceOffset,
     reEnhanceGuardMs,
     enhanceParticlesEnabled,
+    hammerSwingEnabled,
     hammerSmearEnabled,
     shakeBands,
   }

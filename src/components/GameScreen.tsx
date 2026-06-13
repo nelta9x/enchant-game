@@ -708,14 +708,17 @@ export function GameScreen() {
                       <SuccessEffect key={ev.id} event={ev} />
                     ))}
                     {/* 망치는 결과 연출 위에 그린다. impactMs 로 닿는 시점을 데이터에서 받는다(떨림·불꽃·
-                        타격음과 동일 앵커). */}
-                    <HammerStrike
-                      event={hammerStrikeEvent}
-                      impactMs={anim.hammerImpactMs}
-                      shape={hammerShape}
-                      // 모션 블러 스미어 on/off — 데이터 플래그(animation.json). 망치 본체 스윙은 유지.
-                      smearEnabled={anim.hammerSmearEnabled}
-                    />
+                        타격음과 동일 앵커). 데이터 플래그(hammerSwingEnabled)로 끌 수 있다 — 마운트 자체를
+                        차단하며, 임팩트 앵커(떨림·Hit 불꽃·'캉')는 이 컴포넌트와 무관하게 타임라인이 구동한다. */}
+                    {anim.hammerSwingEnabled && (
+                      <HammerStrike
+                        event={hammerStrikeEvent}
+                        impactMs={anim.hammerImpactMs}
+                        shape={hammerShape}
+                        // 모션 블러 스미어 on/off — 데이터 플래그(animation.json). 망치 본체 스윙은 유지.
+                        smearEnabled={anim.hammerSmearEnabled}
+                      />
+                    )}
                     {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 불티·잉걸불·화구·불혀를 캔버스에 1회 폭발.
                         가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 DOM 풀).
                         ⚠️ 망치보다 "뒤"(DOM 아래)가 아니라 위에 둔다 — 불꽃의 화구·불혀는 임팩트 중심에서
