@@ -16,9 +16,10 @@ import { useParticleEmit } from './particleEmit'
 //
 // ── 두 책임을 분리한다(BurstEmitter / ShakeAfterimage) ────────────────────────────────
 // 파티클 emit 과 잔상 비주얼은 수명·다중성이 다르다:
-//   · 파티클 emit 은 "버스트마다" 1회 필요하다 — 연사로 버스트가 겹치면(재강화 잠금 < 버스트 수명) 옛
-//     버스트의 emit 도 끝까지 터져야 한다. 그래서 GameScreen 이 running 의 버스트를 전부 .map 해 이벤트별
-//     BurstEmitter 를 둔다. BurstEmitter 는 DOM 을 그리지 않아(렌더 null) 다중·교체에도 레이어 churn 이 없다.
+//   · 파티클 emit 은 "버스트마다" 1회 필요하다 — 연사로 버스트가 겹쳐도 각 버스트가 자기 burstAt 에 한 번씩
+//     emit 되도록(유실 방지) GameScreen 이 running 의 버스트를 전부 .map 해 이벤트별 BurstEmitter 를 둔다.
+//     단 파티클 풀은 새 emit 마다 이전 버스트를 교체(replace)하므로 화면엔 늘 최신 한 벌만 보인다(잔상의
+//     latest 하드 컷과 같은 정책). BurstEmitter 는 DOM 을 그리지 않아(렌더 null) 다중·교체에도 레이어 churn 이 없다.
 //   · 잔상 비주얼은 "현재 떠 있는 검 1장"이면 충분하고 색과 무관하다(coreVar/edgeVar 는 파티클 색일 뿐).
 //     그래서 ShakeAfterimage 는 SwordStage·HammerStrike 와 같은 **영속 단일 노드**다 — 항상 마운트된 캔버스
 //     한 장을 가장 최근 버스트 id 마다 처음부터 재생한다(연사 시 최신으로 하드 컷). 강화마다 노드를 새로

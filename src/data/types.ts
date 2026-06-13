@@ -83,7 +83,7 @@ export type ShakeBand = {
 //    UI 가드 전용(게임 로직 불변) — 0 = 버스트 즉시 재강화 가능.
 //  - enhanceParticlesEnabled / hammerSwingEnabled / hammerSmearEnabled: 연출 on/off 플래그. false 면
 //    해당 연출이 마운트조차 되지 않는다(순수 프레젠테이션 게이트 — 게임 로직·타임라인·잠금·사운드는 영향 없음).
-//      · enhanceParticlesEnabled: 강화 파티클(임팩트 불꽃 캔버스 HitSparkCanvas + 성공/파괴 버스트 DOM 풀
+//      · enhanceParticlesEnabled: 강화 파티클(임팩트 불꽃 캔버스 HitSparkCanvas + 성공/파괴 버스트 캔버스
 //        ParticlePool — 풀이 없으면 버스트 emit 은 자동 no-op).
 //      · hammerSwingEnabled: 망치 본체 내려치기 스윙(motion.img). false 면 망치 자체가 안 보이고 하위
 //        스미어도 함께 사라진다 — 임팩트 앵커(떨림·Hit 불꽃·'캉' 타격음)는 GameScreen 타임라인이 독립 구동.

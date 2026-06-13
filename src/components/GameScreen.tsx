@@ -568,11 +568,11 @@ export function GameScreen() {
 
   // 연출 트리거는 effectStore 의 running 에서 뽑는다(생명주기·타이밍은 Effect 시스템이 소유). 대부분은
   // "가장 최근" 1개만(latestRunning — 겹친 새 효과 유실 방지)이지만, 성공·파괴 버스트는 running 의 해당
-  // 효과를 전부 렌더한다(toBurstEvents) — 연출 중 재강화해도 옛 버스트가 잘리지 않고 끝까지 터지도록
-  // (파티클은 떨림(임팩트 + 무작위 시간) 뒤에 나오는데, 잠금 해제 직후 재강화하면 최신 1개만 그릴 경우
-  // 버스트가 매번 리셋돼 안 나온다). 재강화 잠금(lockMs = 버스트 + 가드 ~100ms)은 버스트 효과 수명
-  // (burstLifetimeMs = 버스트 + 파티클 비행 ~660ms)보다 짧아, 빠른 재강화 시 버스트 효과가 running 에
-  // 여러 개 겹칠 수 있다(파티클 풀이 CONCURRENCY 만큼 슬롯을 잡아 그 겹침을 흡수한다).
+  // 효과를 전부 렌더한다(toBurstEvents) — 각 버스트가 자기 burstAt(임팩트 + 무작위 떨림 뒤)에 한 번씩
+  // emit 되도록(유실 방지). 최신 1개만 두면 잠금 해제 직후 재강화 시 옛 버스트의 emit 이 발사 전에 잘려
+  // 안 나올 수 있다. 재강화 잠금(lockMs = 버스트 + 가드 ~100ms)은 버스트 효과 수명(burstLifetimeMs =
+  // 버스트 + 파티클 비행 ~660ms)보다 짧아 빠른 재강화 시 버스트 효과가 running 에 여러 개 겹칠 수 있지만,
+  // 파티클 풀은 새 emit 마다 이전 버스트를 교체(replace)하므로 화면엔 늘 최신 한 벌만 보인다(겹침 없음).
   // 주의: flatMap 이 running 변경마다 새 이벤트 객체를 만들어 각 연출의 useOneShot 백스톱 타이머가 매번
   // 리셋되지만 무해하다 — 실제 unmount 는 effectStore 의 _finish(durationMs)가 소유하고 백스톱은 보조다.
   const destructionEvents = useMemo<DestructionEvent[]>(
@@ -711,14 +711,15 @@ export function GameScreen() {
                 }}
                 spriteOverlay={
                   <>
-                    {/* 파티클 풀 — 성공/파괴 버스트와 Hit 불꽃의 모든 파티클을 재사용 노드로 그린다(맨 뒤에 둬
+                    {/* 파티클 풀 — 성공/파괴 버스트 도트를 캔버스 한 장에 그린다(Hit 불꽃은 별개 HitSparkCanvas — 맨 뒤에 둬
                         검·잔상 위에 파티클이 얹히도록). 풀은 항상 마운트, 소비자가 emit 으로 재생을 요청한다.
                         데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 — 풀이 없으면 버스트 emit 은
                         자동 no-op(particleEmit.ts). 잔상 떨림·교대(ShakeBurstEffect)는 영향 없음. */}
                     {anim.enhanceParticlesEnabled && <ParticlePool />}
-                    {/* 버스트 파티클 emit — 동시에 여러 개가 떠 있을 수 있어(재강화 시 옛 버스트 유지) 각
+                    {/* 버스트 파티클 emit — 재강화 시 옛 버스트 emitter 가 유지돼야 대기 중 emit 이 안 잘려서, 각
                         효과를 id 로 키잉해 독립적으로 burstAt 에 emit 한다. 렌더 null(파티클은 풀이 그림)이라
-                        다중·교체에도 레이어 churn 이 없다. 잔상 비주얼은 아래 영속 노드가 따로 그린다. */}
+                        다중·교체에도 레이어 churn 이 없고, 풀은 새 emit 마다 이전 버스트를 교체(replace)하므로
+                        화면엔 최신 한 벌만 보인다. 잔상 비주얼은 아래 영속 노드가 따로 그린다. */}
                     {destructionEvents.map((ev) => (
                       <DestructionEffect key={ev.id} event={ev} />
                     ))}
@@ -742,7 +743,7 @@ export function GameScreen() {
                       />
                     )}
                     {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 불티·잉걸불·화구·불혀를 캔버스에 1회 폭발.
-                        가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 DOM 풀).
+                        가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 별개 캔버스 ParticlePool).
                         ⚠️ 망치보다 "뒤"(DOM 아래)가 아니라 위에 둔다 — 불꽃의 화구·불혀는 임팩트 중심에서
                         피어나는데, 바로 그 자리에 망치 머리가 닿아 정지(holdAfter)하므로 망치 뒤에 깔면 핵심
                         연출이 통째로 가려진다. 임팩트 섬광이 잠깐(≤0.2s) 망치 머리를 삼키는 것이 의도된 강렬함.

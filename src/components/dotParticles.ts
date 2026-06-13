@@ -3,7 +3,7 @@ import type { ParticleEmitSpec } from './particleEmit'
 
 // 성공/파괴 버스트의 방사형 도트 파티클(프레젠테이션 전용·DOM 노드 없음) — 기존 DOM 풀(motion.span 132개를
 // 상시 마운트·재사용)을 캔버스 한 장으로 대체한다. 강화 1회마다 emit() 로 도트 N개 + decor(섬광·충격파 링)
-// 1세트를 추가하고, 살아 있는 입자가 있는 동안에만 rAF 를 돌려 그린 뒤 끝나면 캔버스를 비운다(평소 0 비용
+// 1세트로 교체하고(replace — 이전 버스트를 비워 겹침 없이 최신 한 벌만), 살아 있는 입자가 있는 동안에만 rAF 를 돌려 그린 뒤 끝나면 캔버스를 비운다(평소 0 비용
 // — HitSparkSystem 과 동일한 생명주기). 이로써 ① 상시 132 DOM 노드·motion 구독, ② 버스트당 ~44개 setState
 // 팬아웃, ③ 동시 수십~132개 motion JS 애니메이션(메인 스레드), ④ boxShadow 글로우 레이어 합성이 한꺼번에 사라진다.
 //
@@ -16,7 +16,7 @@ import type { ParticleEmitSpec } from './particleEmit'
 
 const TAU = Math.PI * 2
 
-// ── 옛 DOM 도트 애니메이션 재현 상수(ParticlePool 의 DotSlot.controls 와 1:1) ─────────────
+// ── 옛 DOM 도트 애니메이션 재현 상수(제거된 DOM 풀의 DotSlot.controls 와 1:1) ─────────────
 // opacity/scale 은 times 기준 다중 키프레임, 위치는 단일 키프레임(0→목표)에 전체 easeOut.
 const DOT_TIMES = [0, 0.15, 0.6, 1]
 const DOT_OPACITY = [0, 1, 1, 0]
@@ -26,7 +26,7 @@ const DOT_SCALE = [0.4, 1, 0.9, 0.45]
 // drawImage 반경 R 을 size/(2·ρ) 로 잡으면 본체 지름이 정확히 size 가 되고, 글로우는 그 바깥 size·(1−ρ)/(2ρ) 만큼 번진다.
 const DOT_BODY_RATIO = 0.5
 
-// ── decor(섬광 + 충격파 링) — 옛 DecorSlot 과 1:1. px 는 옛 rem 클래스를 환산(h-32=128 → 반경 64 등). ──
+// ── decor(섬광 + 충격파 링) — 제거된 DOM 풀의 DecorSlot 과 1:1. px 는 옛 rem 클래스를 환산(h-32=128 → 반경 64 등). ──
 const FLASH_DUR = 0.45
 const FLASH_R = 64 // h-32(8rem=128px)의 반경. scale 0.3→1.1.
 const RING_DUR = 0.5
@@ -108,7 +108,7 @@ type Dot = {
   tx: number // 목표 x(중심 기준 px)
   ty: number // 목표 y
   size: number // 기본 지름 px
-  delay: number // 시작 지연(s) = stagger(+ spec.delaySec)
+  delay: number // 시작 지연(s) = stagger
   t: number // 경과(s)
   tex: HTMLCanvasElement // 색 조합 도트 텍스처
 }
@@ -120,7 +120,7 @@ type Decor = {
 }
 
 // ── 도트 파티클 캔버스 시스템 ─────────────────────────────────────────────────────
-// emit() 로 도트·decor 를 추가하고, 살아 있는 입자가 있는 동안에만 rAF 루프를 돈다(평소 0 비용). 캔버스당 하나.
+// emit() 로 도트·decor 로 교체하고(replace — 이전 버스트를 비움), 살아 있는 입자가 있는 동안에만 rAF 루프를 돈다(평소 0 비용). 캔버스당 하나.
 export class DotParticleSystem {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
@@ -162,25 +162,29 @@ export class DotParticleSystem {
     this.cy = rect.height / 2
   }
 
-  // 버스트 1회 — 도트 N개 + decor 1세트를 추가한다. 옛 ParticlePool.emit 과 동일 시그니처(소비자 무변경).
+  // 버스트 1회 — 이전 버스트를 비우고(replace) 도트 N개 + decor 1세트로 교체한다. 옛 ParticlePool.emit 과
+  // 동일 시그니처(소비자 무변경).
   emit(spec: ParticleEmitSpec) {
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
     this.syncBackingStore(rect)
-    const delaySec = spec.delaySec ?? 0
+    // 새 버스트가 이전 버스트를 대체한다(replace — 누적 금지). 연사로 버스트가 겹쳐도 화면엔 늘 최신
+    // 한 벌만 살아, 잔상(ShakeAfterimage)의 latest 하드 컷과 정책이 일치한다. 이전 입자는 즉시 버린다.
+    this.dots.length = 0
+    this.decors.length = 0
     const tex = getDotTexture(spec.coreVar, spec.edgeVar)
     for (const p of spec.particles as Particle[]) {
       this.dots.push({
         tx: p.x,
         ty: p.y,
         size: p.size,
-        delay: delaySec + p.stagger,
+        delay: p.stagger,
         t: 0,
         tex,
       })
     }
     this.decors.push({
-      t: -delaySec, // delaySec 만큼 늦게 시작(음수에서 0 까지는 대기)
+      t: 0,
       core: resolveColor(spec.coreVar),
       edge: resolveColor(spec.edgeVar),
     })
@@ -215,10 +219,6 @@ export class DotParticleSystem {
       const aliveDecors: Decor[] = []
       for (const d of this.decors) {
         d.t += dt
-        if (d.t < 0) {
-          aliveDecors.push(d) // 아직 시작 전(delaySec 대기)
-          continue
-        }
         let alive = false
         // 섬광 — 부드럽게 부푸는 코어 플래시(가산 합성). scale 0.3→1.1, opacity [0,0.85,0].
         if (d.t < FLASH_DUR) {

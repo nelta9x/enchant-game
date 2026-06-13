@@ -11,7 +11,6 @@ export type ParticleEmitSpec = {
   particles: Particle[] // 중심에서 사방으로 튀는 좌표(makeParticles)
   coreVar: string // 밝은 코어 색(CSS var 또는 색 문자열)
   edgeVar: string // 가장자리 색
-  delaySec?: number // 전체 재생 지연(기본 0) + 파티클별 stagger 가 더해진다
 }
 
 export type ParticleEmit = (spec: ParticleEmitSpec) => void

@@ -2,7 +2,7 @@
 // ① 빠른 불티(용접 결의 가는 실 — 탄도 비행) 다수, ② 잉걸불(크고 느린 불씨 소수 — 공기 저항에 곧
 // 멈춰 난류로 춤추다 수명 말기엔 떠오르며 사그라듦), ③ 임팩트 화구·불혀(따뜻한 가산 섬광 + 발화점에서
 // 솟아오르는 화염 혀 — 사실적 불티 위에 얹는 한 줌의 양식화). 밀도 높은 가는 실 + 픽셀 단위 묘사는
-// 작은 스테이지에서 DOM 으로는 묻혀 캔버스로 그린다. 성공/실패 버스트는 여전히 DOM 풀(ParticlePool)
+// 작은 스테이지에서 DOM 으로는 묻혀 캔버스로 그린다. 성공/실패 버스트는 별개 캔버스(ParticlePool)
 // — 이 시스템은 hit 만 담당한다.
 //
 // 좌표/물리는 결정적이지 않아도 된다(시각 연출 — 게임 로직 아님). 매 타격마다 Math.random 으로 약간씩 다른
@@ -164,7 +164,7 @@ function getGlowSprite(): HTMLCanvasElement {
 }
 
 // ── 캔버스 스파크 시스템 ────────────────────────────────────────────────────────
-// 임팩트마다 burst() 로 불티를 추가하고, 살아 있는 불티가 있는 동안에만 rAF 루프를 돈다(평소 0 비용).
+// 임팩트마다 burst() 로 이전 불티를 비우고 새 불티로 교체하며(replace), 살아 있는 불티가 있는 동안에만 rAF 루프를 돈다(평소 0 비용).
 export class HitSparkSystem {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
@@ -220,6 +220,11 @@ export class HitSparkSystem {
     this.k = rect.width / REF_W
     const S = hitSparkSettings
     this.g = S.gravity * this.k
+
+    // 새 타격이 이전 불티를 대체한다(replace — 누적 금지). 화면엔 늘 최신 타격 한 벌만 산다(도트 버스트의
+    // replace 정책과 일치). fireT/shockT 는 아래에서 0 으로 리셋된다.
+    this.sparks.length = 0
+    this.licks.length = 0
 
     const fanRad = (S.fanDeg * Math.PI) / 180
     const v = S.baseVel * S.scale * this.k

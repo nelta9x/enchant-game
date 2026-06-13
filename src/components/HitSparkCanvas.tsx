@@ -3,14 +3,14 @@ import { HitSparkSystem } from './hitSparks'
 
 // Hit 불꽃 캔버스(프레젠테이션 전용·DOM 파티클 없음) — 망치가 검에 "닿는 순간"(impactMs) 불티·잉걸불·
 // 화구·불혀를 캔버스 한 장에 폭발시킨다. 게임 로직과 분리되어 강화 시도(망치 내려치기)에만 반응하며, 결과가
-// 무엇이었는지는 모른 채 "닿았다"는 사실만 그린다(성공·파괴·방지 공통). 성공/실패 버스트는 별개(DOM 풀).
+// 무엇이었는지는 모른 채 "닿았다"는 사실만 그린다(성공·파괴·방지 공통). 성공/실패 버스트는 별개 캔버스(ParticlePool).
 //
 // 검 박스 정중앙에 얹어(left-1/2 top-1/2) ParticlePool 과 같은 좌표 공간을 쓴다. 폭발 원점은 그 정중앙
 // (=강화 마법진 중앙, 좌표계 원점)이라 burst({0,0}) 으로 검·마법진 한가운데서 피어난다. 캔버스 크기는 rem
 // 이라 데스크탑 스케일을 따라가고, 시스템이 실제 픽셀 폭으로 모든 px 를 스케일한다(hitSparks 의 k).
 // pointer-events 없음·aria-hidden. 살아 있는 불티가 있을 때만 rAF 를 돌고 끝나면 캔버스를 비운다(평소 0 비용).
 
-export type HitSparkEvent = { id: number }
+type HitSparkEvent = { id: number }
 
 export function HitSparkCanvas({
   event,
