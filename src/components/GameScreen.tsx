@@ -53,7 +53,7 @@ import { ActionButton } from './ActionButton'
 import { ShopModal } from './ShopModal'
 import { GameClearModal } from './GameClearModal'
 import { SuccessEffect, type SuccessEvent } from './SuccessEffect'
-import type { ShakeBurstEvent } from './ShakeBurstEffect'
+import { ShakeAfterimage, type ShakeBurstEvent } from './ShakeBurstEffect'
 import { SwordStage } from './SwordStage'
 import { TopControls } from './TopControls'
 
@@ -65,25 +65,30 @@ const ANNOUNCE_KEY: Record<string, TranslationKey> = {
   protectedShake: 'toast.protected',
 }
 
-// 실행 중 버스트 효과(성공·파괴)를 연출 이벤트(ShakeBurstEvent)로 투영한다 — 같은 kind 를 전부 뽑아
-// (runningEventsOf: 겹친 옛 버스트 유실 방지) payload 를 이벤트로 매핑한다. sprite 없는 효과(자리만 있는
-// 잠금 등)는 제외(빈 배열). 성공·파괴가 동일 형태(ShakeBurstEvent)라 한 곳에서 만든다 — 반환 타입을 그 명명
-// 타입으로 두어 payload 필드를 늘릴 때 투영 누락이 컴파일에서 잡히게 한다.
+// 효과 1개를 버스트 이벤트(ShakeBurstEvent)로 투영한다 — sprite 없는 효과(자리만 있는 잠금 등)는 null.
+// 성공·파괴가 동일 형태라 투영을 한 곳에 둔다 — 반환 타입을 그 명명 타입으로 두어 payload 필드를 늘릴 때
+// 투영 누락이 컴파일에서 잡히게 한다. 파티클 emit(전부)·잔상(최신 1개) 양쪽이 이 투영을 공유한다.
+function projectBurst(e: Effect): ShakeBurstEvent | null {
+  return e.payload?.sprite
+    ? {
+        id: e.id,
+        sprite: e.payload.sprite,
+        particleCount: e.payload.particleCount ?? 0,
+        // 떨림 시작(impact)·길이(shake)는 잔상 떨림→버스트(emit) 시점을 정하는 데 쓴다.
+        impactMs: e.payload.impactMs ?? 0,
+        shakeMs: e.payload.shakeMs ?? 0,
+      }
+    : null
+}
+
+// 실행 중 버스트 효과(성공·파괴)를 전부 이벤트로 투영한다 — 각 효과가 burstAt 에 파티클을 emit 해야 하므로
+// (runningEventsOf: 겹친 옛 버스트 유실 방지) 최신 1개가 아니라 해당 kind 를 전부 뽑는다. 잔상 비주얼은
+// 이와 달리 최신 1개만 그린다(latestBurstEvent) — 잔상/파티클의 다중성이 달라 분리한다.
 function toBurstEvents(running: Effect[], kind: string): ShakeBurstEvent[] {
-  return runningEventsOf(running, kind).flatMap((e) =>
-    e.payload?.sprite
-      ? [
-          {
-            id: e.id,
-            sprite: e.payload.sprite,
-            particleCount: e.payload.particleCount ?? 0,
-            // 떨림 시작(impact)·길이(shake)는 ShakeBurstEffect 가 잔상 떨림→버스트 시점을 정하는 데 쓴다.
-            impactMs: e.payload.impactMs ?? 0,
-            shakeMs: e.payload.shakeMs ?? 0,
-          },
-        ]
-      : [],
-  )
+  return runningEventsOf(running, kind).flatMap((e) => {
+    const ev = projectBurst(e)
+    return ev ? [ev] : []
+  })
 }
 
 // 클릭 순간 캡처한 카드 rect 를 고정해 두는 보이지 않는 비행 출발 anchor(영점 크기·클릭 통과).
@@ -578,6 +583,15 @@ export function GameScreen() {
     () => toBurstEvents(running, 'successBurst'),
     [running],
   )
+  // 잔상(떨림→팝업)은 영속 단일 노드(ShakeAfterimage)가 그린다 — 색 무관(파티클만 색이 다름)이라 성공·파괴를
+  // 합쳐 "가장 최근" 버스트 1개만 그린다(망치·HitSpark 와 같은 latest 패턴). 연사로 버스트가 겹쳐도 잔상은
+  // 최신으로 하드 컷되고, 옛 버스트의 파티클은 위 emitter(successEvents/destructionEvents .map)가 책임진다.
+  const latestBurstEvent = useMemo<ShakeBurstEvent | null>(() => {
+    const s = latestRunning(running, 'successBurst')
+    const d = latestRunning(running, 'destruction')
+    const fx = s && d ? (s.id > d.id ? s : d) : (s ?? d) // id 단조 증가 — 큰 쪽이 최신
+    return fx ? projectBurst(fx) : null
+  }, [running])
   const coinFlightEvent = useMemo<CoinFlightEvent | null>(() => {
     const fx = latestRunning(running, 'coinFlight')
     return fx ? { id: fx.id, coinCount: fx.payload?.coinCount ?? 0 } : null
@@ -702,14 +716,19 @@ export function GameScreen() {
                         데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 — 풀이 없으면 버스트 emit 은
                         자동 no-op(particleEmit.ts). 잔상 떨림·교대(ShakeBurstEffect)는 영향 없음. */}
                     {anim.enhanceParticlesEnabled && <ParticlePool />}
-                    {/* 성공·파괴 버스트는 동시에 여러 개가 떠 있을 수 있다(재강화 시 옛 버스트 유지) —
-                        각 효과를 id 로 키잉해 독립 재생한다(잔상 떨림·팝업; 파티클은 풀로 emit). */}
+                    {/* 버스트 파티클 emit — 동시에 여러 개가 떠 있을 수 있어(재강화 시 옛 버스트 유지) 각
+                        효과를 id 로 키잉해 독립적으로 burstAt 에 emit 한다. 렌더 null(파티클은 풀이 그림)이라
+                        다중·교체에도 레이어 churn 이 없다. 잔상 비주얼은 아래 영속 노드가 따로 그린다. */}
                     {destructionEvents.map((ev) => (
                       <DestructionEffect key={ev.id} event={ev} />
                     ))}
                     {successEvents.map((ev) => (
                       <SuccessEffect key={ev.id} event={ev} />
                     ))}
+                    {/* 잔상(떨림→팝업·소멸) — 성공·파괴 공통의 영속 단일 캔버스 한 장이 가장 최근 버스트를
+                        그린다(강화마다 마운트/언마운트하지 않아 모바일 교체 프레임 레이어 churn 제거). 소멸
+                        순간 새 검(entranceDelay)과 같은 burstAt 으로 정확히 교대된다. */}
+                    <ShakeAfterimage event={latestBurstEvent} />
                     {/* 망치는 결과 연출 위에 그린다. impactMs 로 닿는 시점을 데이터에서 받는다(떨림·불꽃·
                         타격음과 동일 앵커). 데이터 플래그(hammerSwingEnabled)로 끌 수 있다 — 마운트 자체를
                         차단하며, 임팩트 앵커(떨림·Hit 불꽃·'캉')는 이 컴포넌트와 무관하게 타임라인이 구동한다. */}
