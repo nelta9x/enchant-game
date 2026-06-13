@@ -45,16 +45,12 @@ export function InventoryPanel({
 }: InventoryPanelProps) {
   const t = useT()
   const equipped = sword !== undefined && level !== null
-  const count = (equipped ? 1 : 0) + items.length
 
   return (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-panel-edge bg-panel">
-      <div className="flex items-center justify-between border-b border-panel-edge px-3 py-2">
+      <div className="flex items-center border-b border-panel-edge px-3 py-2">
         <span className="text-sm font-bold text-on-dark">
           {t('inventory.title')}
-        </span>
-        <span className="text-xs font-semibold tabular-nums text-on-dark-soft">
-          {count}
         </span>
       </div>
 
