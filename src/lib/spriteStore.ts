@@ -47,6 +47,8 @@ async function decodeDrawable(url: string): Promise<DrawableSprite | null> {
 class SpriteStore {
   private cache = new Map<string, DrawableSprite>() // 검 sprite 파일명 → 그릴 수 있는 소스
   private fallback: DrawableSprite // default.png(로드 후) 또는 1x1 투명(로드 전/실패)
+  // 같은 스프라이트의 동시 load 를 합쳐 중복 디코드를 막는다(loadAll 백그라운드 + 표시 재그리기 요청이 겹쳐도 1회).
+  private inflight = new Map<string, Promise<void>>()
 
   constructor() {
     // 동기 최종 폴백 — default.png 로드 전 첫 get() 도 throw 없이 그릴 게 있도록.
@@ -64,13 +66,26 @@ class SpriteStore {
     else devWarn('failed to load default sprite (sprites/default.png)')
   }
 
-  // 검 스프라이트 1장 적재(시작검 await 용). 이미 있으면 no-op(URL 키 중복 방지).
-  async load(sprite: string): Promise<void> {
-    if (this.cache.has(sprite)) return
-    const drawable = await decodeDrawable(swordSpriteUrl(sprite))
-    if (drawable) this.cache.set(sprite, drawable)
-    // 실패 시 캐시 미저장 → 이후 get() 은 default.png 폴백. 누락/오타 스프라이트를 조용히 삼키지 않게 알린다.
-    else devWarn(`failed to load sprite "${sprite}"`)
+  // 스프라이트가 풀에 적재됐는지 — SwordStage 가 첫 페인트에 폴백을 그렸는지 판별해 로드 후 재그리기를 건다.
+  has(sprite: string): boolean {
+    return this.cache.has(sprite)
+  }
+
+  // 검 스프라이트 1장 적재(시작검 await·표시 재그리기 용). 캐시되면 즉시 resolve, 적재 중이면 같은 약속을
+  // 공유한다(중복 디코드 방지). 실패 시 캐시 미저장 → 다음 load 가 재시도하고 get() 은 그때까지 폴백.
+  load(sprite: string): Promise<void> {
+    if (this.cache.has(sprite)) return Promise.resolve()
+    const existing = this.inflight.get(sprite)
+    if (existing) return existing
+    const p = (async () => {
+      const drawable = await decodeDrawable(swordSpriteUrl(sprite))
+      if (drawable) this.cache.set(sprite, drawable)
+      // 누락/오타 스프라이트를 조용히 삼키지 않게 알린다(실패 시 캐시 미저장 → get() 은 default.png 폴백).
+      else devWarn(`failed to load sprite "${sprite}"`)
+      this.inflight.delete(sprite)
+    })()
+    this.inflight.set(sprite, p)
+    return p
   }
 
   // 모든 검 스프라이트를 순차 적재한다(시작 후 백그라운드 발사 — 보통 await 하지 않는다). 데이터 레이어

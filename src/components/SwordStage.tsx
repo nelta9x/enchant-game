@@ -10,7 +10,7 @@ import { motion, useAnimationControls } from 'motion/react'
 import { useI18nStore, useT } from '../i18n'
 import type { SwordData } from '../data/types'
 import { formatAmount, formatGold } from '../lib/format'
-import { drawSpriteContain } from '../lib/spriteStore'
+import { drawSpriteContain, spriteStore } from '../lib/spriteStore'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
 import { SuccessRateSigil } from './SuccessRateSigil'
@@ -140,6 +140,19 @@ export function SwordStage({
       scale: 1,
       transition: { duration: 0.35, ease: 'easeOut', delay: entranceDelay },
     })
+    // 첫 무기 안 보임 방지 — 스프라이트가 아직 풀에 없으면(첫 페인트가 시작검 적재를 앞질렀거나, 다음 검이
+    // 백그라운드 적재 중) 위 drawSprite 는 default.png 폴백을 그린다. 적재되는 즉시 한 번 더 그려 빈/폴백
+    // 검이 남지 않게 한다(그 사이 검이 또 바뀌지 않았을 때만). load 는 적재 완료/캐시 히트에 resolve 하고
+    // 동시 호출을 합친다(중복 디코드 없음).
+    if (!spriteStore.has(spriteName)) {
+      let cancelled = false
+      void spriteStore.load(spriteName).then(() => {
+        if (!cancelled && prevSpriteRef.current === spriteName) drawSprite(spriteName)
+      })
+      return () => {
+        cancelled = true
+      }
+    }
   }, [spriteName, entranceDelay, entranceControls, drawSprite])
 
   // rem 반응 스케일(뷰포트 변화)로 표시 크기가 바뀌면 backing store 를 맞춰 다시 그린다(현재 스프라이트 유지).
