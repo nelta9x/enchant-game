@@ -194,11 +194,10 @@ export function SwordStage({
             }}
           />
         )}
-        {/* 천천히 도는 마법진 — 발동 시 결계로 승격돼 흰빛으로 점등하고 더 또렷이 빛난다.
-            상시 회전이라 CSS(.fx-spin, 기본 48s)가 소유한다 — armed 전환은 클래스·boxShadow 만
-            바뀌므로 회전은 끊기지 않는다. */}
+        {/* 마법진 — 발동 시 결계로 승격돼 흰빛으로 점등하고 더 또렷이 빛난다. 회전 애니메이션은
+            제거됐다(정적) — 이전엔 CSS(.fx-spin, 48s)가 상시 회전을 소유했다. */}
         <div
-          className={`fx-spin pointer-events-none absolute inset-3 rounded-full border ${
+          className={`pointer-events-none absolute inset-3 rounded-full border ${
             armed ? 'border-white/80' : 'border-frame/25'
           }`}
           style={
