@@ -194,20 +194,12 @@ export function SwordStage({
             }}
           />
         )}
-        {/* 마법진 — 발동 시 결계로 승격돼 흰빛으로 점등하고 더 또렷이 빛난다. 회전 애니메이션은
-            제거됐다(정적) — 이전엔 CSS(.fx-spin, 48s)가 상시 회전을 소유했다. */}
+        {/* 마법진 — 발동 시 결계로 승격돼 흰빛 테두리로 점등한다. 회전 애니메이션은 제거됐다(정적) —
+            이전엔 CSS(.fx-spin, 48s)가 상시 회전을 소유했다. */}
         <div
           className={`pointer-events-none absolute inset-3 rounded-full border ${
             armed ? 'border-white/80' : 'border-frame/25'
           }`}
-          style={
-            armed
-              ? {
-                  boxShadow:
-                    '0 0 18px color-mix(in srgb, white 60%, transparent)',
-                }
-              : undefined
-          }
         >
           <div
             className={`absolute inset-2 rounded-full border border-dashed ${
@@ -232,13 +224,13 @@ export function SwordStage({
           >
             {hasSword ? (
               // SpriteStore 의 GPU 상주 ImageBitmap 을 그리는 캔버스(영속) — 교체는 디코드·업로드 없는 블릿.
-              // 크기/픽셀아트 보간/그림자는 기존 <img> 와 동일(h-36/40, pixelated, drop-shadow). 그리기·backing
-              // store 크기는 drawSprite 가 소유한다(아래 useLayoutEffect·ResizeObserver).
+              // 크기/픽셀아트 보간은 기존 <img> 와 동일(h-36/40, pixelated). 그리기·backing store 크기는
+              // drawSprite 가 소유한다(아래 useLayoutEffect·ResizeObserver).
               <canvas
                 ref={spriteCanvasRef}
                 role="img"
                 aria-label={t(sword.nameKey)}
-                className="h-36 w-36 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] sm:h-40 sm:w-40"
+                className="h-36 w-36 object-contain sm:h-40 sm:w-40"
                 style={{ imageRendering: 'pixelated' }}
               />
             ) : (

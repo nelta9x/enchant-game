@@ -6,7 +6,7 @@ import { SigilRunes } from './Sigil'
 // 색(ink-soft)으로 맞춰 세 코너가 한 덩어리로 보인다. 크기·오프셋은 세 코너 동일(h-20, -25%/-2%).
 //
 // 강화에 쓰는 도구(호라드릭 망치)를 늘 보여 주는 자리 — 향후 "망치 업그레이드" 기능의 시각 앵커다.
-// 그래서 룬은 차분하게(opacity) 두되 망치 본체는 풀 불투명·drop-shadow 로 또렷이 띄운다(검 본체의
+// 그래서 룬은 차분하게(opacity) 두되 망치 본체는 풀 불투명으로 또렷이 띄운다(검 본체의
 // 강조 스프라이트와 같은 무게). 지금은 표시 전용(상호작용 없음)이라 마법진들과 같이 aria-hidden —
 // 업그레이드 기능이 붙을 때 클릭 어포던스 + aria-label(i18n 키)을 함께 추가한다.
 
@@ -41,7 +41,7 @@ export function HammerStation() {
             src={HAMMER_SPRITE}
             alt=""
             draggable={false}
-            className="h-12 w-12 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.35)]"
+            className="h-12 w-12 object-contain"
             style={{ imageRendering: 'pixelated' }}
           />
         </span>

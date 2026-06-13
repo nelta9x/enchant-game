@@ -99,15 +99,12 @@ function ProtectionSigil({
   const cls = `pointer-events-auto transition-opacity ${dim}`
 
   const body = (
-    // 마법진(회전 룬)이 가운데 충전 수치를 감싼다. 발동 시 흰빛 글로우가 더해진다(기존 활성화 효과).
+    // 마법진(회전 룬)이 가운데 충전 수치를 감싼다. 발동 시 룬이 흰빛으로 점등한다(상태색으로 구분).
     <div
       className="relative h-20 w-20"
       style={{
         // 마법진 룬은 currentColor 로 그려진다 — 상태색(발동·충분=흰빛 / 부족·보호불가=회색)을 여기서 물들인다.
         color: lit ? 'white' : 'var(--color-ink-soft)',
-        filter: armed
-          ? 'drop-shadow(0 0 7px rgba(255,255,255,0.9))'
-          : undefined,
       }}
     >
       <SigilRunes />

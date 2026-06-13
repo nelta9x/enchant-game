@@ -53,7 +53,7 @@ export function GameClearModal({ open, onClose }: GameClearModalProps) {
                   <motion.img
                     src={swordSpriteUrl(finalSword.sprite)}
                     alt={t(finalSword.nameKey)}
-                    className="relative h-28 w-28 object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+                    className="relative h-28 w-28 object-contain"
                     style={{ imageRendering: 'pixelated' }}
                     draggable={false}
                     initial={{ scale: 0.6, rotate: -12, opacity: 0 }}
