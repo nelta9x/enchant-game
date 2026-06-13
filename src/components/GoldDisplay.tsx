@@ -5,7 +5,7 @@ import {
   useMotionValue,
   useTransform,
 } from 'motion/react'
-import { useI18nStore } from '../i18n'
+import { useI18nStore, useT } from '../i18n'
 import { formatAmount, formatGold } from '../lib/format'
 import { Coin } from './Coin'
 import { COIN_ARRIVAL_SEC, coinArrivalTimes } from './coins'
@@ -24,6 +24,7 @@ export function GoldDisplay({
   coinCount?: number
 }) {
   const lang = useI18nStore((s) => s.lang)
+  const t = useT()
 
   // 표시 숫자(명령형으로만 갱신 — React 재렌더 없이 textContent 만 바뀐다).
   const display = useMotionValue(gold)
@@ -84,16 +85,19 @@ export function GoldDisplay({
     }
   }, [gold, display])
 
+  // 인벤토리 목록의 컴팩트 슬롯 콘텐츠 — 자체 박스(테두리·배경·그림자) 없이 아이템 행과 같은
+  // 구성(아이콘 + 이름 + 값)으로 그린다. 슬롯 외형(h-14·금색 테두리)은 감싸는 InventoryPanel 의
+  // 골드 행 div 가 제공하고, 코인 도착 측정 ref(goldRef)도 그 div 가 든다.
   return (
     <motion.div
       animate={punch}
       aria-label={formatGold(gold, lang)}
-      className="relative flex w-full items-center justify-center gap-2 rounded-lg border border-panel-edge bg-panel px-3 py-2.5 shadow-md"
+      className="relative flex h-full w-full items-center justify-center gap-2.5"
     >
-      {/* 도달 글로우 — 코인이 빨려 들어오는 동안 테두리에서 황금빛이 번진다(스트림처럼 두 번 일렁). */}
+      {/* 도달 글로우 — 코인이 빨려 들어오는 동안 슬롯에서 황금빛이 번진다(스트림처럼 두 번 일렁). */}
       <motion.span
         key={pulseKey}
-        className="pointer-events-none absolute inset-0 rounded-lg"
+        className="pointer-events-none absolute inset-0 rounded-md"
         style={{ boxShadow: '0 0 22px 3px var(--color-gold-glow)' }}
         initial={{ opacity: 0 }}
         animate={
@@ -101,10 +105,12 @@ export function GoldDisplay({
         }
         transition={{ delay: COIN_ARRIVAL_SEC, duration: 0.7, ease: 'easeOut' }}
       />
-      <Coin className="h-5 w-5" />
-      {/* 금액 슬롯 고정(min-w) — 보유 골드가 수십억으로 늘어도 표시 폭이 변하지 않게 자리를 미리 잡는다.
-          (자릿수에 무관히 흔들리지 않도록 고정 text-sm + tabular-nums + 가운데 정렬) */}
-      <motion.span className="min-w-[7.5rem] whitespace-nowrap text-center text-sm font-bold tabular-nums text-on-dark">
+      <Coin className="h-10 w-10" />
+      <span className="truncate text-sm font-medium text-on-dark">
+        {t('inventory.gold')}
+      </span>
+      {/* 금액(아이템 행의 수량 자리) — 카운트업·통통통이 여기에 반영된다(tabular-nums 로 자릿수 흔들림 방지). */}
+      <motion.span className="shrink-0 whitespace-nowrap text-sm font-bold tabular-nums text-gold">
         {text}
       </motion.span>
     </motion.div>
