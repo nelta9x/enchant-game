@@ -106,12 +106,12 @@ export function CommissionBar({
       aria-label={t('commission.title')}
     >
       {/* 거래 제안 카드는 게임 레이아웃이 허용하는 폭을 모두 쓴다 — 상단바(TopControls)·메인 그리드와
-          동일한 62rem 밴드(lg+)를 mx-auto 로 가운데 정렬해 좌우 끝이 인벤토리/강화 패널과 맞물리게 한다.
+          동일한 61rem 밴드(lg+)를 mx-auto 로 가운데 정렬해 좌우 끝이 인벤토리/강화 패널과 맞물리게 한다.
           <lg(세로형)에선 컨테이너 폭을 그대로 꽉 채운다. 통합 타이머 바는 카드 행 아래에 같은 밴드 폭으로
           이어 붙인다(flex-col). 도착 연출 오버레이(OfferArrivalFx)는 카드 행 컨테이너(relative)에만 absolute
-          inset-0 으로 깔려 카드 영역에만 정렬되고 타이머 바는 덮지 않는다. 62rem 은 그리드 컬럼 합
+          inset-0 으로 깔려 카드 영역에만 정렬되고 타이머 바는 덮지 않는다. 61rem 은 그리드 컬럼 합
           (16+28+16 + gap)과 동기화할 것 — 컬럼/갭을 바꾸면 이 값도 함께 고친다. */}
-      <div className="mx-auto flex w-full flex-col gap-1.5 lg:max-w-[62rem]">
+      <div className="mx-auto flex w-full flex-col gap-1.5 lg:max-w-[61rem]">
         <div className="relative">
           <OfferArrivalFx />
           <div ref={slotsRef} className="flex gap-2">

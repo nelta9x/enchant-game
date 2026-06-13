@@ -635,12 +635,12 @@ export function GameScreen() {
           초기 16px 기준이라 스케일과 무관하게 1024px 에서 고정 — <lg 는 세로 단일 컬럼(16px). */}
       <div className="relative flex w-full flex-col rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5 lg:min-h-svh lg:rounded-none lg:border-0 lg:px-0">
         {/* 상단 컨트롤은 아래 메인 그리드와 같은 폭으로 가운데 정렬한다. 그리드는 full-width 안에서
-            lg:grid-cols-[16rem_28rem_16rem] + gap-4(0.25rem×4=1rem, 갭 2개) = 62rem 만 justify-center 로
+            lg:grid-cols-[16rem_28rem_16rem] + gap-2(0.25rem×2=0.5rem, 갭 2개=1rem) = 61rem 만 justify-center 로
             가운데에 쓰는데, TopControls 만 full-width 라 상단바가 좌우로 더 넓게 튀어나와 보였다(불일치).
-            여기서 같은 62rem 밴드(mx-auto)로 묶어 언어토글·게이지·상점 줄이 인벤토리/강화 패널의 좌우 끝과
-            정렬되게 한다. bg-stage(베이지)는 바깥 div 가 계속 full-width 로 깐다. 62rem 은 위 그리드 컬럼
+            여기서 같은 61rem 밴드(mx-auto)로 묶어 언어토글·게이지·상점 줄이 인벤토리/강화 패널의 좌우 끝과
+            정렬되게 한다. bg-stage(베이지)는 바깥 div 가 계속 full-width 로 깐다. 61rem 은 위 그리드 컬럼
             합과 동기화할 것 — 컬럼/갭을 바꾸면 이 값도 함께 고친다. <lg(세로형)은 그대로 full-width. */}
-        <div className="lg:mx-auto lg:w-full lg:max-w-[62rem]">
+        <div className="lg:mx-auto lg:w-full lg:max-w-[61rem]">
           <TopControls onOpenShop={openShop} />
         </div>
 
@@ -650,7 +650,7 @@ export function GameScreen() {
         {/* 좁은 화면(<lg)은 단일 컬럼으로 세로 스택 — 3열은 고정폭 검 스테이지(검 박스 240·이름 배너 320)가
             들어갈 만큼 넓을 때만 쓴다. sm(640) 기준이면 640~1024 구간에서 가운데 트랙이 눌려 좌우 패널과
             겹치므로, 전환 기준을 lg(1024)로 둔다(성공률을 검 오른쪽으로 옮기는 lg 기준과도 일치). */}
-        <div className="mt-3 grid grid-cols-1 gap-4 lg:my-auto lg:min-h-[34rem] lg:justify-center lg:grid-cols-[16rem_28rem_16rem]">
+        <div className="mt-3 grid grid-cols-1 gap-2 lg:my-auto lg:min-h-[34rem] lg:justify-center lg:grid-cols-[16rem_28rem_16rem]">
           {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음).
               세로형(<lg)에선 강화 버튼처럼 컬럼 폭을 꽉 채우고, lg+(3열)에선 컬럼을 채운다. */}
           <div className="order-last flex w-full min-h-0 flex-col lg:order-none lg:justify-center">
@@ -774,7 +774,7 @@ export function GameScreen() {
                 패널 높이(헤더 2.8125rem[골드 알약 py-1 포함] + 목록 17.25rem + 테두리 0.125rem = 20.1875rem)에
                 맞춘다. lg+ 에선 그 높이의 2행 그리드(강화 2 : 판매 1)로 버튼이 행을 채운다(items-stretch).
                 세로형(<lg)은 콘텐츠 높이의 일반 flex 스택. (인벤토리 헤더/목록 높이를 바꾸면 이 값도 같이 고칠 것.) */}
-            <div className="flex w-full flex-col items-center gap-3 lg:grid lg:h-[20.1875rem] lg:grid-rows-[2fr_1fr] lg:items-stretch">
+            <div className="flex w-full flex-col items-center gap-2 lg:grid lg:h-[20.1875rem] lg:grid-rows-[2fr_1fr] lg:items-stretch">
               <EnhanceButton
                 disabled={!canEnhance}
                 charging={enhanceLocked}
