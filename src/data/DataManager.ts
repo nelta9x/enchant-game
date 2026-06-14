@@ -26,7 +26,7 @@ export class DataManager {
   private animation: AnimationConfig | null = null
   private loaded = false
 
-  // 데이터 파일(sources/*.json)을 검증·적재한다(동기).
+  // 데이터 파일(public/data/*.json)을 검증·적재한다(동기).
   // 데이터 소스는 코드 상수가 아니라 별도 데이터 파일이며, loadSwords()/loadShop()/loadItems()이
   // 파일을 읽어 런타임 검증을 거친 도메인 타입으로 만든다.
   // 원격/비동기 로드가 필요해지면 이 메서드만 async로 전환하면 된다.

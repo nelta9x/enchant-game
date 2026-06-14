@@ -1,4 +1,4 @@
-import animationRaw from './sources/animation.json'
+import animationRaw from '../../public/data/animation.json'
 import type { AnimationConfig, ShakeBand } from './types'
 import { isRecord, makeFail } from './validate'
 

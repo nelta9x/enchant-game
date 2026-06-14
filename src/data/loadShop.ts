@@ -1,4 +1,4 @@
-import shopRaw from './sources/shop.json'
+import shopRaw from '../../public/data/shop.json'
 import type { ShopItem } from './types'
 import { parseMaterial } from './loadSwords'
 import { isRecord, makeFail } from './validate'

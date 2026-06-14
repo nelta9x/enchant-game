@@ -1,4 +1,4 @@
-import floatingTextRaw from './sources/floatingText.json'
+import floatingTextRaw from '../../public/data/floatingText.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
 import type { FloatingTextData, FloatingTextEntry } from './types'
 import { isRecord, makeFail } from './validate'

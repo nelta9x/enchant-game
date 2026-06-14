@@ -1,4 +1,4 @@
-import swordsRaw from './sources/swords.json'
+import swordsRaw from '../../public/data/swords.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
 import type { Drop, Material, SwordData, SwordNote } from './types'
 import { isRecord, makeFail } from './validate'

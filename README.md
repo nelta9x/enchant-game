@@ -40,7 +40,7 @@ npm test           # vitest 테스트
 
 세 가지 원칙으로 짜여 있다 — 코드 작성 규약의 상세는 [CLAUDE.md](CLAUDE.md) 참조.
 
-- **데이터는 코드와 분리** — 검·상점·의뢰 등 게임 데이터는 `src/data/sources/*.json` 에 두어 디자이너가 직접 편집하고, 로더가 시작 시 검증해 `DataManager`(단일 출처)에 적재한다.
+- **데이터는 코드와 분리** — 검·상점·의뢰 등 게임 데이터는 `public/data/*.json` 에 두어 디자이너가 직접 편집하고, 로더가 시작 시 `import`로 읽어(번들 인라인 — `file://` 보존) 검증한 뒤 `DataManager`(단일 출처)에 적재한다.
 - **문자열은 i18n** — UI 텍스트·표시명은 코드에 박지 않고 번역 키로 관리한다(`src/i18n`, ko/en).
 - **뷰와 로직 분리** — 강화 확률 엔진 등 로직은 순수 함수로 떼어 테스트하고, 컴포넌트는 렌더에 집중한다.
 
@@ -48,7 +48,7 @@ npm test           # vitest 테스트
 
 ```
 src/
-  data/        # 게임 데이터 — sources/*.json + 검증 로더 + DataManager (단일 출처)
+  data/        # 게임 데이터 레이어 — 검증 로더 + DataManager (단일 출처). 데이터 JSON 본체는 public/data/
   game/        # 강화 도메인 로직 (순수 엔진, 테스트 대상)
   store/       # zustand 상태 + 순수 코어(enhancer·queue) 셸
   components/  # 뷰(프레젠테이셔널) + 연출 효과
@@ -56,6 +56,7 @@ src/
   lib/         # 자산 URL·포맷·사운드 등 경계 유틸
   i18n/        # 다국어 (ko = 키의 단일 출처, en)
 public/
+  data/             # 게임 데이터 JSON (디자이너 편집 대상, import로 번들)
   sprites/swords/   # 검 스프라이트 PNG (단계별, 파일명 = 영문명 slug)
   sprites/items/    # 아이템 스프라이트 PNG
   audio/            # 효과음 WAV
