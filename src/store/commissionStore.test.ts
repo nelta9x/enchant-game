@@ -1,12 +1,4 @@
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeAll,
-  beforeEach,
-  afterEach,
-} from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { createCommissionStore } from './commissionStore'
 import { useGameStore } from './gameStore'
 import { dataManager } from '../data/DataManager'
@@ -18,24 +10,25 @@ const goldOf = (reward: Material): number =>
 // 아이템 비용 의뢰의 납품 itemId 추출(본 픽스처는 골드 비용을 쓰지 않음 — 골드면 빈 문자열로 단언 실패 유도).
 const costItemId = (cost: Material): string =>
   cost.kind === 'item' ? cost.itemId : ''
+// active 의 id 목록(세션 동일성 비교용).
+const idsOf = (store: ReturnType<typeof createCommissionStore>): number[] =>
+  store.getState().active.map((c) => c.id)
 
-// 셸(타이머+데이터) 통합 테스트. 풀 basePrice 는 실제 데이터(DataManager)를 쓰되, 설정은 픽스처를 주입해
-// production 값과 독립시킨다. 출제 풀은 보유 골드가 고르므로(currentBucket), 테스트는 gold 를 세팅해
-// 어느 버킷이 뽑히는지 제어한다. 타이밍은 결정적이도록 spawnInterval·duration 의 min==max 로 둔다.
+// 셸(강화 시도 신호+데이터) 통합 테스트. 풀 basePrice 는 실제 데이터(DataManager)를 쓰되, 설정은 픽스처를
+// 주입해 production 값과 독립시킨다. 출제 풀은 보유 골드가 고르므로(currentBucket), 테스트는 gold 를 세팅해
+// 어느 버킷이 뽑히는지 제어한다. 갱신 카운터는 결정적이도록 refreshWeights 를 단일 후보(value 3)로 둔다.
 beforeAll(() => {
   dataManager.load()
 })
 
 beforeEach(() => {
-  vi.useFakeTimers()
   // 기본은 버킷 A([0, 500000)) 구간. 개별 테스트가 필요하면 gold 를 덮어 다른 버킷을 고른다.
   // maxLevelReached 를 0 으로 리셋해 잠금 게이트 테스트의 출발 바닥을 고정한다(전역 store 공유 → 이전 테스트
   // 잔존값 방지). 본 파일의 CONFIG/BARTER 픽스처는 unlockAtLevel:0 이라 나머지 테스트는 값과 무관하게 활성.
   useGameStore.setState({ gold: 1000, maxLevelReached: 0 })
 })
-afterEach(() => vi.useRealTimers())
 
-// 결정적 버킷 헬퍼: 간격 10s, 지속 30s, incentive 1.0·additive 0 고정(reward = basePrice).
+// 결정적 버킷 헬퍼: 갱신 후보 단일(value 3), incentive 1.0·additive 0 고정(reward = basePrice).
 function bucket(
   minGold: number,
   maxGold: number | null,
@@ -54,10 +47,7 @@ function bucket(
       additiveMin: 0,
       additiveMax: 0,
     })),
-    durationMinMs: 30_000,
-    durationMaxMs: 30_000,
-    spawnIntervalMinMs: 10_000,
-    spawnIntervalMaxMs: 10_000,
+    refreshWeights: [{ value: 3, weight: 1 }],
   }
 }
 
@@ -65,7 +55,6 @@ function bucket(
 // 보유 골드 구간이 [0,∞) 를 연속으로 덮는다(로더 불변 미러).
 const CONFIG: CommissionConfig = {
   maxCommissions: 3,
-  tickIntervalMs: 250,
   // unlockAtLevel:0 = 항상 활성(레거시 동작 유지). 잠금 게이트는 별도 describe 에서 nonzero 로 검증한다.
   unlockAtLevel: 0,
   buckets: [
@@ -84,26 +73,55 @@ const CONFIG: CommissionConfig = {
 }
 
 describe('commissionStore — 제안 세션 모델', () => {
-  it('start 는 첫 세션(서로 다른 제안 maxCommissions 개)을 즉시 한 번에 출제하고 타이머를 멈춘다', () => {
+  it('start 는 첫 세션(서로 다른 제안 maxCommissions 개)을 즉시 한 번에 출제한다', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     expect(store.getState().active).toHaveLength(3) // 세션 3개 한 번에
     // 버킷 A(검 단계 3,4,5)에서만 출제 + 세션 내 중복 없음.
     const ids = store.getState().active.map((c) => costItemId(c.cost))
-    for (const id of ids) expect(['sword_3', 'sword_4', 'sword_5']).toContain(id)
+    for (const id of ids)
+      expect(['sword_3', 'sword_4', 'sword_5']).toContain(id)
     expect(new Set(ids).size).toBe(3) // 서로 다른 제안
-    expect(store.getState().nextSpawnAt).toBeNull() // 세션이 떠 있음 → 정지
-    // 세션이 떠 있는 동안은 시간이 흘러도 보충하지 않는다(트리클 아님).
-    vi.advanceTimersByTime(10_000)
-    expect(store.getState().active).toHaveLength(3)
+    // 갱신 카운터가 세팅됐고 가득 차 있다.
+    expect(store.getState().attemptsTotal).toBeGreaterThan(0)
+    expect(store.getState().attemptsRemaining).toBe(
+      store.getState().attemptsTotal,
+    )
     store.getState().stop()
   })
 
-  it('제안 하나를 선택(fulfill)하면 나머지 제안까지 모두 사라지고 세션이 끝난다', () => {
+  it('강화 시도 1회로는 세션이 갱신되지 않고 카운터만 줄어든다', () => {
+    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
+    store.getState().start()
+    const before = idsOf(store)
+    const total = store.getState().attemptsTotal
+    store.getState().notifyAttempt()
+    expect(idsOf(store)).toEqual(before) // 같은 세션
+    expect(store.getState().attemptsRemaining).toBe(total - 1)
+    store.getState().stop()
+  })
+
+  it('카운터가 0이 되는 시도에 세션 전체가 새로 갱신된다(새 ids)', () => {
+    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
+    store.getState().start()
+    const before = idsOf(store)
+    const total = store.getState().attemptsTotal
+    for (let i = 0; i < total; i += 1) store.getState().notifyAttempt()
+    expect(store.getState().active).toHaveLength(3)
+    // 새 세션이라 직전 세션과 id 가 겹치지 않는다(단조 증가).
+    for (const id of idsOf(store)) expect(before).not.toContain(id)
+    expect(store.getState().attemptsRemaining).toBe(
+      store.getState().attemptsTotal,
+    )
+    store.getState().stop()
+  })
+
+  it('제안 하나를 선택(fulfill)하면 그 카드만 사라지고 나머지·카운터는 그대로다', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     expect(store.getState().active).toHaveLength(3)
     const target = store.getState().active[0]
+    const total = store.getState().attemptsTotal
     // 고른 제안의 납품 재료만 보유시킨다.
     useGameStore.setState({
       currentSwordId: null,
@@ -111,18 +129,19 @@ describe('commissionStore — 제안 세션 모델', () => {
       gold: 0,
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
-    expect(store.getState().active).toHaveLength(0) // 세션 전체 종료(나머지도 사라짐)
+    expect(store.getState().active).toHaveLength(2) // 그 카드만 제거
+    expect(store.getState().active.some((c) => c.id === target.id)).toBe(false)
+    expect(store.getState().attemptsRemaining).toBe(total) // 납품은 카운터 불변
     store.getState().stop()
   })
 
-  it('stop 후 tick 이 더 이상 돌지 않는다', () => {
+  it('stop 후에는 notifyAttempt 가 아무 동작도 하지 않는다', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     store.getState().stop()
     expect(store.getState().active).toHaveLength(0)
-    expect(store.getState().nextSpawnAt).toBeNull()
-    vi.advanceTimersByTime(CONFIG.tickIntervalMs * 8)
-    expect(store.getState().active).toHaveLength(0) // 타이머 해제 — 재생성 없음
+    store.getState().notifyAttempt() // 정지 상태 — 무동작
+    expect(store.getState().active).toHaveLength(0)
   })
 
   it('보유 골드가 출제 버킷을 결정한다: 저골드→버킷 A, 고골드→버킷 B (헤드라인 동작)', () => {
@@ -193,7 +212,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     store.getState().stop()
   })
 
-  it('fulfill: 요구 검 보유 시 골드 지급 + active 제거', () => {
+  it('fulfill: 요구 검 보유 시 골드 지급 + 그 카드만 제거', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     const target = store.getState().active[0]
@@ -204,7 +223,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
     expect(useGameStore.getState().gold).toBe(goldOf(target.reward))
-    expect(store.getState().active).toHaveLength(0) // 세션 전체 종료
+    expect(store.getState().active).toHaveLength(2) // 그 카드만 제거(나머지 유지)
     store.getState().stop()
   })
 
@@ -250,7 +269,6 @@ describe('commissionStore — 제안 세션 모델', () => {
   // 물물교환 의뢰 전용 설정: 형광물질 2개 납품 → sword_12 1개 지급(아이템 보상).
   const BARTER: CommissionConfig = {
     maxCommissions: 1,
-    tickIntervalMs: 250,
     unlockAtLevel: 0,
     buckets: [
       {
@@ -266,10 +284,7 @@ describe('commissionStore — 제안 세션 모델', () => {
             rewardItemCount: 1,
           },
         ],
-        durationMinMs: 30_000,
-        durationMaxMs: 30_000,
-        spawnIntervalMinMs: 10_000,
-        spawnIntervalMaxMs: 10_000,
+        refreshWeights: [{ value: 3, weight: 1 }],
       },
     ],
   }
@@ -284,8 +299,16 @@ describe('commissionStore — 제안 세션 모델', () => {
     store.getState().start()
     const target = store.getState().active[0]
     expect(costItemId(target.cost)).toBe('faded_fluorescent')
-    expect(target.cost).toEqual({ kind: 'item', itemId: 'faded_fluorescent', count: 2 })
-    expect(target.reward).toEqual({ kind: 'item', itemId: 'sword_12', count: 1 })
+    expect(target.cost).toEqual({
+      kind: 'item',
+      itemId: 'faded_fluorescent',
+      count: 2,
+    })
+    expect(target.reward).toEqual({
+      kind: 'item',
+      itemId: 'sword_12',
+      count: 1,
+    })
     expect(store.getState().fulfill(target.id)).toBe(true)
     const items = useGameStore.getState().items
     expect(items.find((i) => i.itemId === 'faded_fluorescent')?.count).toBe(1) // 3→1 (2 소모)
@@ -314,7 +337,7 @@ describe('commissionStore — 제안 세션 모델', () => {
 })
 
 // 제안 활성화 잠금(unlockAtLevel) — 도달 강화 레벨(maxLevelReached)이 임계 미만이면 제안이 전혀 출제되지 않고,
-// 임계에 도달한 순간(다음 tick)부터 첫 세션이 부트스트랩된다. maxLevelReached 는 단조라 한 번 해제되면 유지된다.
+// 임계에 도달한 순간(다음 강화 시도)부터 첫 세션이 부트스트랩된다. maxLevelReached 는 단조라 한 번 해제되면 유지된다.
 describe('commissionStore — 제안 활성화 잠금(unlockAtLevel)', () => {
   // CONFIG(버킷 A) 그대로 + 활성화 임계만 10 으로. 잠금/해제는 maxLevelReached 로 제어한다.
   const GATED: CommissionConfig = { ...CONFIG, unlockAtLevel: 10 }
@@ -324,28 +347,31 @@ describe('commissionStore — 제안 활성화 잠금(unlockAtLevel)', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: GATED })
     store.getState().start()
     expect(store.getState().active).toHaveLength(0)
-    expect(store.getState().nextSpawnAt).toBeNull() // 초기 빈 상태 그대로
     store.getState().stop()
   })
 
-  it('잠금 중에는 tick 이 여러 번 흘러도 계속 비어 있다', () => {
+  it('잠금 중에는 강화 시도를 여러 번 알려도 계속 비어 있다', () => {
     useGameStore.setState({ maxLevelReached: 0 })
     const store = createCommissionStore({ rng: () => 0.5, config: GATED })
     store.getState().start()
-    vi.advanceTimersByTime(250 * 5) // tick 5회
+    for (let i = 0; i < 5; i += 1) store.getState().notifyAttempt()
     expect(store.getState().active).toHaveLength(0)
     store.getState().stop()
   })
 
-  it('도달 레벨이 임계에 닿으면 다음 tick 에서 첫 세션을 부트스트랩한다', () => {
+  it('도달 레벨이 임계에 닿으면 다음 강화 시도에서 첫 세션을 부트스트랩한다(차감 없음)', () => {
     useGameStore.setState({ maxLevelReached: 0 })
     const store = createCommissionStore({ rng: () => 0.5, config: GATED })
     store.getState().start()
     expect(store.getState().active).toHaveLength(0) // 아직 잠금
-    // 임계 도달 → 다음 tick 에서 해제·부트스트랩.
+    // 임계 도달 → 다음 강화 시도에서 해제·부트스트랩.
     useGameStore.setState({ maxLevelReached: 10 })
-    vi.advanceTimersByTime(250)
+    store.getState().notifyAttempt()
     expect(store.getState().active).toHaveLength(3) // 서로 다른 제안 3개 한 번에
+    // 해제 교차 시도는 첫 세션을 만들 뿐 카운터를 소비하지 않는다(가득 찬 상태).
+    expect(store.getState().attemptsRemaining).toBe(
+      store.getState().attemptsTotal,
+    )
     store.getState().stop()
   })
 
@@ -360,15 +386,15 @@ describe('commissionStore — 제안 활성화 잠금(unlockAtLevel)', () => {
   it('잠금 중 start→stop→start(StrictMode 이중 마운트) 후 해제되면 정상 부트스트랩한다', () => {
     useGameStore.setState({ maxLevelReached: 0 }) // 잠금
     const store = createCommissionStore({ rng: () => 0.5, config: GATED })
-    // 마운트→언마운트→재마운트(App effect 의 start/stop/start 와 동일). 래치(bootstrapped)가
+    // 마운트→언마운트→재마운트(App effect 의 start/stop/start 와 동일). 래치(bootstrapped/started)가
     // stop 에서 리셋되어 재start 후에도 잠금 상태가 유지되어야 한다(빈 상태).
     store.getState().start()
     store.getState().stop()
     store.getState().start()
     expect(store.getState().active).toHaveLength(0)
-    // 이후 임계 도달 → 다음 tick 에서 1회 부트스트랩(중복 출제 없음).
+    // 이후 임계 도달 → 다음 강화 시도에서 1회 부트스트랩(중복 출제 없음).
     useGameStore.setState({ maxLevelReached: 10 })
-    vi.advanceTimersByTime(250)
+    store.getState().notifyAttempt()
     expect(store.getState().active).toHaveLength(3)
     store.getState().stop()
   })

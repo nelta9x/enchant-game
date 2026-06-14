@@ -1,13 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
+  attempt,
   bootstrapCommissionQueue,
   commissionPool,
   complete,
   emptyCommissionQueue,
   generateOne,
   pickDistinctEntries,
+  refresh,
+  rollAttempts,
   spawnSession,
-  tick,
   type Commission,
   type CommissionQueueState,
   type BucketSettings,
@@ -25,17 +27,12 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-// 버킷 공통 설정 픽스처(보상 배수/가산은 아이템별이라 여기 없음). 타이밍을 결정적으로 min==max.
-const SETTINGS: BucketSettings = {
-  durationMinMs: 100_000,
-  durationMaxMs: 100_000,
-  spawnIntervalMinMs: 10_000,
-  spawnIntervalMaxMs: 10_000,
-}
+// 버킷 공통 설정 픽스처 — 갱신 후보를 단일 값(3)으로 두어 rollAttempts 가 결정적이게 한다.
+const SETTINGS: BucketSettings = { refreshWeights: [{ value: 3, weight: 1 }] }
 
 const SESSION = 3 // 글로벌 세션 크기(한 세션에 한 번에 출제할 제안 수)
 
-const RNG = () => 0.3 // 상수 — min==max 라 보상/타이밍엔 무관. 가중치 동일이라 비복원 추출 순서도 결정적.
+const RNG = () => 0.3 // 상수 — 가중치 동일이라 비복원 추출 순서가 결정적.
 
 // 골드 보상 PoolEntry 헬퍼 — 아이템 비용(itemId×count)을 cost 로 싣고 incentive/additive 범위를 둔다.
 function entry(
@@ -88,50 +85,98 @@ const costEntryId = (e: PoolEntry): string =>
 const costId = (cost: Commission['cost']): string =>
   cost.kind === 'item' ? cost.itemId : 'gold'
 
-function tickState(
-  state: CommissionQueueState,
-  now: number,
-  pool: readonly PoolEntry[] = POOL3,
-): CommissionQueueState {
-  return tick(state, now, RNG, pool, SETTINGS, SESSION).state
+// 불변식: 0 <= attemptsRemaining <= attemptsTotal.
+function checkInvariant(s: CommissionQueueState): boolean {
+  return s.attemptsRemaining >= 0 && s.attemptsRemaining <= s.attemptsTotal
 }
 
-// 불변식: tick 후 nextSpawnAt === null ⟺ active.length > 0(세션이 떠 있음).
-function checkInvariant(s: CommissionQueueState): boolean {
-  return (s.nextSpawnAt === null) === (s.active.length > 0)
-}
+const ids = (s: CommissionQueueState): number[] => s.active.map((c) => c.id)
 
 describe('emptyCommissionQueue', () => {
-  it('빈 active + 즉시(now) 첫 세션 예정', () => {
-    expect(emptyCommissionQueue(0)).toEqual({
+  it('빈 active + 카운터 0', () => {
+    expect(emptyCommissionQueue()).toEqual({
       active: [],
-      nextSpawnAt: 0,
+      attemptsRemaining: 0,
+      attemptsTotal: 0,
       nextId: 1,
     })
   })
 })
 
 describe('bootstrapCommissionQueue — 시작 즉시 첫 세션', () => {
-  it('첫 세션을 즉시 채운다(서로 다른 제안 SESSION 개) + 타이머 정지(null)', () => {
-    const s = bootstrapCommissionQueue(0, RNG, POOL3, SETTINGS, SESSION)
+  it('첫 세션을 즉시 채운다(서로 다른 제안 SESSION 개) + 갱신 카운터를 뽑는다', () => {
+    const s = bootstrapCommissionQueue(RNG, POOL3, SETTINGS, SESSION)
     expect(s.active).toHaveLength(3)
     expect(new Set(s.active.map((c) => costId(c.cost))).size).toBe(3) // 중복 없음
-    expect(s.nextSpawnAt).toBeNull() // 세션이 떠 있음
+    // 단일 후보(3) → 총·남은 카운터 모두 3.
+    expect(s.attemptsTotal).toBe(3)
+    expect(s.attemptsRemaining).toBe(3)
     expect(s.nextId).toBe(4)
     expect(checkInvariant(s)).toBe(true)
   })
 
   it('풀의 서로 다른 항목이 SESSION 보다 적으면 있는 만큼만(min)', () => {
-    const s = bootstrapCommissionQueue(0, RNG, POOL, SETTINGS, SESSION) // 단일 항목
+    const s = bootstrapCommissionQueue(RNG, POOL, SETTINGS, SESSION) // 단일 항목
     expect(s.active).toHaveLength(1)
-    expect(s.nextSpawnAt).toBeNull()
+    expect(s.attemptsTotal).toBeGreaterThan(0)
     expect(checkInvariant(s)).toBe(true)
   })
 
-  it('풀이 비면 0개 + 즉시 재시도(now)', () => {
-    const s = bootstrapCommissionQueue(0, RNG, [], SETTINGS, SESSION)
+  it('풀이 비면 0개 + 카운터 0(다음 시도에 재시도)', () => {
+    const s = bootstrapCommissionQueue(RNG, [], SETTINGS, SESSION)
     expect(s.active).toHaveLength(0)
-    expect(s.nextSpawnAt).toBe(0)
+    expect(s.attemptsRemaining).toBe(0)
+    expect(s.attemptsTotal).toBe(0)
+  })
+})
+
+describe('rollAttempts — 갱신 카운터 가중 추첨', () => {
+  it('단일 후보면 그 value 를 반환한다', () => {
+    expect(
+      rollAttempts(RNG, { refreshWeights: [{ value: 4, weight: 1 }] }),
+    ).toBe(4)
+  })
+
+  it('후보 범위(값) 안의 정수를 돌려준다', () => {
+    const settings: BucketSettings = {
+      refreshWeights: [1, 2, 3, 4, 5].map((value) => ({ value, weight: 1 })),
+    }
+    const rng = mulberry32(99)
+    for (let i = 0; i < 50; i += 1) {
+      const v = rollAttempts(rng, settings)
+      expect(Number.isInteger(v)).toBe(true)
+      expect(v).toBeGreaterThanOrEqual(1)
+      expect(v).toBeLessThanOrEqual(5)
+    }
+  })
+
+  it('weight 가 큰 후보가 더 자주 나온다(분포 방향)', () => {
+    const settings: BucketSettings = {
+      refreshWeights: [
+        { value: 1, weight: 1 },
+        { value: 5, weight: 9 },
+      ],
+    }
+    const rng = mulberry32(7)
+    let heavy = 0
+    let light = 0
+    for (let i = 0; i < 500; i += 1) {
+      if (rollAttempts(rng, settings) === 5) heavy += 1
+      else light += 1
+    }
+    expect(heavy).toBeGreaterThan(light)
+  })
+
+  it('같은 시드는 같은 값', () => {
+    const settings: BucketSettings = {
+      refreshWeights: [
+        { value: 1, weight: 1 },
+        { value: 5, weight: 1 },
+      ],
+    }
+    expect(rollAttempts(mulberry32(3), settings)).toBe(
+      rollAttempts(mulberry32(3), settings),
+    )
   })
 })
 
@@ -163,42 +208,25 @@ describe('pickDistinctEntries — 비복원 가중 추출(세션 내 중복 제�
 
 describe('spawnSession — 한 세션 배치 출제', () => {
   it('서로 다른 제안 min(sessionSize, 풀) 개를 한 번에, id 는 startId 부터 단조 증가', () => {
-    const { offers, nextId } = spawnSession(0, RNG, POOL3, SETTINGS, 3, 5)
+    const { offers, nextId } = spawnSession(RNG, POOL3, 3, 5)
     expect(offers).toHaveLength(3)
     expect(offers.map((o) => o.id)).toEqual([5, 6, 7])
     expect(nextId).toBe(8)
     expect(new Set(offers.map((o) => costId(o.cost))).size).toBe(3) // 중복 없음
-    for (const o of offers) {
-      expect(o.createdAt).toBe(0)
-      expect(o.expiresAt).toBe(100_000) // now + duration(min==max)
-    }
-  })
-
-  it('세션의 모든 제안은 하나의 통합 만료 시각을 공유한다(통합 지속시간)', () => {
-    // duration 범위를 min<max 로 두어 "한 번만 뽑아 전체 적용"인지(제안마다 따로 뽑지 않는지) 검증한다.
-    const settings: BucketSettings = { ...SETTINGS, durationMinMs: 10_000, durationMaxMs: 90_000 }
-    const { offers } = spawnSession(0, mulberry32(123), POOL3, settings, 3, 1)
-    expect(offers).toHaveLength(3)
-    // 전부 같은 createdAt/expiresAt — 세션 공통(관계 단언, 매직넘버 아님).
-    expect(new Set(offers.map((o) => o.createdAt)).size).toBe(1)
-    expect(new Set(offers.map((o) => o.expiresAt)).size).toBe(1)
-    // 만료는 [now+min, now+max] 범위 안.
-    expect(offers[0].expiresAt).toBeGreaterThanOrEqual(10_000)
-    expect(offers[0].expiresAt).toBeLessThanOrEqual(90_000)
   })
 
   it('풀의 항목이 적으면 있는 만큼만 출제한다(short session)', () => {
     // 단일 항목 풀 → 1개.
-    expect(spawnSession(0, RNG, POOL, SETTINGS, 3, 1).offers).toHaveLength(1)
+    expect(spawnSession(RNG, POOL, 3, 1).offers).toHaveLength(1)
     // 서로 다른 2개 풀, sessionSize 3 → 2개(min). 중복 없이.
     const twoPool = [entry({ itemId: 'a' }), entry({ itemId: 'b' })]
-    const { offers } = spawnSession(0, RNG, twoPool, SETTINGS, 3, 1)
+    const { offers } = spawnSession(RNG, twoPool, 3, 1)
     expect(offers).toHaveLength(2)
     expect(new Set(offers.map((o) => costId(o.cost))).size).toBe(2)
   })
 
   it('풀이 비면 빈 세션', () => {
-    expect(spawnSession(0, RNG, [], SETTINGS, 3, 1)).toEqual({
+    expect(spawnSession(RNG, [], 3, 1)).toEqual({
       offers: [],
       nextId: 1,
     })
@@ -207,22 +235,19 @@ describe('spawnSession — 한 세션 배치 출제', () => {
 
 describe('generateOne — 결정적 단건 생성 + 보상 공식(세션 내부 빌딩블록)', () => {
   it('빈 풀이면 null', () => {
-    expect(generateOne([], 0, mulberry32(1), SETTINGS)).toBeNull()
+    expect(generateOne([], mulberry32(1))).toBeNull()
   })
 
-  it('reward = round((basePrice + additive) * incentive), 만료 시각', () => {
-    const now = 1_000
-    const c = generateOne(POOL, now, mulberry32(42), SETTINGS)!
+  it('reward = round((basePrice + additive) * incentive)', () => {
+    const c = generateOne(POOL, mulberry32(42))!
     expect(c.cost).toEqual({ kind: 'item', itemId: 'sword_5', count: 1 })
     // incentive 2.0, additive 0 (min==max) → (1000 + 0) * 2 = 2000 (Material 골드)
     expect(c.reward).toEqual({ kind: 'gold', amount: 2000 })
-    expect(c.createdAt).toBe(now)
-    expect(c.expiresAt).toBe(now + SETTINGS.durationMinMs) // min==max
   })
 
   it('additive 가 incentive 곱하기 전에 더해진다((base+additive)*incentive)', () => {
     const pool = [entry({ additiveMin: 100, additiveMax: 100 })]
-    const c = generateOne(pool, 0, mulberry32(7), SETTINGS)!
+    const c = generateOne(pool, mulberry32(7))!
     expect(c.reward).toEqual({ kind: 'gold', amount: 2200 }) // (1000 + 100) * 2
   })
 
@@ -242,12 +267,12 @@ describe('generateOne — 결정적 단건 생성 + 보상 공식(세션 내부 
       incentiveMax: 3,
     })
     // rng=0 → 'a' 선택 → (100+0)*1 = 100
-    expect(generateOne([a, b], 0, () => 0, SETTINGS)!.reward).toEqual({
+    expect(generateOne([a, b], () => 0)!.reward).toEqual({
       kind: 'gold',
       amount: 100,
     })
     // rng=0.6 → r=1.2 → 'b' 선택 → (100+0)*3 = 300
-    expect(generateOne([a, b], 0, () => 0.6, SETTINGS)!.reward).toEqual({
+    expect(generateOne([a, b], () => 0.6)!.reward).toEqual({
       kind: 'gold',
       amount: 300,
     })
@@ -263,15 +288,18 @@ describe('generateOne — 결정적 단건 생성 + 보상 공식(세션 내부 
         rewardItemCount: 1,
       },
     ]
-    const c = generateOne(itemPool, 1_000, mulberry32(42), SETTINGS)!
-    expect(c.cost).toEqual({ kind: 'item', itemId: 'faded_fluorescent', count: 2 })
+    const c = generateOne(itemPool, mulberry32(42))!
+    expect(c.cost).toEqual({
+      kind: 'item',
+      itemId: 'faded_fluorescent',
+      count: 2,
+    })
     expect(c.reward).toEqual({ kind: 'item', itemId: 'sword_12', count: 1 })
-    expect(c.expiresAt).toBe(1_000 + SETTINGS.durationMinMs) // min==max
   })
 
   it('같은 시드는 같은 결과', () => {
-    expect(generateOne(POOL, 0, mulberry32(7), SETTINGS)).toEqual(
-      generateOne(POOL, 0, mulberry32(7), SETTINGS),
+    expect(generateOne(POOL, mulberry32(7))).toEqual(
+      generateOne(POOL, mulberry32(7)),
     )
   })
 })
@@ -362,92 +390,91 @@ describe('commissionPool — entries + basePrice 결합', () => {
   })
 })
 
-describe('tick — 제안 세션 모델', () => {
-  it('빈 큐(즉시 예정)에서 첫 tick 에 한 세션이 통째로 등장하고 타이머가 멈춘다', () => {
-    const s = tickState(emptyCommissionQueue(0), 0)
+describe('refresh — 새 세션 갱신', () => {
+  it('세션을 한 번에 출제하고 갱신 카운터를 뽑는다(총=남음)', () => {
+    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1)
     expect(s.active).toHaveLength(3)
-    expect(s.nextSpawnAt).toBeNull()
+    expect(new Set(s.active.map((c) => costId(c.cost))).size).toBe(3)
+    expect(s.attemptsTotal).toBe(3) // 단일 후보
+    expect(s.attemptsRemaining).toBe(3)
+    expect(s.nextId).toBe(4)
     expect(checkInvariant(s)).toBe(true)
   })
 
-  it('세션이 떠 있는 동안 추가 tick 은 보충하지 않는다(트리클 아님)', () => {
-    let s = tickState(emptyCommissionQueue(0), 0) // 세션 3개
-    s = tickState(s, 5_000)
-    expect(s.active).toHaveLength(3)
-    expect(s.nextSpawnAt).toBeNull()
+  it('카운터는 refreshWeights 후보 범위 안에서 뽑힌다', () => {
+    const settings: BucketSettings = {
+      refreshWeights: [
+        { value: 1, weight: 1 },
+        { value: 5, weight: 1 },
+      ],
+    }
+    const s = refresh(mulberry32(5), POOL3, settings, SESSION, 1)
+    expect([1, 5]).toContain(s.attemptsTotal)
+    expect(s.attemptsRemaining).toBe(s.attemptsTotal)
   })
 
-  it('세션이 전부 만료되면 expired 를 반환하고 쿨다운을 세기 시작한다', () => {
-    const s = tickState(emptyCommissionQueue(0), 0) // 만료 100000
-    const { state: s2, expired } = tick(s, 100_000, RNG, POOL3, SETTINGS, SESSION)
-    expect(expired).toHaveLength(3)
-    expect(s2.active).toHaveLength(0)
-    expect(s2.nextSpawnAt).toBe(110_000) // now + interval(10000)
-    expect(checkInvariant(s2)).toBe(true)
-  })
-
-  it('쿨다운이 지나면 다음 세션이 시작된다(새 id)', () => {
-    let s = tickState(emptyCommissionQueue(0), 0) // ids 1,2,3
-    s = tickState(s, 100_000) // 전부 만료 → nextSpawnAt 110000
+  it('풀이 비면 빈 세션 + 카운터 0(nextId 유지)', () => {
+    const s = refresh(RNG, [], SETTINGS, SESSION, 7)
     expect(s.active).toHaveLength(0)
-    s = tickState(s, 110_000) // 쿨다운 끝 → 새 세션
-    expect(s.active).toHaveLength(3)
-    expect(s.active.map((c) => c.id)).toEqual([4, 5, 6])
-    expect(s.nextSpawnAt).toBeNull()
-    expect(checkInvariant(s)).toBe(true)
-  })
-
-  it('쿨다운 전이면 대기(세션 없음 유지)', () => {
-    let s = tickState(emptyCommissionQueue(0), 0)
-    s = tickState(s, 100_000) // nextSpawnAt 110000
-    s = tickState(s, 105_000) // 아직 전
-    expect(s.active).toHaveLength(0)
-    expect(s.nextSpawnAt).toBe(110_000)
-  })
-
-  it('세션은 통째로 만료된다(부분 만료 없음 — 모든 제안이 같은 만료를 공유)', () => {
-    // 만료 직전(99_999)엔 아무것도 만료되지 않고, 만료 시각(100_000)엔 세션 전체가 함께 빠진다.
-    const s = tickState(emptyCommissionQueue(0), 0) // 세션 3개, 공통 만료 100_000
-    expect(s.active).toHaveLength(3)
-    const before = tick(s, 99_999, RNG, POOL3, SETTINGS, SESSION)
-    expect(before.expired).toHaveLength(0) // 아직 아무도 만료 안 됨
-    expect(before.state.active).toHaveLength(3) // 세션 그대로
-    const at = tick(s, 100_000, RNG, POOL3, SETTINGS, SESSION)
-    expect(at.expired).toHaveLength(3) // 통째로 만료
-    expect(at.state.active).toHaveLength(0)
-    expect(checkInvariant(at.state)).toBe(true)
-  })
-
-  it('풀이 비면 세션 시작을 보류한다(즉시 재시도)', () => {
-    const s = tickState(emptyCommissionQueue(0), 0, []) // 빈 풀
-    expect(s.active).toHaveLength(0)
-    expect(s.nextSpawnAt).toBe(0) // 과거 시각 유지 → 다음 tick 재시도
+    expect(s.attemptsRemaining).toBe(0)
+    expect(s.attemptsTotal).toBe(0)
+    expect(s.nextId).toBe(7)
   })
 })
 
-describe('complete — 제안 선택 시 세션 전체 종료', () => {
-  it('고른 id 가 있으면 세션의 모든 제안을 비운다(하나를 고르면 세션 끝)', () => {
-    const s = tickState(emptyCommissionQueue(0), 0) // 3개
-    const id = s.active[1].id
-    const s2 = complete(s, id)
-    expect(s2.active).toHaveLength(0) // 나머지까지 전부 사라짐
-    expect(s2.nextSpawnAt).toBeNull() // complete 는 그대로 둠(다음 tick 이 쿨다운)
+describe('attempt — 강화 시도 반영(차감/갱신)', () => {
+  it('카운터가 1보다 크면 1 줄이고 세션은 그대로 둔다', () => {
+    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1) // remaining 3
+    const before = ids(s)
+    const s2 = attempt(s, RNG, POOL3, SETTINGS, SESSION)
+    expect(s2.attemptsRemaining).toBe(2)
+    expect(s2.attemptsTotal).toBe(3)
+    expect(ids(s2)).toEqual(before) // 같은 세션(ids 동일)
+    expect(checkInvariant(s2)).toBe(true)
   })
 
-  it('complete 후 다음 tick 이 쿨다운을 세고, 쿨다운이 지나면 새 세션을 연다', () => {
-    const s = tickState(emptyCommissionQueue(0), 0)
-    const s2 = complete(s, s.active[0].id)
-    const s3 = tickState(s2, 5_000) // 비었고 nextSpawnAt null → 쿨다운 세팅
-    expect(s3.active).toHaveLength(0)
-    expect(s3.nextSpawnAt).toBe(15_000) // 5000 + interval(10000)
-    expect(checkInvariant(s3)).toBe(true)
-    const s4 = tickState(s3, 15_000) // 새 세션
-    expect(s4.active).toHaveLength(3)
-    expect(checkInvariant(s4)).toBe(true)
+  it('카운터가 1에서 0으로 떨어지는 시도에 세션을 통째로 갱신한다(새 ids)', () => {
+    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1)
+    const one: CommissionQueueState = { ...s, attemptsRemaining: 1 }
+    const s2 = attempt(one, RNG, POOL3, SETTINGS, SESSION)
+    expect(s2.active).toHaveLength(3)
+    // 새 세션이라 id 가 직전 세션과 겹치지 않는다(단조 증가).
+    for (const id of ids(s2)) expect(ids(one)).not.toContain(id)
+    expect(s2.attemptsRemaining).toBe(s2.attemptsTotal) // 새로 가득
+    expect(checkInvariant(s2)).toBe(true)
+  })
+
+  it('빈-풀 상태(카운터 0)에서 풀이 차 있으면 다음 시도가 세션을 연다', () => {
+    const empty = emptyCommissionQueue() // attemptsRemaining 0
+    const s = attempt(empty, RNG, POOL3, SETTINGS, SESSION)
+    expect(s.active).toHaveLength(3)
+    expect(s.attemptsRemaining).toBe(s.attemptsTotal)
+    expect(checkInvariant(s)).toBe(true)
+  })
+})
+
+describe('complete — 제안 선택 시 그 카드만 제거(세션 갱신 아님)', () => {
+  it('고른 id 만 사라지고 나머지·카운터는 그대로 남는다', () => {
+    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1) // 3개, remaining 3
+    const target = s.active[1].id
+    const s2 = complete(s, target)
+    expect(s2.active).toHaveLength(2) // 하나만 제거
+    expect(ids(s2)).not.toContain(target)
+    // 나머지 카드 유지 + 카운터 불변.
+    expect(s2.attemptsRemaining).toBe(3)
+    expect(s2.attemptsTotal).toBe(3)
+  })
+
+  it('마지막 카드까지 납품하면 active 는 비지만 카운터는 남는다(갱신은 카운터 0에서만)', () => {
+    let s = refresh(RNG, POOL3, SETTINGS, SESSION, 1)
+    for (const c of [...s.active]) s = complete(s, c.id)
+    expect(s.active).toHaveLength(0)
+    expect(s.attemptsRemaining).toBe(3) // 납품은 카운터를 줄이지 않는다
+    expect(checkInvariant(s)).toBe(true)
   })
 
   it('없는 id 는 무변화', () => {
-    const s = tickState(emptyCommissionQueue(0), 0)
+    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1)
     expect(complete(s, 9999)).toBe(s)
   })
 })

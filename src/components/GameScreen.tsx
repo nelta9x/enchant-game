@@ -384,6 +384,10 @@ export function GameScreen() {
     const result = enhance(effectiveProtection)
     if (!result) return
 
+    // 제안 갱신은 강화 시도 기반이다 — 결과(성공/실패/보호/파괴)에 무관하게 강화 1회를 의뢰 큐에 알린다.
+    // (no-op 강화는 위에서 빠지므로 알리지 않는다.) 카운터 차감·세션 갱신은 commissionStore 가 소유한다.
+    useCommissionStore.getState().notifyAttempt()
+
     // ── 이번 강화의 연출 타임라인(단일 출처) ──────────────────────────────────────
     // 떨림 시간(shakeMs)을 1회 무작위로 뽑고, 데이터 타이밍과 합쳐 모든 마일스톤·수명을 도출한다. 아래
     // 모든 효과·사운드·공개 타이머·잠금이 이 한 객체의 슬라이스를 쓴다 — impact+shake 계산이 곳곳에서
@@ -458,11 +462,7 @@ export function GameScreen() {
     // 새 검 등장(burstAt 까지 억제)이 항상 같은 타임라인 슬라이스를 쓰도록 한곳에서 enqueue 한다 — 두 분기가
     // 따로 작성하면 한쪽 payload(예: 등장 억제 지연)만 고쳐 잔상 소멸·새 검 등장이 어긋나는(강화 전/후 검 동시
     // 노출) 발산이 생길 수 있어 일반화한다. 파티클 수는 단계(level)에 비례 — 호출 측이 잔상/도달 검을 해석해 넘긴다.
-    const enqueueShakeBurst = (
-      kind: string,
-      sprite: string,
-      level: number,
-    ) => {
+    const enqueueShakeBurst = (kind: string, sprite: string, level: number) => {
       enqueueEffect({
         kind,
         exclusive: false,

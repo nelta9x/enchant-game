@@ -143,23 +143,28 @@ export type CommissionItemEntry = {
       }
   )
 
-// 의뢰 골드 버킷 1구간(언어 중립). 플레이어의 보유 골드 구간마다 출제 아이템·시간을 독립 설정한다.
+// 제안 갱신 후보 1개(가중 추첨). value = 한 세션이 버티는 강화 시도 횟수, weight = 추첨 빈도(기본 1).
+// 세션 시작 시 버킷의 refreshWeights 에서 weight 비례로 하나를 골라 그 value 를 세션 카운터로 삼는다.
+// 후보 값의 범위(최소/최대)와 각 값의 빈도가 전부 데이터(commission.json)로 표현된다 — 균등하게 하려면
+// 모든 weight 를 1 로 둔다(예: 값 1~5 각 weight 1 = 1~5 균등).
+export type RefreshWeight = {
+  value: number // 갱신까지의 강화 시도 횟수(정수 >= 1)
+  weight: number // 추첨 가중치(> 0)
+}
+
+// 의뢰 골드 버킷 1구간(언어 중립). 플레이어의 보유 골드 구간마다 출제 아이템·갱신 분포를 독립 설정한다.
 // 버킷들은 [0, ∞) 를 빈틈·겹침 없이 덮어야 한다(로더가 강제): 첫 버킷 minGold=0, 연속, 마지막 maxGold=null.
 //  - minGold: 담당 골드 구간 하한(포함). 검증 전용 — 셀렉터는 maxGold 만 본다.
 //  - maxGold: 상한(미포함). null = ∞(마지막 버킷).
 //  - items: 이 버킷에서 출제될 아이템 목록(itemId + weight + 아이템별 incentive/additive). 비어있지 않음
-//  - durationMin/MaxMs: 세션 1개의 시간 제한 범위(세션 시작 시 이 구간에서 한 번 무작위). 세션의 모든 제안이
-//    이 하나의 만료 시각을 공유해 통째로 같이 만료된다(통합 지속시간 — 카드별이 아니라 세션 1개 바로 표현).
-//  - spawnIntervalMin/MaxMs: 세션과 세션 사이 쿨다운 범위(이 구간에서 무작위). 세션이 끝나면(선택 또는
-//    전부 만료) 이 간격만큼 비운 뒤 다음 세션이 시작된다.
+//  - refreshWeights: 세션이 갱신되기까지의 강화 시도 횟수 후보(가중 추첨). 세션 시작 시 여기서 하나를 뽑아
+//    세션 카운터로 삼고, 강화 시도마다 1씩 차감해 0 이 되면 세션 전체가 새로 갱신된다(시간이 아니라 시도 기반).
+//    비어있지 않음.
 export type GoldBucket = {
   minGold: number
   maxGold: number | null
   items: CommissionItemEntry[]
-  durationMinMs: number
-  durationMaxMs: number
-  spawnIntervalMinMs: number
-  spawnIntervalMaxMs: number
+  refreshWeights: RefreshWeight[]
 }
 
 // 의뢰(Commission) 시스템 튜닝 설정(언어 중립). 코드 상수가 아니라 데이터 파일(commission.json)에 두고
@@ -167,8 +172,7 @@ export type GoldBucket = {
 // 시스템 파라미터(아래 2개)는 버킷과 무관한 글로벌이고, 나머지 튜닝값은 전부 buckets[] 안에 골드 구간별로 둔다.
 //  - maxCommissions: 한 "제안 세션"에 한 번에 출제되는 제안 수(=세션 크기). 세션 발생 시 서로 다른 제안을
 //    이만큼 한 번에 출제하고, 풀의 서로 다른 항목 수가 이보다 적으면 있는 만큼만 낸다(min). 플레이어가 그중
-//    하나를 선택(납품)하면 나머지가 사라지며 세션이 끝나고, spawnInterval 쿨다운 뒤 다음 세션이 시작된다.
-//  - tickIntervalMs: 셸(commissionStore)이 시간을 전진시키는 주기(만료/세션 시작 감지 해상도)
+//    하나를 선택(납품)하면 그 카드만 사라지고 나머지는 남는다 — 세션은 갱신 카운터가 0 이 될 때만 통째로 새로 뜬다.
 //  - unlockAtLevel: 제안 기능이 활성화되는 최소 "도달 강화 레벨"(gameStore.maxLevelReached 기준, 단조 high-water-mark).
 //    플레이어가 이 레벨에 한 번이라도 도달하기 전에는 제안이 전혀 출제되지 않는다(초반엔 재화가 없어 활용 불가 — 의도된 잠금).
 //    maxLevelReached 는 파괴·판매로 내려가지 않으므로(달성=영구) 한 번 해제되면 다시 잠기지 않는다. 0 = 처음부터 활성.
@@ -176,7 +180,6 @@ export type GoldBucket = {
 //  - buckets: 보유 골드 구간별 정의([0,∞) 를 덮는 연속 버킷 — buckets[0] 이 골드 0 구간).
 export type CommissionConfig = {
   maxCommissions: number
-  tickIntervalMs: number
   unlockAtLevel: number
   buckets: GoldBucket[]
 }
