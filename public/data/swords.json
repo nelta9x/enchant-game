@@ -198,7 +198,11 @@
     "protectionTickets": 1,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "dark_matter", "count": 1, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 8, "chance": 1 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
+    ],
     "sprite": "blackwidow.png"
   },
   {
@@ -278,6 +282,7 @@
     "protectionTickets": 9,
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 25, "chance": 1 }],
     "sprite": "doombringer.png"
   },
   {
@@ -293,6 +298,7 @@
     "protectionTickets": 10,
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 30, "chance": 1 }],
     "sprite": "diffusalblade.png"
   },
   {
@@ -308,6 +314,7 @@
     "protectionTickets": 12,
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 40, "chance": 1 }],
     "sprite": "flameblade.png"
   },
   {
@@ -323,6 +330,7 @@
     "protectionTickets": 15,
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 50, "chance": 1 }],
     "sprite": "bloodthirster.png"
   },
   {
@@ -339,6 +347,13 @@
     "protectionTickets": 17,
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 40, "chance": 1 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
+    ],
     "notes": ["storable"],
     "sprite": "mastersword.png"
   },
@@ -356,6 +371,13 @@
     "protectionTickets": 20,
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 50, "chance": 1 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
+    ],
     "notes": ["storable"],
     "sprite": "grandfather.png"
   },
@@ -373,6 +395,7 @@
     "protectionTickets": 22,
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 40, "chance": 1 }],
     "sprite": "infinityedge.png"
   },
   {
@@ -389,7 +412,34 @@
     "protectionTickets": 23,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "dark_matter", "count": 20, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 70, "chance": 1 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
+    ],
     "sprite": "evilswordapophis.png"
   },
   {
@@ -406,6 +456,7 @@
     "protectionTickets": 23,
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 100, "chance": 1 }],
     "sprite": "divinerapier.png"
   },
   {
@@ -421,6 +472,14 @@
     "protectionTickets": "disabled",
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 80, "chance": 1 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
+    ],
     "sprite": "ashbringer.png"
   },
   {
@@ -437,6 +496,7 @@
     "protectionTickets": "disabled",
     "whiffWeight": 3,
     "destroyWeight": 7,
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 20, "chance": 1 }],
     "sprite": "frostmourne.png"
   },
   {
