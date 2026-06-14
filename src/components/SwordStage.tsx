@@ -182,11 +182,19 @@ export function SwordStage({
     displaySword.sellPrice > 0
 
   return (
-    <div className="flex flex-col items-center gap-5">
-      {/* 검 + 글로우 + 마법진 */}
+    <div className="flex h-full w-full flex-col items-center gap-5 lg:h-auto lg:w-auto">
+      {/* 검 + 글로우 + 마법진 — 세로형(<lg)에선 폭 기준 정사각(aspect-square)으로 남는 영역을 채운다.
+          폭을 min(66.67%, calc(100svh − chrome))로 제한한다:
+          · 세로(높이): chrome(상단바·거래바·판매가·이름배너·버튼·인벤토리·갭·카드패딩, 실측 ≈47.5/49rem)을
+            뺀 남는 높이에 맞춰 스크롤 0. sm 미만/이상 패딩 차이로 반응형(소폭 버퍼 포함).
+          · 가로(폭): 66.67% — 코너 결계(보호·망치·성공률)가 박스 밖으로 ±25% 나가므로 결계까지 포함한
+            "그룹" 폭이 1.5×박스 = 컬럼 폭이 되게 한다. 덕분에 결계가 마법진과 겹치지 않고(바깥) 화면에도
+            모두 들어온다. 화면이 길면 이 66.67% 에서 멈춰 그룹이 컬럼 폭을 꽉 채운다(결계 바깥 오프셋 유지).
+          rem 항은 루트 font-size 와 함께 스케일(index.css 세로 스케일과 한 세트 — 하단 그룹 높이를 바꾸면
+          chrome 값 재측정). lg+ 에선 고정 박스(h-60 w-60)·max-w 해제로 기존 레이아웃 복원. */}
       <div
         ref={swordBoxRef}
-        className="relative flex h-52 w-52 items-center justify-center sm:h-60 sm:w-60"
+        className="relative flex aspect-square w-full max-w-[min(66.67%,calc(100svh-48rem))] items-center justify-center sm:max-w-[min(66.67%,calc(100svh-49.5rem))] lg:aspect-auto lg:h-60 lg:w-60 lg:max-w-none"
       >
         {/* 따뜻한 골드 글로우 */}
         <div
@@ -224,10 +232,12 @@ export function SwordStage({
         </div>
 
         {/* 떨림 레이어(방지 시 실제 검을 흔든다) — remount 하지 않고 shakeControls 로 제어한다.
-            spriteOverlay(파괴 잔상·파티클)는 이 레이어 밖 형제라 함께 흔들리지 않는다. */}
+            spriteOverlay(파괴 잔상·파티클)는 이 레이어 밖 형제라 함께 흔들리지 않는다.
+            h-full w-full: 박스(aspect-square)를 꽉 채워 정의된 크기를 만든다 — 아래 캔버스의 퍼센트
+            크기(h-2/3)가 풀리도록(중간 래퍼가 콘텐츠 크기면 % 가 0 으로 무너진다). 검은 가운데 정렬. */}
         <motion.div
           animate={shakeControls}
-          className="relative flex items-center justify-center"
+          className="relative flex h-full w-full items-center justify-center"
         >
           {/* 스프라이트 등장(스프라이트 변할 때마다 재생) — 영속 캔버스에 명령형(entranceControls)으로 다시 튼다.
               key 재마운트를 쓰지 않는 이유: 매 교체마다 새 합성 레이어를 만들어(레이어 churn) 모바일에서 끊김을
@@ -235,17 +245,18 @@ export function SwordStage({
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={entranceControls}
-            className="flex items-center justify-center"
+            className="flex h-full w-full items-center justify-center"
           >
             {hasSword ? (
               // SpriteStore 의 GPU 상주 ImageBitmap 을 그리는 캔버스(영속) — 교체는 디코드·업로드 없는 블릿.
-              // 크기/픽셀아트 보간은 기존 <img> 와 동일(h-36/40, pixelated). 그리기·backing store 크기는
-              // drawSprite 가 소유한다(아래 useLayoutEffect·ResizeObserver).
+              // 세로형(<lg)에선 박스 비례(h-2/3 w-2/3)라 커지는 마법진을 따라 스프라이트도 함께 커진다
+              // (위 두 래퍼가 h-full w-full 이라 % 가 박스 크기로 풀린다). lg+ 에선 고정(h-40, pixelated).
+              // 그리기·backing store 크기는 drawSprite 가 소유한다(아래 ResizeObserver 가 리사이즈마다 재그림).
               <canvas
                 ref={spriteCanvasRef}
                 role="img"
                 aria-label={t(sword.nameKey)}
-                className="h-36 w-36 object-contain sm:h-40 sm:w-40"
+                className="h-2/3 w-2/3 object-contain lg:h-40 lg:w-40"
                 style={{ imageRendering: 'pixelated' }}
               />
             ) : (

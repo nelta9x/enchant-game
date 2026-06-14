@@ -16,6 +16,7 @@ export function HammerStation() {
   return (
     // 위치: 검 우상단 — 좌상단 보호 결계(ProtectionWard)와 좌우 대칭(같은 -25%/-2% 오프셋, 좌→우 반전).
     // 검 박스가 overflow-visible 라 박스 밖으로 살짝 나가도 잘리지 않는다(다른 코너 결계와 동일).
+    // 세로형(<lg)에서도 박스를 결계 그룹이 컬럼을 안 넘을 만큼만 키워(SwordStage max-w) 바깥 오프셋을 유지한다.
     <div
       className="pointer-events-none absolute"
       style={{ right: '-25%', top: '-2%' }}
