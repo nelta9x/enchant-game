@@ -124,8 +124,12 @@ type Decor = {
 export class DotParticleSystem {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
+  // 풀(증가만) — 0..dotCount / 0..decorCount 가 활성 슬롯. 버스트마다 객체를 새로 만들지 않고 슬롯의 필드만
+  // 덮어써 재사용한다(GC 압박 제거). 활성 범위 밖의 슬롯은 다음 버스트에 다시 쓰인다(꼬리에 보존).
   private dots: Dot[] = []
+  private dotCount = 0
   private decors: Decor[] = []
+  private decorCount = 0
   private cx = 0
   private cy = 0
   private w = 0
@@ -168,26 +172,37 @@ export class DotParticleSystem {
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
     this.syncBackingStore(rect)
-    // 새 버스트가 이전 버스트를 대체한다(replace — 누적 금지). 연사로 버스트가 겹쳐도 화면엔 늘 최신
-    // 한 벌만 살아, 잔상(ShakeAfterimage)의 latest 하드 컷과 정책이 일치한다. 이전 입자는 즉시 버린다.
-    this.dots.length = 0
-    this.decors.length = 0
+    // 새 버스트가 이전 버스트를 대체한다(replace — 누적 금지). 단 객체를 버리고 새로 만들지 않고 풀 슬롯
+    // (this.dots[i])의 필드만 덮어써 재사용한다 — 첫 대형 버스트 이후로는 Dot 할당이 0이라 연사 시 GC 압박이
+    // 없다. dotCount 를 이번 입자 수로 맞춰 이전 버스트의 잔여 슬롯을 활성 범위 밖으로 버린다(잔상 latest 하드
+    // 컷과 같은 정책 — 화면엔 늘 최신 한 벌만).
     const tex = getDotTexture(spec.coreVar, spec.edgeVar)
-    for (const p of spec.particles as Particle[]) {
-      this.dots.push({
-        tx: p.x,
-        ty: p.y,
-        size: p.size,
-        delay: p.stagger,
-        t: 0,
-        tex,
-      })
+    const particles = spec.particles as Particle[]
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i]
+      let d = this.dots[i]
+      if (!d) {
+        d = { tx: 0, ty: 0, size: 0, delay: 0, t: 0, tex }
+        this.dots[i] = d
+      }
+      d.tx = p.x
+      d.ty = p.y
+      d.size = p.size
+      d.delay = p.stagger
+      d.t = 0
+      d.tex = tex
     }
-    this.decors.push({
-      t: 0,
-      core: resolveColor(spec.coreVar),
-      edge: resolveColor(spec.edgeVar),
-    })
+    this.dotCount = particles.length
+    // decor(섬광+충격파 링) 1세트 — 단일 슬롯 재사용. core/edge 는 resolveColor 의 캐시 배열 참조라 추가 할당 없음.
+    let dec = this.decors[0]
+    if (!dec) {
+      dec = { t: 0, core: [0, 0, 0], edge: [0, 0, 0] }
+      this.decors[0] = dec
+    }
+    dec.t = 0
+    dec.core = resolveColor(spec.coreVar)
+    dec.edge = resolveColor(spec.edgeVar)
+    this.decorCount = 1
     if (!this.running) {
       this.running = true
       this.prev = 0
@@ -201,7 +216,7 @@ export class DotParticleSystem {
     const dt = Math.min(0.05, (ts - this.prev) / 1000)
     this.prev = ts
     this.draw(dt)
-    if (this.dots.length === 0 && this.decors.length === 0) {
+    if (this.dotCount === 0 && this.decorCount === 0) {
       this.running = false
       this.ctx.clearRect(0, 0, this.w, this.h)
       return
@@ -215,9 +230,10 @@ export class DotParticleSystem {
     ctx.clearRect(0, 0, this.w, this.h)
 
     // ── decor: 섬광(가산) + 충격파 링 ──
-    if (this.decors.length > 0) {
-      const aliveDecors: Decor[] = []
-      for (const d of this.decors) {
+    if (this.decorCount > 0) {
+      let w = 0
+      for (let r = 0; r < this.decorCount; r++) {
+        const d = this.decors[r]
         d.t += dt
         let alive = false
         // 섬광 — 부드럽게 부푸는 코어 플래시(가산 합성). scale 0.3→1.1, opacity [0,0.85,0].
@@ -257,32 +273,49 @@ export class DotParticleSystem {
           ctx.stroke()
           alive = true
         }
-        if (alive) aliveDecors.push(d)
+        if (alive) {
+          if (w !== r) {
+            const tmp = this.decors[w]
+            this.decors[w] = d
+            this.decors[r] = tmp
+          }
+          w++
+        }
       }
-      this.decors = aliveDecors
+      this.decorCount = w
     }
 
     // ── 도트: 중심에서 사방으로 뻗으며 페이드(텍스처 블릿) ──
-    if (this.dots.length > 0) {
-      const aliveDots: Dot[] = []
-      for (const p of this.dots) {
+    if (this.dotCount > 0) {
+      // in-place swap 압축 — 살아 있는 입자를 앞으로 모으고 죽은 입자는 꼬리에 보존(다음 버스트 재사용),
+      // 매 프레임 aliveDots 배열을 새로 만들지 않는다. 순서는 바뀌나 도트는 독립 블릿이라 시각 차이가 없다.
+      let w = 0
+      for (let r = 0; r < this.dotCount; r++) {
+        const p = this.dots[r]
         p.t += dt
         const q = (p.t - p.delay) / PARTICLE_DUR
-        if (q >= 1) continue // 수명 종료(제거)
-        aliveDots.push(p)
-        if (q < 0) continue // 아직 시작 전(stagger 대기) — 살아 있으나 안 그림
-        const e = easeOut(q)
-        const x = this.cx + p.tx * e
-        const y = this.cy + p.ty * e
-        const op = keyframe(q, DOT_TIMES, DOT_OPACITY)
-        const scale = keyframe(q, DOT_TIMES, DOT_SCALE)
-        // R = size/(2·ρ)·scale → 본체 지름이 정확히 size·scale, 글로우는 그 바깥으로 번진다.
-        const r = (p.size / (2 * DOT_BODY_RATIO)) * scale
-        ctx.globalAlpha = op
-        ctx.drawImage(p.tex, x - r, y - r, r * 2, r * 2)
+        if (q >= 1) continue // 수명 종료 — 압축에서 제외(슬롯은 꼬리에 남아 재사용)
+        if (q >= 0) {
+          // q<0 은 아직 시작 전(stagger 대기) — 살아 있으나 안 그림. q>=0 일 때만 블릿.
+          const e = easeOut(q)
+          const x = this.cx + p.tx * e
+          const y = this.cy + p.ty * e
+          const op = keyframe(q, DOT_TIMES, DOT_OPACITY)
+          const scale = keyframe(q, DOT_TIMES, DOT_SCALE)
+          // R = size/(2·ρ)·scale → 본체 지름이 정확히 size·scale, 글로우는 그 바깥으로 번진다.
+          const r2 = (p.size / (2 * DOT_BODY_RATIO)) * scale
+          ctx.globalAlpha = op
+          ctx.drawImage(p.tex, x - r2, y - r2, r2 * 2, r2 * 2)
+        }
+        if (w !== r) {
+          const tmp = this.dots[w]
+          this.dots[w] = p
+          this.dots[r] = tmp
+        }
+        w++
       }
       ctx.globalAlpha = 1
-      this.dots = aliveDots
+      this.dotCount = w
     }
   }
 
@@ -297,6 +330,8 @@ export class DotParticleSystem {
     this.running = false
     if (this.raf) cancelAnimationFrame(this.raf)
     this.dots = []
+    this.dotCount = 0
     this.decors = []
+    this.decorCount = 0
   }
 }
