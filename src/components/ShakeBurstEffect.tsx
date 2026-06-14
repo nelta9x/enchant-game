@@ -3,25 +3,24 @@ import { motion, useAnimationControls } from 'motion/react'
 import { drawSpriteContain } from '../lib/spriteStore'
 import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
-import { makeParticles } from './particles'
 import { useParticleEmit } from './particleEmit'
 
 // "떨림 후 분출" 연출(프레젠테이션 전용) — 파괴(적색·검 소멸)와 성공(금색·상위 검 등장)이 색만 달리해
-// 같은 시퀀스를 쓴다. 게임 로직과 분리되어 이벤트(재생 id + 잔상 스프라이트 + 파티클 수 + 임팩트/떨림
-// 타이밍)에만 반응하며 상태를 바꾸지 않고 그리기만 한다.
+// 같은 시퀀스를 쓴다. 게임 로직과 분리되어 이벤트(재생 id + 잔상 스프라이트 + 임팩트/떨림 타이밍)에만
+// 반응하며 상태를 바꾸지 않고 그리기만 한다.
 //
 // 연출(t=0 = 강화 시점):
 //   [0, impact)        잔상(강화 전 검)이 가만히 있는다 — 망치는 아직 윈드업 중.
 //   [impact, burstAt)  망치가 닿은 순간부터 잔상이 덜덜 떤다(무작위 떨림 시간 shakeMs).
-//   burstAt            떨림 끝 → 잔상이 팝업·소멸하고, 파티클이 풀에서 사방으로 터진다(성공=금/파괴=적).
+//   burstAt            떨림 끝 → 잔상이 팝업·소멸하고, 결과 색 불꽃이 사방으로 터진다(성공=금/파괴=적).
 //
 // ── 두 책임을 분리한다(BurstEmitter / ShakeAfterimage) ────────────────────────────────
-// 파티클 emit 과 잔상 비주얼은 수명·다중성이 다르다:
-//   · 파티클 emit 은 "버스트마다" 1회 필요하다 — 연사로 버스트가 겹쳐도 각 버스트가 자기 burstAt 에 한 번씩
+// 불꽃 emit 과 잔상 비주얼은 수명·다중성이 다르다:
+//   · 불꽃 emit 은 "버스트마다" 1회 필요하다 — 연사로 버스트가 겹쳐도 각 버스트가 자기 burstAt 에 한 번씩
 //     emit 되도록(유실 방지) GameScreen 이 running 의 버스트를 전부 .map 해 이벤트별 BurstEmitter 를 둔다.
-//     단 파티클 풀은 새 emit 마다 이전 버스트를 교체(replace)하므로 화면엔 늘 최신 한 벌만 보인다(잔상의
+//     단 불꽃 캔버스는 새 emit 마다 이전 버스트를 교체(replace)하므로 화면엔 늘 최신 한 벌만 보인다(잔상의
 //     latest 하드 컷과 같은 정책). BurstEmitter 는 DOM 을 그리지 않아(렌더 null) 다중·교체에도 레이어 churn 이 없다.
-//   · 잔상 비주얼은 "현재 떠 있는 검 1장"이면 충분하고 색과 무관하다(coreVar/edgeVar 는 파티클 색일 뿐).
+//   · 잔상 비주얼은 "현재 떠 있는 검 1장"이면 충분하고 색과 무관하다(coreVar/edgeVar 는 불꽃 색일 뿐).
 //     그래서 ShakeAfterimage 는 SwordStage·HammerStrike 와 같은 **영속 단일 노드**다 — 항상 마운트된 캔버스
 //     한 장을 가장 최근 버스트 id 마다 처음부터 재생한다(연사 시 최신으로 하드 컷). 강화마다 노드를 새로
 //     마운트/언마운트하면(과거 구조) 매번 합성 레이어를 만들어 모바일 교체 프레임에서 끊김을 유발했다.
@@ -29,14 +28,13 @@ import { useParticleEmit } from './particleEmit'
 export type ShakeBurstEvent = {
   id: number
   sprite: string // 잔상으로 그릴 검 스프라이트 파일명(spriteStore 풀에 이미 적재됨 — get 으로 블릿)
-  particleCount: number
   impactMs: number // 망치가 닿는 시각(떨림 시작) — 데이터 기반 고정값
   shakeMs: number // 이번 강화의 떨림 길이(무작위) — burstAt = impact + shake
 }
 
-// 버스트 파티클 emit 트리거(렌더 null) — burstAt 에 풀로 1회 emit 한다. 색(coreVar/edgeVar)만 달리해
-// 성공(금)·파괴(적)가 각자의 인스턴스를 가진다(SuccessEffect/DestructionEffect 가 색을 바인딩). DOM 을
-// 그리지 않으므로 GameScreen 이 running 의 버스트를 전부 .map(key=id) 해도 레이어 churn 이 없다.
+// 버스트 불꽃 emit 트리거(렌더 null) — burstAt 에 불꽃 캔버스(HitSparkCanvas)로 1회 emit 한다. 색
+// (coreVar/edgeVar)만 달리해 성공(금)·파괴(적)가 각자의 인스턴스를 가진다(SuccessEffect/DestructionEffect 가
+// 색을 바인딩). DOM 을 그리지 않으므로 GameScreen 이 running 의 버스트를 전부 .map(key=id) 해도 레이어 churn 이 없다.
 export function BurstEmitter({
   event,
   coreVar,
@@ -54,13 +52,8 @@ export function BurstEmitter({
   const burstAtMs = event ? event.impactMs + event.shakeMs : 0
   useEffect(() => {
     if (burstId === null || !event) return
-    const particleCount = event.particleCount
     const tid = setTimeout(() => {
-      emit({
-        particles: makeParticles(particleCount),
-        coreVar,
-        edgeVar,
-      })
+      emit({ coreVar, edgeVar })
     }, burstAtMs)
     return () => clearTimeout(tid)
     // eslint-disable-next-line react-hooks/exhaustive-deps

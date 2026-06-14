@@ -1,9 +1,12 @@
-// 강화 망치 임팩트의 불꽃(프레젠테이션 전용) — 작은 캔버스 한 장이 매 임팩트마다 세 겹을 폭발시킨다:
-// ① 빠른 불티(용접 결의 가는 실 — 탄도 비행) 다수, ② 잉걸불(크고 느린 불씨 소수 — 공기 저항에 곧
-// 멈춰 난류로 춤추다 수명 말기엔 떠오르며 사그라듦), ③ 임팩트 화구·불혀(따뜻한 가산 섬광 + 발화점에서
-// 솟아오르는 화염 혀 — 사실적 불티 위에 얹는 한 줌의 양식화). 밀도 높은 가는 실 + 픽셀 단위 묘사는
-// 작은 스테이지에서 DOM 으로는 묻혀 캔버스로 그린다. 성공/실패 버스트는 별개 캔버스(ParticlePool)
-// — 이 시스템은 hit 만 담당한다.
+// 강화 분출 불꽃(프레젠테이션 전용) — 작은 캔버스 한 장이 매 버스트(떨림이 끝나는 burstAt)마다 세 겹을
+// 폭발시킨다: ① 빠른 불티(용접 결의 가는 실 — 탄도 비행) 다수, ② 잉걸불(크고 느린 불씨 소수 — 공기
+// 저항에 곧 멈춰 난류로 춤추다 수명 말기엔 떠오르며 사그라듦), ③ 임팩트 화구·불혀(따뜻한 가산 섬광 +
+// 발화점에서 솟아오르는 화염 혀). 밀도 높은 가는 실 + 픽셀 단위 묘사는 작은 스테이지에서 DOM 으로는
+// 묻혀 캔버스로 그린다.
+//
+// 이 불꽃이 옛 "도트 버스트"(성공=금/파괴=적)를 대체한다 — 그래서 burst(origin, colors) 가 결과 색쌍을
+// 받아 화염색을 결과별로 물들인다(성공=금 계열 / 파괴=적 계열). 발사 시점도 임팩트가 아니라 버스트
+// (떨림 끝 = 결과 공개)에 맞춘다 — 호출 측(HitSparkCanvas)이 그 타이밍을 소유한다.
 //
 // 좌표/물리는 결정적이지 않아도 된다(시각 연출 — 게임 로직 아님). 매 타격마다 Math.random 으로 약간씩 다른
 // 산란을 줘 더 자연스럽다. 색은 index.css 의 @theme 토큰(소스 hex 금지)을 런타임 1회 해석해 쓴다.
@@ -11,40 +14,43 @@
 // 튜닝값(개수·굵기·스케일 등) — 브라우저에서 눈으로 맞추는 값이다. 한곳에 모아 두어 연출을 조정한다.
 const hitSparkSettings = {
   // ── 빠른 불티(용접 결 — 가늘고 빠른 실) ──
-  count: 8, // 한 타격당 불티 수 — 폭발감은 화구·불혀가 담당하므로 실은 몇 가닥만
-  thick: 0.9, // 불티 코어 선 굵기(px, k 로 스케일) — 테두리 없이 코어 단독이라 이만큼은 굵어야 베이지 위에서 읽힌다
-  scale: 1, // 전체 스케일(속도·길이·아크 반경)
-  fanDeg: 70, // 위(−90°) 중심 부채꼴 폭 — 넓혀서 "분출"이 아니라 "폭발"로
+  // 이 불꽃이 옛 도트 버스트(성공=금/파괴=적)를 대체하므로, 한 가닥짜리 임팩트 불티가 아니라 사방으로
+  // 터지는 "분출"이 되도록 수·굵기·후광·산란을 키웠다. 속도(baseVel)·scale 은 그대로 둬 캔버스 밖으로
+  // 새지 않게 하고, 크기감은 굵기(thick)·길이(lenCap)·후광(glow)·화구/불혀 반경으로 키운다.
+  count: 14, // 한 타격당 불티 수 — 도트 버스트를 대신해 사방으로 더 풍성하게 흩는다
+  thick: 1.4, // 불티 코어 선 굵기(px, k 로 스케일) — 테두리 없이 코어 단독이라 굵을수록 또렷하다
+  scale: 1, // 전체 스케일(속도·길이·아크 반경) — 키우면 캔버스 밖으로 새므로 크기감은 아래 반경들로 낸다
+  fanDeg: 150, // 발화점 중심 부채꼴 폭 — 넓혀서 위쪽 분출이 아니라 사방 폭발로(도트 버스트의 방사 느낌)
   baseVel: 300, // 기준 속도(px/s) — ×scale×k, 불티별 sp(0.6~1.9) 난수 배수
   gravity: 700, // 중력(px/s², ×k) — 호 그리며 낙하
   lifeMin: 0.1, // 불티 최소 수명(초) — +lifeVar 난수
   lifeVar: 0.3, // 수명 변주 — 제각각 사그라듦
-  lenFactor: 0.01, // 실 길이 = min(cap, |v|×이값) — 빠를수록 긴 실(모션블러)
-  lenCap: 10, // 실 길이 상한(×scale×k)
-  arcR: 10, // 발화점 반경(×scale×k) — 불혀 가로 산란의 기준(심지 섬광은 제거됨)
-  glow: 18, // 불티 후광 반경(px, ×k) — additive 로 깔아 발광체처럼(0 이면 글로우 없음)
+  lenFactor: 0.013, // 실 길이 = min(cap, |v|×이값) — 빠를수록 긴 실(모션블러)
+  lenCap: 15, // 실 길이 상한(×scale×k)
+  arcR: 14, // 발화점 반경(×scale×k) — 불혀 가로 산란의 기준(심지 섬광은 제거됨)
+  glow: 28, // 불티 후광 반경(px, ×k) — additive 로 깔아 발광체처럼(0 이면 글로우 없음)
   // ── 잉걸불(크고 느린 불씨 소수 — 식는 동안 잔류해 타격의 여운을 만든다) ──
-  emberCount: 5, // 한 타격당 잉걸불 수
+  emberCount: 8, // 한 타격당 잉걸불 수
   emberVelMul: 1.15, // 초기 속도 = baseVel × 이 값 — 망치 머리(≈±50px) 가장자리 밖까지 나가 멈추도록
   emberLifeMin: 0.45, // 잉걸불 최소 수명(초) — 불티보다 길게 잔류
   emberLifeVar: 0.3,
   emberDrag: 5, // 공기 저항(1/s, 지수 감쇠) — 튀어나온 직후 급감속해 허공에 머문다
   emberFlutter: 320, // 난류 좌우 흔들림(가속 px/s², ×k) — 느려진 불씨가 춤추는 요동
   emberBuoyancy: 1.6, // 수명 말기 중력 상쇄 — 유효 중력 = g×(1 − 이값×life²), 1 보다 크면 끝에서 떠오른다
-  emberHead: 2.6, // 잉걸불 크기 가중(px, ×k) — 글로우 후광 반경에 들어가 불씨가 더 크게 빛난다
+  emberHead: 3.6, // 잉걸불 크기 가중(px, ×k) — 글로우 후광 반경에 들어가 불씨가 더 크게 빛난다
   // ── 임팩트 화구(따뜻한 폭발 섬광 — 가산 합성으로 불혀·불티와 겹쳐 중심이 백열로 탄다) ──
-  fireR: 46, // 화구 최대 반경(×scale×k) — 망치 머리를 잠깐 삼키고 가장자리가 머리 밖으로 비어져 나오는 크기
+  fireR: 56, // 화구 최대 반경(×scale×k) — 분출의 중심 섬광(도트 버스트의 코어를 대신)
   fireDur: 0.13, // 화구 길이(초) — 짧게 번쩍하고 꺼진다
-  fireGlow: 0.6, // 화구 후광 강도(0~1, 0 이면 없음) — 글로우 스프라이트를 크게 덧대 빛이 번진다
+  fireGlow: 0.7, // 화구 후광 강도(0~1, 0 이면 없음) — 글로우 스프라이트를 크게 덧대 빛이 번진다
   // ── 충격파 링(임팩트 "펑" — 원점에서 빠르게 팽창하며 사라지는 백열 고리) ──
-  shockR: 64, // 링 최대 반경(×scale×k)
+  shockR: 78, // 링 최대 반경(×scale×k)
   shockDur: 0.18, // 링 길이(초) — 화구보다 살짝 길게 남아 팽창이 읽힌다
   // ── 불혀(발화점에서 솟아오르며 수축·깜빡이다 꺼지는 화염 혀) ──
-  lickCount: 6, // 한 타격당 불혀 수 — 작아진 대신 여러 가닥이 춤춘다
+  lickCount: 9, // 한 타격당 불혀 수 — 여러 가닥이 사방에서 춤춘다
   lickRise: 150, // 상승 속도(px/s, ×scale×k) — 망치 머리 위로 솟아오르도록
   lickLife: 0.38, // 기본 수명(초) — ×(0.7~1.3) 난수
-  lickR: 26, // 기본 반경(px, ×scale×k) — ×(0.7~1.4) 난수, 수명 따라 수축
-  lickGlow: 0.5, // 불혀 후광 강도(0~1, 0 이면 없음) — 단마다 글로우를 덧대 혀가 주변을 비춘다
+  lickR: 33, // 기본 반경(px, ×scale×k) — ×(0.7~1.4) 난수, 수명 따라 수축
+  lickGlow: 0.6, // 불혀 후광 강도(0~1, 0 이면 없음) — 단마다 글로우를 덧대 혀가 주변을 비춘다
 }
 
 const REF_W = 460 // 데모 기준 캔버스 폭 — 실제 캔버스 폭과의 비(k)로 모든 px 를 스케일(rem 스케일 대응)
@@ -83,13 +89,14 @@ type Lick = {
 }
 
 // ── @theme 토큰(hex) → rgb 1회 해석 + 캐시 ─────────────────────────────────────
-// 캐시는 정적이다 — 현재 코드베이스에 런타임 테마 전환 경로가 없다(hit 토큰은 index.css 의 정적 @theme 상수).
-// 다크모드/테마 토글을 도입하면 palette·glowSprite 를 무효화(null 리셋)해야 한다.
+// 결과(성공=금/파괴=적)마다 화염색이 다르므로 색쌍(coreVar|edgeVar)별로 팔레트를 캐시한다 — 변종이 둘뿐이라
+// Map 으로 충분하다. 캐시는 정적이다(런타임 테마 전환 경로 없음 — hit 토큰은 index.css 의 정적 @theme 상수).
+// 다크모드/테마 토글을 도입하면 paletteCache·glowSprite 를 무효화(clear/null 리셋)해야 한다.
 type Palette = {
   cool: number[][]
   arcCore: number[] // 화염 백열 중심색 — 화구·불혀 그라데이션의 가장 뜨거운 속
 }
-let palette: Palette | null = null
+const paletteCache = new Map<string, Palette>()
 
 function hexToRgb(hex: string): number[] {
   const h = hex.replace('#', '').trim()
@@ -104,21 +111,28 @@ function hexToRgb(hex: string): number[] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
-function resolvePalette(): Palette {
-  if (palette) return palette
+// 'var(--x)' 래퍼 또는 생 hex 를 받아 실제 hex 문자열로 푼다(소비자는 'var(--color-gold)' 형태를 넘긴다).
+function resolveColorExpr(root: CSSStyleDeclaration, expr: string): string {
+  const m = expr.match(/var\((--[\w-]+)\)/)
+  return (m ? root.getPropertyValue(m[1]) : expr).trim()
+}
+
+// 결과 색쌍(coreVar=밝은 코어 / edgeVar=가장자리)으로 식어가는 4-stop 화염 램프를 만든다:
+//   머리(백열 화염 노랑, 공통) → 코어(결과색) → 가장자리(결과색) → 잿불(공통 어두운 적). 머리·꼬리는
+// 공통 hit 토큰이라 어떤 결과든 백열에서 시작해 잿불로 식고, 중간 두 stop 만 결과색(금/적)으로 물든다.
+function resolvePalette(coreVar: string, edgeVar: string): Palette {
+  const key = coreVar + '|' + edgeVar
+  const cached = paletteCache.get(key)
+  if (cached) return cached
   const root = getComputedStyle(document.documentElement)
   const tok = (name: string) => hexToRgb(root.getPropertyValue(name).trim())
-  palette = {
-    // 식어가는 4-stop: 머리(화염 노랑) → 주황 → 적색 → 잿불
-    cool: [
-      tok('--color-hit-flash'),
-      tok('--color-hit-core'),
-      tok('--color-hit-edge'),
-      tok('--color-hit-ember'),
-    ],
+  const expr = (e: string) => hexToRgb(resolveColorExpr(root, e))
+  const pal: Palette = {
+    cool: [tok('--color-hit-flash'), expr(coreVar), expr(edgeVar), tok('--color-hit-ember')],
     arcCore: tok('--color-hit-arc-core'),
   }
-  return palette
+  paletteCache.set(key, pal)
+  return pal
 }
 
 // 식어가는 화염색을 out 버퍼(길이 3)에 채운다 — 매 프레임 새 배열을 반환하던 coolAt 의 인플레이스 버전
@@ -151,7 +165,12 @@ const rgba = (c: number[], a: number) =>
 let glowSprite: HTMLCanvasElement | null = null
 function getGlowSprite(): HTMLCanvasElement {
   if (glowSprite) return glowSprite
-  const color = resolvePalette().cool[0]
+  // 후광 색은 백열 머리(--color-hit-flash)로 고정 — 결과(금/적)와 무관한 공통 뜨거운 심지라 한 장만 굽는다.
+  const color = hexToRgb(
+    getComputedStyle(document.documentElement)
+      .getPropertyValue('--color-hit-flash')
+      .trim(),
+  )
   const S = 48
   const off = document.createElement('canvas')
   off.width = S
@@ -188,6 +207,7 @@ export class HitSparkSystem {
   private bh = 0
   private k = 1 // 스케일 = 캔버스 CSS 폭 / REF_W (rem 스케일 대응)
   private g = 0 // 중력(px/s², ×k) — burst 에서 설정값으로 채운다
+  private pal: Palette | null = null // 이번 버스트의 화염 팔레트(결과 색쌍) — burst 가 채우고 draw 가 읽는다
   private running = false
   private prev = 0
   private raf = 0
@@ -235,9 +255,10 @@ export class HitSparkSystem {
     return l
   }
 
-  // origin: 폭발 원점(검 박스 중심 기준 px) — 호출자가 망치 머리 끝(impactTipOffset)을 넘긴다.
+  // origin: 폭발 원점(검 박스 중심 기준 px). colors: 결과(성공=금/파괴=적)의 코어·가장자리 색쌍 —
+  // 화염 램프 중간 두 stop 에 꽂혀 불꽃 전체를 결과색으로 물들인다(머리 백열·잿불 꼬리는 공통).
   // 망치 키프레임과 같은 "생(raw) px" 공간이라 k 를 곱하지 않는다(rem 스케일과 무관하게 정렬 유지).
-  burst(origin: { x: number; y: number }) {
+  burst(origin: { x: number; y: number }, colors: { coreVar: string; edgeVar: string }) {
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
     const dpr = this.syncBackingStore(rect)
@@ -247,6 +268,7 @@ export class HitSparkSystem {
     this.cx = rect.width / 2 + origin.x
     this.cy = rect.height / 2 + origin.y
     this.k = rect.width / REF_W
+    this.pal = resolvePalette(colors.coreVar, colors.edgeVar)
     const S = hitSparkSettings
     this.g = S.gravity * this.k
 
@@ -339,7 +361,8 @@ export class HitSparkSystem {
 
   private draw(dt: number) {
     const ctx = this.ctx
-    const pal = resolvePalette()
+    const pal = this.pal
+    if (!pal) return // 팔레트는 burst 가 채운다 — 루프는 burst 이후에만 도므로 사실상 항상 설정돼 있다.
     const S = hitSparkSettings
     ctx.clearRect(0, 0, this.w, this.h)
 
