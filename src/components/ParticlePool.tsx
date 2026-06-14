@@ -1,4 +1,5 @@
 import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
+import { dataManager } from '../data/DataManager'
 import { DotParticleSystem } from './dotParticles'
 import {
   ParticleEmitContext,
@@ -42,7 +43,8 @@ export const ParticlePool = memo(function ParticlePool() {
     const canvas = canvasRef.current
     if (!canvas) return
     const sys = new DotParticleSystem(canvas)
-    sys.warmup()
+    // 도트 풀을 시작 시 데이터(animation.json) 지정 수만큼 미리 확보 — 첫 버스트도 객체 할당 0.
+    sys.warmup(dataManager.getAnimation().particlePoolReserve.dots)
     const emit: ParticleEmit = (spec: ParticleEmitSpec) => sys.emit(spec)
     if (emitRef) emitRef.current = emit
     return () => {

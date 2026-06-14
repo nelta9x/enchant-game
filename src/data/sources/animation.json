@@ -12,5 +12,6 @@
     { "maxLevel": 10, "minMs": 100, "maxMs": 100 },
     { "maxLevel": 20, "minMs": 500, "maxMs": 500 },
     { "maxLevel": null, "minMs": 700, "maxMs": 700 }
-  ]
+  ],
+  "particlePoolReserve": { "dots": 44, "hitSparks": 13, "hitLicks": 6 }
 }

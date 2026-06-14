@@ -48,6 +48,29 @@ function parseFaceOffset(raw: unknown): { x: number; y: number } {
   return { x: fnum('x'), y: fnum('y') }
 }
 
+// 파티클 풀 사전 확보 수 검증 — 세 풀(도트·불티·불혀) 모두 정수 >= 0(0 = 사전 확보 없이 lazily 성장).
+function parsePoolReserve(raw: unknown): {
+  dots: number
+  hitSparks: number
+  hitLicks: number
+} {
+  if (!isRecord(raw))
+    fail('particlePoolReserve must be an object { dots, hitSparks, hitLicks }')
+  const fint = (key: 'dots' | 'hitSparks' | 'hitLicks'): number => {
+    const v = raw[key]
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0)
+      fail(
+        `particlePoolReserve.${key} must be an integer >= 0 (got ${String(v)})`,
+      )
+    return v
+  }
+  return {
+    dots: fint('dots'),
+    hitSparks: fint('hitSparks'),
+    hitLicks: fint('hitLicks'),
+  }
+}
+
 // 떨림 레벨 밴드 1구간 검증. maxLevel(상한, null=∞) + 떨림 범위(minMs <= maxMs, 정수 >= 0).
 function parseShakeBand(raw: unknown, idx: number): ShakeBand {
   const where = `shakeBands[${idx}]`
@@ -105,6 +128,9 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
     )
   const shakeBands = rawBands.map((b, i) => parseShakeBand(b, i))
 
+  // 파티클 풀 사전 확보 수(도트·불티·불혀) — 시작 시 풀을 미리 채워 첫 버스트 객체 할당을 없앤다.
+  const particlePoolReserve = parsePoolReserve(raw.particlePoolReserve)
+
   // 커버리지 불변: 검 레벨 [1, ∞) 를 빈틈·겹침 없이 덮어야 한다(셀렉터가 maxLevel 만으로 담당 밴드를 고르는 전제).
   //  - maxLevel 은 엄격 증가(겹침·역순 금지). 비말단 밴드의 maxLevel 은 정수(null 금지).
   //  - 마지막 밴드만 maxLevel === null(=∞, 그 위 모든 레벨). 연속성은 "이전 maxLevel 다음 레벨부터"라
@@ -135,6 +161,7 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
     hammerSwingEnabled,
     hammerSmearEnabled,
     shakeBands,
+    particlePoolReserve,
   }
 }
 

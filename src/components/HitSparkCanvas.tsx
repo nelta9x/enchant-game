@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { dataManager } from '../data/DataManager'
 import { HitSparkSystem } from './hitSparks'
 
 // Hit 불꽃 캔버스(프레젠테이션 전용·DOM 파티클 없음) — 망치가 검에 "닿는 순간"(impactMs) 불티·잉걸불·
@@ -27,7 +28,9 @@ export function HitSparkCanvas({
   useEffect(() => {
     if (canvasRef.current && !sysRef.current) {
       sysRef.current = new HitSparkSystem(canvasRef.current)
-      sysRef.current.warmup()
+      // 불티·불혀 풀을 시작 시 데이터(animation.json) 지정 수만큼 미리 확보 — 첫 타격도 객체 할당 0.
+      const reserve = dataManager.getAnimation().particlePoolReserve
+      sysRef.current.warmup(reserve.hitSparks, reserve.hitLicks)
     }
     return () => {
       sysRef.current?.dispose()
