@@ -116,7 +116,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     store.getState().stop()
   })
 
-  it('제안 하나를 선택(fulfill)하면 그 카드만 사라지고 나머지·카운터는 그대로다', () => {
+  it('제안 하나를 선택(fulfill)하면 세션 카드가 전부 사라지고(바만 남음) 카운터는 그대로다', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     expect(store.getState().active).toHaveLength(3)
@@ -129,9 +129,9 @@ describe('commissionStore — 제안 세션 모델', () => {
       gold: 0,
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
-    expect(store.getState().active).toHaveLength(2) // 그 카드만 제거
-    expect(store.getState().active.some((c) => c.id === target.id)).toBe(false)
+    expect(store.getState().active).toHaveLength(0) // 카드 전부 사라짐(바만 남음)
     expect(store.getState().attemptsRemaining).toBe(total) // 납품은 카운터 불변
+    expect(store.getState().attemptsTotal).toBe(total)
     store.getState().stop()
   })
 
@@ -212,7 +212,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     store.getState().stop()
   })
 
-  it('fulfill: 요구 검 보유 시 골드 지급 + 그 카드만 제거', () => {
+  it('fulfill: 요구 검 보유 시 골드 지급 + 세션 카드 전부 제거', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     const target = store.getState().active[0]
@@ -223,7 +223,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
     expect(useGameStore.getState().gold).toBe(goldOf(target.reward))
-    expect(store.getState().active).toHaveLength(2) // 그 카드만 제거(나머지 유지)
+    expect(store.getState().active).toHaveLength(0) // 카드 전부 사라짐(바만 남음)
     store.getState().stop()
   })
 
