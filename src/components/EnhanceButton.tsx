@@ -8,9 +8,11 @@ import { itemDisplayName } from '../lib/items'
 import { Coin } from './Coin'
 import { ItemIcon } from './ItemIcon'
 
-// 황금 채움 위 글자 톤 — 차가운 검정 대신 따뜻한 진한 갈금색(gold-ink)에, 위에서 빛이 드는 듯한 옅은
-// 엠보스 하이라이트(gold-glow)를 더해 금속에 새긴 듯한 느낌을 준다.
-const GOLD_INK = 'text-gold-ink [text-shadow:0_1px_0_var(--color-gold-glow)]'
+// 황금 채움 위 흰 글자 — 따뜻한 갈금색(gold-ink) 8방향 1px 외곽선 + 옅은 드롭섀도로, 밝은 금색
+// 표면 위에서도 또렷하게 떠 보이게 한다(게임 UI 특유의 아웃라인 라벨). base(어두운 표면 위 금색)에는
+// 쓰지 않고 골드 사본에만 인라인 style 로 얹는다.
+const GOLD_OUTLINE =
+  '1px 0 0 var(--color-gold-ink), -1px 0 0 var(--color-gold-ink), 0 1px 0 var(--color-gold-ink), 0 -1px 0 var(--color-gold-ink), 1px 1px 0 var(--color-gold-ink), -1px 1px 0 var(--color-gold-ink), 1px -1px 0 var(--color-gold-ink), -1px -1px 0 var(--color-gold-ink), 0 2px 3px rgba(0,0,0,0.3)'
 
 // 강화 버튼 — 둥근 카드형(황금빛 글로우). 카드 안에 "강화" 라벨 + 강화 조건(비용/재료)을 아이콘+수량으로 보여 준다.
 //  - 골드 비용: 금화 아이콘 + 금액 / 아이템(재료검·잡템) 비용: 아이템 아이콘 + ×수량 / 무료·최종 단계: 칩 없이 라벨만.
@@ -93,8 +95,9 @@ export function EnhanceButton({
         />
         <span
           className={`relative flex items-center justify-center gap-1.5 text-sm font-bold tabular-nums ${
-            onGold ? GOLD_INK : 'text-on-dark'
+            onGold ? 'text-white' : 'text-on-dark'
           }`}
+          style={onGold ? { textShadow: GOLD_OUTLINE } : undefined}
           // 황금 사본은 base 와 글자만 같고 시각 중복이라 스크린리더에서 숨긴다(접근성은 base 가 전담).
           aria-label={onGold ? undefined : `${t('cost.enhance')}: ${label}`}
         >
@@ -116,11 +119,12 @@ export function EnhanceButton({
       <span
         className={`relative text-2xl font-extrabold tracking-wide ${
           onGold
-            ? GOLD_INK
+            ? 'text-white'
             : !ready && !charging
               ? 'text-on-dark-soft'
               : 'text-gold'
         }`}
+        style={onGold ? { textShadow: GOLD_OUTLINE } : undefined}
       >
         {t('action.enhance')}
       </span>
