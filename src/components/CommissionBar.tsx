@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { motion } from 'motion/react'
 import { dataManager } from '../data/DataManager'
 import { useT } from '../i18n'
@@ -7,10 +7,8 @@ import { formatAmount } from '../lib/format'
 import { useCommissionHotkey } from '../hooks/useCommissionHotkey'
 import { useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
-import { useOfferFxStore } from '../store/offerFxStore'
 import type { Commission } from '../store/commissionQueue'
 import { ItemIcon } from './ItemIcon'
-import { OfferArrivalFx } from './OfferArrivalFx'
 
 // 상단 의뢰 바. 현재 떠 있는 의뢰(active)를 최대 MAX_COMMISSIONS 슬롯으로 보여 준다.
 // 각 의뢰서: 아이템 아이콘 + 이름 + 보상가(판매가에 인센티브가 붙은 금액). 요구 검을 보유했을 때만
@@ -41,23 +39,9 @@ export function CommissionBar({
   void currentSwordId
   void gold
 
-  // 새 거래 제안이 슬롯에 들어오면 도착 연출을 1회 재생한다(연출 본체는 OfferArrivalFx).
-  // active 의 id 집합을 직전과 비교해 처음 보는 id 가 있으면 발화. 단조 증가 id 라 재사용 충돌 없음.
-  const fireOfferFx = useOfferFxStore((s) => s.fire)
-  const seenIds = useRef<Set<number>>(new Set())
-  const seeded = useRef(false)
-  useEffect(() => {
-    const ids = active.map((c) => c.id)
-    // 첫 마운트(부트스트랩 스폰)는 NEW 로 깜빡이지 않도록 현재 id 를 본 것으로 시드만 한다.
-    if (!seeded.current) {
-      seenIds.current = new Set(ids)
-      seeded.current = true
-      return
-    }
-    const arrived = ids.some((id) => !seenIds.current.has(id))
-    seenIds.current = new Set(ids)
-    if (arrived) fireOfferFx()
-  }, [active, fireOfferFx])
+  // 새 세션 도착 연출은 카드별로 처리한다 — 세션이 갱신되면 카드 id 가 전부 새 값이 되어 CommissionCard 가
+  // remount 되고, 그때 카드 테두리가 짧게 황금빛으로 빛났다 가라앉는다(아래 CommissionCard). 별도 도착
+  // 오버레이(글로우/토스트)는 두지 않는다 — 카드는 즉각 교체되고 은은한 테두리 신호만 남긴다(깜빡임 없음).
 
   // 인덱스 기반 슬롯 — active 가 비는 자리는 placeholder. 카드 식별은 인덱스가 아니라 c.id(React key).
   // 슬롯 수(maxCommissions)는 DataManager 설정에서 읽는다(ItemIcon 이 dataManager 를 직접 쓰는 것과 일관).
@@ -106,28 +90,24 @@ export function CommissionBar({
     >
       {/* 거래 제안 카드는 게임 레이아웃이 허용하는 폭을 모두 쓴다 — 상단바(TopControls)·메인 그리드와
           동일한 61rem 밴드(lg+)를 mx-auto 로 가운데 정렬해 좌우 끝이 인벤토리/강화 패널과 맞물리게 한다.
-          <lg(세로형)에선 컨테이너 폭을 그대로 꽉 채운다. 통합 타이머 바는 카드 행 아래에 같은 밴드 폭으로
-          이어 붙인다(flex-col). 도착 연출 오버레이(OfferArrivalFx)는 카드 행 컨테이너(relative)에만 absolute
-          inset-0 으로 깔려 카드 영역에만 정렬되고 타이머 바는 덮지 않는다. 61rem 은 그리드 컬럼 합
-          (16+28+16 + gap)과 동기화할 것 — 컬럼/갭을 바꾸면 이 값도 함께 고친다. */}
+          <lg(세로형)에선 컨테이너 폭을 그대로 꽉 채운다. 세그먼트 바는 카드 행 아래에 같은 밴드 폭으로
+          이어 붙인다(flex-col). 61rem 은 그리드 컬럼 합(16+28+16 + gap)과 동기화할 것 — 컬럼/갭을 바꾸면
+          이 값도 함께 고친다. */}
       <div className="mx-auto flex w-full flex-col gap-1.5 lg:max-w-[61rem]">
-        <div className="relative">
-          <OfferArrivalFx />
-          <div ref={slotsRef} className="flex gap-2">
-            {slots.map((c, i) =>
-              c ? (
-                <CommissionCard
-                  key={c.id}
-                  slotIndex={i}
-                  commission={c}
-                  fulfillable={canFulfill(c.cost)}
-                  onFulfill={onFulfill}
-                />
-              ) : (
-                <EmptySlot key={`empty-${i}`} />
-              ),
-            )}
-          </div>
+        <div ref={slotsRef} className="flex gap-2">
+          {slots.map((c, i) =>
+            c ? (
+              <CommissionCard
+                key={c.id}
+                slotIndex={i}
+                commission={c}
+                fulfillable={canFulfill(c.cost)}
+                onFulfill={onFulfill}
+              />
+            ) : (
+              <EmptySlot key={`empty-${i}`} />
+            ),
+          )}
         </div>
         {/* 세그먼트 바 슬롯은 세션이 없어도(잠금/빈) 항상 자식으로 두어 부모 flex-col gap-1.5 의 간격과
             바 높이를 항상 확보한다 — 세션이 떴다 사라질 때 아래 UI 가 흔들리지 않게. 비활성 구간(total 0)은
@@ -179,12 +159,11 @@ function CommissionCard({
         : rewardName
 
   return (
-    <motion.button
+    // 카드는 애니메이션 없이 즉각 표시된다(세션 갱신 시 깜빡임 방지) — 등장 시점 신호는 아래
+    // 테두리 하이라이트(NewSessionHighlight)가 은은하게만 전달한다.
+    <button
       type="button"
       data-commission-slot={slotIndex}
-      initial={{ opacity: 0, scale: 0.85, y: -8 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
       disabled={!fulfillable}
       onClick={(e) => onFulfill(commission, e.currentTarget)}
       // 거래 동작(지불 → 보상)을 스크린리더에 합성해 알린다. 단축키도 안내한다.
@@ -197,6 +176,7 @@ function CommissionCard({
           : 'cursor-not-allowed border-frame/40 bg-panel-soft opacity-60'
       }`}
     >
+      <NewSessionHighlight />
       <KeyHint slot={key} active={fulfillable} />
       {/* 헤드라인 아이콘 = 지불할 것(아이템이면 아이콘, 골드면 큰 코인). */}
       {cost.kind === 'item' ? (
@@ -259,7 +239,23 @@ function CommissionCard({
           ) : null}
         </span>
       </span>
-    </motion.button>
+    </button>
+  )
+}
+
+// 새 세션 도착 하이라이트 — 카드가 mount 될 때(세션 갱신으로 id 가 새로 바뀔 때) 카드 테두리가 짧게
+// 황금빛으로 빛났다 가라앉는다. 카드 자체는 즉시 보이고(깜빡임 없음), 이 오버레이만 opacity 가
+// 0.75→0 으로 한 번 페이드아웃해 "방금 새로 떴다"는 신호만 은은하게 준다. 납품으로 남은 카드는
+// remount 되지 않으므로(같은 id) 빛나지 않는다 — 새로 출제된 카드에만 적용된다.
+function NewSessionHighlight() {
+  return (
+    <motion.span
+      aria-hidden
+      className="pointer-events-none absolute inset-0 rounded-lg border-2 border-gold"
+      initial={{ opacity: 0.75 }}
+      animate={{ opacity: 0 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+    />
   )
 }
 
