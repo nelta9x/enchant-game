@@ -183,16 +183,18 @@ export function SwordStage({
 
   return (
     <div className="flex h-full w-full flex-col items-center gap-5 lg:h-auto lg:w-auto">
-      {/* 검 + 글로우 + 마법진 — 세로형(<lg)에선 폭 기준 정사각(aspect-square w-full)으로 컬럼 폭까지
-          커진다. 폭을 min(컬럼폭, calc(100svh − chrome))로 제한 — chrome 는 박스를 뺀 나머지(상단바·거래바·
-          판매가·이름배너·강화/판매 버튼·인벤토리·갭·카드패딩)의 실측 높이라, 박스가 남는 세로 공간을
-          넘지 않아 스크롤 0(정사각 유지). chrome 은 패딩 차이로 sm 미만(≈47.5rem)과 sm+(≈49rem)이 달라
-          반응형으로 둔다(소폭 버퍼 포함). rem 이라 루트 font-size 와 함께 스케일된다(index.css 세로 스케일과
-          한 세트 — 하단 그룹 높이를 바꾸면 이 값도 재측정). 화면이 길면 컬럼 폭에서 멈추고 남는 높이는
-          아래 여백이 돼 위(마법진)·아래(버튼/인벤토리) 앵커가 된다. lg+ 에선 고정 박스(h-60 w-60) 복원. */}
+      {/* 검 + 글로우 + 마법진 — 세로형(<lg)에선 폭 기준 정사각(aspect-square)으로 남는 영역을 채운다.
+          폭을 min(66.67%, calc(100svh − chrome))로 제한한다:
+          · 세로(높이): chrome(상단바·거래바·판매가·이름배너·버튼·인벤토리·갭·카드패딩, 실측 ≈47.5/49rem)을
+            뺀 남는 높이에 맞춰 스크롤 0. sm 미만/이상 패딩 차이로 반응형(소폭 버퍼 포함).
+          · 가로(폭): 66.67% — 코너 결계(보호·망치·성공률)가 박스 밖으로 ±25% 나가므로 결계까지 포함한
+            "그룹" 폭이 1.5×박스 = 컬럼 폭이 되게 한다. 덕분에 결계가 마법진과 겹치지 않고(바깥) 화면에도
+            모두 들어온다. 화면이 길면 이 66.67% 에서 멈춰 그룹이 컬럼 폭을 꽉 채운다(결계 바깥 오프셋 유지).
+          rem 항은 루트 font-size 와 함께 스케일(index.css 세로 스케일과 한 세트 — 하단 그룹 높이를 바꾸면
+          chrome 값 재측정). lg+ 에선 고정 박스(h-60 w-60)·max-w 해제로 기존 레이아웃 복원. */}
       <div
         ref={swordBoxRef}
-        className="relative flex aspect-square w-full max-w-[min(100%,calc(100svh-48rem))] items-center justify-center sm:max-w-[min(100%,calc(100svh-49.5rem))] lg:aspect-auto lg:h-60 lg:w-60 lg:max-w-none"
+        className="relative flex aspect-square w-full max-w-[min(66.67%,calc(100svh-48rem))] items-center justify-center sm:max-w-[min(66.67%,calc(100svh-49.5rem))] lg:aspect-auto lg:h-60 lg:w-60 lg:max-w-none"
       >
         {/* 따뜻한 골드 글로우 */}
         <div
