@@ -17,7 +17,7 @@ function valid() {
       { maxLevel: 10, minMs: 100, maxMs: 200 },
       { maxLevel: null, minMs: 500, maxMs: 500 },
     ],
-    particlePoolReserve: { dots: 44, hitSparks: 13, hitLicks: 6 },
+    particlePoolReserve: { hitSparks: 13, hitLicks: 6 },
   }
 }
 
@@ -188,7 +188,7 @@ describe('parseAnimationConfig — 연출 타이밍 검증(순수)', () => {
     })
   })
 
-  describe('particlePoolReserve — 파티클 풀 사전 확보 수', () => {
+  describe('particlePoolReserve — 임팩트 불꽃 풀 사전 확보 수', () => {
     it('비객체면 실패', () => {
       expect(() =>
         parseAnimationConfig({ ...valid(), particlePoolReserve: undefined }),
@@ -198,12 +198,11 @@ describe('parseAnimationConfig — 연출 타이밍 검증(순수)', () => {
       ).toThrow(/particlePoolReserve must be an object/)
     })
 
-    it('dots/hitSparks/hitLicks 가 누락·음수·소수·비숫자면 실패', () => {
-      for (const key of ['dots', 'hitSparks', 'hitLicks'] as const) {
+    it('hitSparks/hitLicks 가 누락·음수·소수·비숫자면 실패', () => {
+      for (const key of ['hitSparks', 'hitLicks'] as const) {
         const bad = (v: unknown) => ({
           ...valid(),
           particlePoolReserve: {
-            dots: 44,
             hitSparks: 13,
             hitLicks: 6,
             [key]: v,
@@ -219,10 +218,9 @@ describe('parseAnimationConfig — 연출 타이밍 검증(순수)', () => {
     it('0 은 허용(사전 확보 없이 lazily 성장 — 이전 동작)', () => {
       const cfg = parseAnimationConfig({
         ...valid(),
-        particlePoolReserve: { dots: 0, hitSparks: 0, hitLicks: 0 },
+        particlePoolReserve: { hitSparks: 0, hitLicks: 0 },
       })
       expect(cfg.particlePoolReserve).toEqual({
-        dots: 0,
         hitSparks: 0,
         hitLicks: 0,
       })
@@ -258,9 +256,8 @@ describe('loadAnimation — 번들 데이터 무결성', () => {
       const isLast = i === a.shakeBands.length - 1
       expect(b.maxLevel === null).toBe(isLast)
     })
-    // 파티클 풀 사전 확보 수: 값(튜닝)은 박지 않고 구조/정수>=0 만 확인.
+    // 임팩트 불꽃 풀 사전 확보 수: 값(튜닝)은 박지 않고 구조/정수>=0 만 확인.
     for (const v of [
-      a.particlePoolReserve.dots,
       a.particlePoolReserve.hitSparks,
       a.particlePoolReserve.hitLicks,
     ]) {

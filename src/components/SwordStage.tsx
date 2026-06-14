@@ -10,7 +10,7 @@ import { motion, useAnimationControls } from 'motion/react'
 import { useI18nStore, useT } from '../i18n'
 import type { SwordData } from '../data/types'
 import { formatAmount, formatGold } from '../lib/format'
-import { drawSpriteContain, spriteStore } from '../lib/spriteStore'
+import { drawSpriteContain, drawSpriteTinted, spriteStore } from '../lib/spriteStore'
 import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
@@ -51,6 +51,11 @@ type SwordStageProps = {
   // 판매가 강조(pop) 트리거. shakeKey 와 같은 idiom — 값이 바뀔 때마다 가격 표시가 한 번 통 튄다.
   // 강화 성공으로 가격이 오른 순간에만 호출 측이 올린다(보관·장착·판매로 가격이 바뀔 땐 올리지 않음).
   pricePopKey?: number
+  // 강화 성공 "백열" 트리거 — 값이 바뀔 때마다(새 검 등장 = burstAt) 검 실루엣이 흰빛으로 달궈졌다가
+  // 식는다(갓 벼려진 금속). shakeKey 와 같은 idiom(초기 0 은 무시). 성공일 때만 호출 측이 올린다.
+  whiteHotKey?: number
+  // 레벨 롤업 트리거 — 값이 바뀔 때마다 +N 뱃지가 아래에서 굴러 올라온다(보상감). 성공일 때만 올린다.
+  levelRollKey?: number
 }
 
 // 양피지 위에 얹는 가로 육각형 배너 클립.
@@ -70,6 +75,8 @@ export function SwordStage({
   shakeDurationSec = 0.4,
   swordBoxRef,
   pricePopKey = 0,
+  whiteHotKey = 0,
+  levelRollKey = 0,
 }: SwordStageProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
@@ -106,6 +113,23 @@ export function SwordStage({
       })
     }
   }, [pricePopKey, priceControls])
+
+  // 레벨 롤업 — 강화 성공으로 단계가 오를 때 levelRollKey 가 바뀌며 +N 뱃지가 아래에서 굴러 올라온다
+  // (overflow-hidden 클립 안에서 y 100%→0 + scale 펀치). priceControls·shakeControls 와 동일 idiom(초기 0 은
+  // 조용). 표시값(displayLevel)은 호출 측이 이 트리거와 같은 박자(결과 공개)에 새 검으로 바꾸므로, 굴러
+  // 올라오는 숫자가 곧 새 단계다.
+  const levelControls = useAnimationControls()
+  useEffect(() => {
+    if (levelRollKey > 0) {
+      levelControls.set({ y: '100%', opacity: 0, scale: 1.4 })
+      levelControls.start({
+        y: '0%',
+        opacity: 1,
+        scale: 1,
+        transition: { duration: 0.45, ease: 'backOut' },
+      })
+    }
+  }, [levelRollKey, levelControls])
 
   // ── 검 스프라이트 표시(canvas) ───────────────────────────────────────────────────
   // <img> 대신 <canvas>로 SpriteStore 의 GPU 상주 ImageBitmap 을 그린다 — 강화 교체 프레임이 디코드·
@@ -173,6 +197,39 @@ export function SwordStage({
     ro.observe(canvas)
     return () => ro.disconnect()
   }, [drawSprite])
+
+  // ── 강화 성공 백열(white-hot) ────────────────────────────────────────────────────
+  // 새(상위) 검이 등장하는 순간(whiteHotKey, = burstAt) 검 실루엣을 흰빛으로 달궈 식어가게 그린다 —
+  // "갓 벼려진" 금속 질감. 파티클 분출 대신 보상감을 검 자체에 입힌다. 실루엣 캔버스(검 모양 단색 흰빛)와
+  // 후광(radial glow)을 screen 블렌드로 새 검 위에 겹쳐, opacity 가 식으면 본래 색 검만 남는다. 색은
+  // 토큰(--color-white-hot)에서 1회 해석한다(hex 하드코딩 금지 규약 — hitSparks 의 토큰 해석 미러).
+  const whiteHotCanvasRef = useRef<HTMLCanvasElement>(null)
+  const whiteHotControls = useAnimationControls()
+  const bloomControls = useAnimationControls()
+  useEffect(() => {
+    if (whiteHotKey > 0 && spriteName !== null) {
+      const canvas = whiteHotCanvasRef.current
+      const tint =
+        getComputedStyle(document.documentElement)
+          .getPropertyValue('--color-white-hot')
+          .trim() || '#ffffff'
+      if (canvas) drawSpriteTinted(canvas, swordSpriteUrl(spriteName), tint)
+      whiteHotControls.set({ opacity: 1, scale: 1 })
+      whiteHotControls.start({
+        opacity: [1, 1, 0],
+        scale: [1, 1.04],
+        transition: { duration: 0.65, ease: 'easeOut', times: [0, 0.4, 1] },
+      })
+      bloomControls.set({ opacity: 1, scale: 0.6 })
+      bloomControls.start({
+        opacity: [1, 0],
+        scale: [0.6, 1.7],
+        transition: { duration: 0.65, ease: 'easeOut' },
+      })
+    }
+    // 트리거(whiteHotKey)가 바뀔 때의 최신 spriteName 을 쓰면 충분하다(새 검은 이미 교체됨).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whiteHotKey])
 
   // 판매가(검의 sellPrice) 표시 여부 — 검 없음/판매 불가(null·0)면 자리만 지키고 숨긴다.
   // 이름·스탯과 함께 지연 공개되는 displaySword 기준(강화 직후 새 가격이 먼저 새지 않게).
@@ -259,6 +316,38 @@ export function SwordStage({
         {/* 스프라이트 위 오버레이 슬롯(파괴 연출 등) — 자리만 제공, 내용은 주입받는다. */}
         {spriteOverlay}
 
+        {/* 강화 성공 백열 후광 — 새 검 등장 순간 흰빛이 검 주위로 부풀었다 사라진다(screen 블렌드로 가산광). */}
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          initial={{ opacity: 0, scale: 0.65 }}
+          animate={bloomControls}
+        >
+          <div
+            className="h-44 w-44 sm:h-48 sm:w-48"
+            style={{
+              background:
+                'radial-gradient(circle, color-mix(in srgb, var(--color-white-hot) 85%, transparent) 0%, transparent 64%)',
+              mixBlendMode: 'screen',
+            }}
+          />
+        </motion.div>
+        {/* 강화 성공 백열 실루엣 — 새 검 모양의 흰빛 단색이 본래 색 검 위에 겹쳐 식어간다(screen 블렌드).
+            실제 검 캔버스(shake/entrance 레이어)와 같은 크기·중앙 정렬이라 정확히 포개진다. */}
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          aria-hidden
+        >
+          <motion.canvas
+            ref={whiteHotCanvasRef}
+            aria-hidden
+            className="h-36 w-36 object-contain sm:h-40 sm:w-40"
+            style={{ imageRendering: 'pixelated', mixBlendMode: 'screen' }}
+            initial={{ opacity: 0, scale: 1 }}
+            animate={whiteHotControls}
+          />
+        </div>
+
         {/* 보호 결계 전경(하단 뱃지 + 발동 플레어) — 검 위에 그려 필요/보유·상태를 또렷이 드러낸다. */}
         <ProtectionWard {...protection} />
 
@@ -314,8 +403,15 @@ export function SwordStage({
             {hasDisplaySword ? t(displaySword.nameKey) : t('sword.none')}
           </span>
           {hasDisplaySword && (
-            <span className="ml-2 text-xl font-bold tabular-nums text-gold">
-              +{displayLevel}
+            // overflow-hidden 클립 안에서 숫자가 아래(y 100%)에서 굴러 올라온다(레벨 롤업). 평소엔 정지.
+            <span className="ml-2 inline-flex overflow-hidden align-baseline text-xl font-bold tabular-nums text-gold">
+              <motion.span
+                initial={{ y: '0%', opacity: 1, scale: 1 }}
+                animate={levelControls}
+                className="inline-block"
+              >
+                +{displayLevel}
+              </motion.span>
             </span>
           )}
         </div>

@@ -37,11 +37,12 @@
   --color-enhance: #2f93c8;
   --color-enhance-glow: #63d2ff;
 
-  /* 강화 결과 색(연출 파티클) */
+  /* 강화 결과 색 */
   --color-success: #4caf6e;
   --color-danger: #d8654f;
-  --color-danger-glow: #ff7a5c; /* 파괴 연출 파티클 코어(밝은 적색) */
-  --color-gold-glow: #ffe79a; /* 성공 연출 파티클 코어(밝은 황금색) */
+  --color-danger-glow: #ff7a5c; /* danger 의 밝은 변형(번쩍임·글로우) */
+  --color-gold-glow: #ffe79a; /* gold 의 밝은 변형(출발 섬광·글로우 그림자·펄스 링) */
+  --color-white-hot: #fff4d6; /* 강화 성공 "백열" — 갓 벼려진 새 검 실루엣·글로우(SwordStage) */
 
   /* Hit 불꽃(망치 임팩트 불티·화구·불혀) — 성공/실패 버스트와 구분되는 "화염" 톤: 백열 중심 →
      노랑 → 주황 → 적색 → 잿불. 캔버스(HitSparkCanvas/hitSparks.ts)가 이 토큰들을 런타임 1회 rgb 로

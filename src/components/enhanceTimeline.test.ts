@@ -18,7 +18,7 @@ const ANIM: AnimationConfig = {
   hammerSwingEnabled: true,
   hammerSmearEnabled: true,
   shakeBands: [{ maxLevel: null, minMs: 200, maxMs: 500 }],
-  particlePoolReserve: { dots: 44, hitSparks: 13, hitLicks: 6 },
+  particlePoolReserve: { hitSparks: 13, hitLicks: 6 },
 }
 
 describe('rollShakeMs — 떨림 시간 무작위 추출', () => {

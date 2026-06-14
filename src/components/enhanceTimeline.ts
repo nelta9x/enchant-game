@@ -1,5 +1,4 @@
 import type { AnimationConfig, ShakeBand } from '../data/types'
-import { PARTICLE_DUR } from './particles'
 
 // 강화 1회 연출의 "타임라인" 단일 출처(순수). 데이터(animation.json → AnimationConfig)의 시퀀스 타이밍 +
 // 매 강화마다 무작위로 뽑은 떨림 시간(shakeMs)으로, GameScreen 이 효과·사운드·공개·잠금을 거는 데 필요한
@@ -23,6 +22,11 @@ import { PARTICLE_DUR } from './particles'
 
 // 연출 수명에 더하는 여유(ms) — 애니메이션이 끝나기 직전 효과가 사라져 끊기지 않도록(기존 +60 관례 계승).
 const TAIL_BUFFER_MS = 60
+
+// 결과 연출(성공=새 검 백열·파괴=잔상 디졸브 소멸)이 버스트(결과 공개) 후 재생되는 길이(초). burstLifetimeMs 가
+// 이만큼을 더해, 결과 연출이 끝나기 전에 효과가 running 에서 빠지지 않게 한다(예전 파티클 비행 시간 PARTICLE_DUR 을
+// 대체한 단일 출처 — 백열·디졸브 중 가장 긴 것 이상).
+const RESULT_ANIM_SEC = 0.6
 
 export type EnhanceTimeline = {
   // ── 마일스톤(반드시 서로 일치해야 하는 값들) ──
@@ -78,7 +82,7 @@ export function computeEnhanceTimeline(
     suppressMs: burstAtMs,
     lockMs: burstAtMs + anim.reEnhanceGuardMs,
     burstLifetimeMs:
-      burstAtMs + Math.round(PARTICLE_DUR * 1000) + TAIL_BUFFER_MS,
+      burstAtMs + Math.round(RESULT_ANIM_SEC * 1000) + TAIL_BUFFER_MS,
     protectedDurationMs: burstAtMs + TAIL_BUFFER_MS,
   }
 }

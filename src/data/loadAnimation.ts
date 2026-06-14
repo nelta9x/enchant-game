@@ -48,15 +48,14 @@ function parseFaceOffset(raw: unknown): { x: number; y: number } {
   return { x: fnum('x'), y: fnum('y') }
 }
 
-// 파티클 풀 사전 확보 수 검증 — 세 풀(도트·불티·불혀) 모두 정수 >= 0(0 = 사전 확보 없이 lazily 성장).
+// 임팩트 불꽃 풀 사전 확보 수 검증 — 두 풀(불티·불혀) 모두 정수 >= 0(0 = 사전 확보 없이 lazily 성장).
 function parsePoolReserve(raw: unknown): {
-  dots: number
   hitSparks: number
   hitLicks: number
 } {
   if (!isRecord(raw))
-    fail('particlePoolReserve must be an object { dots, hitSparks, hitLicks }')
-  const fint = (key: 'dots' | 'hitSparks' | 'hitLicks'): number => {
+    fail('particlePoolReserve must be an object { hitSparks, hitLicks }')
+  const fint = (key: 'hitSparks' | 'hitLicks'): number => {
     const v = raw[key]
     if (typeof v !== 'number' || !Number.isInteger(v) || v < 0)
       fail(
@@ -65,7 +64,6 @@ function parsePoolReserve(raw: unknown): {
     return v
   }
   return {
-    dots: fint('dots'),
     hitSparks: fint('hitSparks'),
     hitLicks: fint('hitLicks'),
   }
@@ -128,7 +126,7 @@ export function parseAnimationConfig(raw: unknown): AnimationConfig {
     )
   const shakeBands = rawBands.map((b, i) => parseShakeBand(b, i))
 
-  // 파티클 풀 사전 확보 수(도트·불티·불혀) — 시작 시 풀을 미리 채워 첫 버스트 객체 할당을 없앤다.
+  // 임팩트 불꽃 풀 사전 확보 수(불티·불혀) — 시작 시 풀을 미리 채워 첫 타격 객체 할당을 없앤다.
   const particlePoolReserve = parsePoolReserve(raw.particlePoolReserve)
 
   // 커버리지 불변: 검 레벨 [1, ∞) 를 빈틈·겹침 없이 덮어야 한다(셀렉터가 maxLevel 만으로 담당 밴드를 고르는 전제).

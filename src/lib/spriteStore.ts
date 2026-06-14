@@ -137,3 +137,40 @@ export function drawSpriteContain(
   const dh = sh * scale
   ctx.drawImage(src, (bw - dw) / 2, (bh - dh) / 2, dw, dh)
 }
+
+// 스프라이트를 object-contain 으로 그린 뒤 그 실루엣을 단색(color)으로 칠한다(뷰 경계 헬퍼) — 강화 성공의
+// "백열" 연출(SwordStage)이 새 검 위에 흰빛 실루엣을 겹쳐 식어가는 모습을 그리는 데 쓴다. drawSpriteContain
+// 과 같은 블릿·DPR·픽셀아트 규약을 따르되, source-in 합성으로 스프라이트 알파만 남기고 색으로 치환한다
+// (모양은 검, 색은 단색). 그릴 게 없으면 조용히 반환한다.
+export function drawSpriteTinted(
+  canvas: HTMLCanvasElement,
+  url: string,
+  color: string,
+): void {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const dpr = Math.min(3, window.devicePixelRatio || 1)
+  const bw = Math.round(canvas.offsetWidth * dpr)
+  const bh = Math.round(canvas.offsetHeight * dpr)
+  if (bw <= 0 || bh <= 0) return
+  if (canvas.width !== bw || canvas.height !== bh) {
+    canvas.width = bw
+    canvas.height = bh
+  }
+  ctx.imageSmoothingEnabled = false
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.clearRect(0, 0, bw, bh)
+  const src = spriteStore.get(url)
+  const sw = src instanceof HTMLImageElement ? src.naturalWidth : src.width
+  const sh = src instanceof HTMLImageElement ? src.naturalHeight : src.height
+  if (!sw || !sh) return
+  const scale = Math.min(bw / sw, bh / sh)
+  const dw = sw * scale
+  const dh = sh * scale
+  ctx.drawImage(src, (bw - dw) / 2, (bh - dh) / 2, dw, dh)
+  // source-in: 기존(스프라이트) 알파와 겹치는 곳에만 새 칠을 남긴다 → 검 모양의 단색 실루엣.
+  ctx.globalCompositeOperation = 'source-in'
+  ctx.fillStyle = color
+  ctx.fillRect(0, 0, bw, bh)
+  ctx.globalCompositeOperation = 'source-over'
+}

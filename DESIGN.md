@@ -55,7 +55,8 @@
 | 토큰        | 값        | 의미 · 대표 사용처                                                                                                                              |
 | ----------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `gold`      | `#f1c14b` | 게임의 핵심 강조색. 세 가지 의미로만 쓴다 — ① 가치(판매가 `SwordStage`) ② 강화 수치(`+N`, "강화" 라벨) ③ 재화(보유 골드 `GoldDisplay`, 비용 칩) |
-| `gold-glow` | `#ffe79a` | gold의 밝은 변형 — 성공 파티클 코어, 출발 섬광(`LaunchFlare`), 글로우 그림자, 펄스 링                                                           |
+| `gold-glow` | `#ffe79a` | gold의 밝은 변형 — 출발 섬광(`LaunchFlare`), 글로우 그림자, 펄스 링                                                           |
+| `white-hot` | `#fff4d6` | 강화 성공 "백열" — 갓 벼려진 새 검 실루엣·후광(`SwordStage`, screen 블렌드)                                                           |
 | `frame`     | `#9c854f` | 금장 테두리 — 보조 버튼 `border-frame/50`, **중앙 검 마법진** `border-frame/25`, 게이지의 "지난 기록" 칸 `bg-frame`. ⚠️ 코너 결계(Sigil)는 frame 이 아니라 `ink-soft` — 아래 동기화 표 참조 |
 | `silver`    | `#c2c7d1` | 은화(예비 — 현재 미사용)                                                                                                                        |
 
@@ -66,11 +67,10 @@
 | `enhance`      | `#2f93c8` | 청색 액션 — 상점 구매 버튼, 세그먼트 토글 선택값 `bg-enhance`                                 |
 | `enhance-glow` | `#63d2ff` | 강화 청색 글로우(예비 — 현재 미사용)                                                          |
 | `success`      | `#4caf6e` | "지금 가능" 초록 — 의뢰 카드 활성(`border-success` + `ring-success/60` + 글로우), 단축키 힌트 |
-| `danger`       | `#d8654f` | 파괴·임박 적색 — 파괴 파티클 가장자리, 세션 타이머 임박색, 상점 부족 안내 `text-danger`       |
-| `danger-glow`  | `#ff7a5c` | 파괴 파티클 코어(밝은 적색)                                                                   |
+| `danger`       | `#d8654f` | 파괴·임박 적색 — 세션 타이머 임박색, 상점 부족 안내 `text-danger`       |
+| `danger-glow`  | `#ff7a5c` | danger 의 밝은 변형(번쩍임·글로우, 밝은 적색)                                                                   |
 
-`-glow` 접미사 규칙: **같은 계열의 밝은 변형**으로, 파티클 코어·글로우 그림자·번쩍임에만 쓴다
-(성공/파괴 버스트는 `coreVar`=glow, `edgeVar`=본색 짝 — `SuccessEffect`/`DestructionEffect`).
+`-glow` 접미사 규칙: **같은 계열의 밝은 변형**으로, 글로우 그림자·번쩍임에만 쓴다.
 
 ### 연출 전용
 
@@ -114,7 +114,7 @@
 | `rounded-2xl`  | 주역 표면 — 강화 버튼, 모달 패널, 메인 카드         |
 | `rounded-lg`   | 일반 — 패널·보조 버튼·의뢰 카드·골드창              |
 | `rounded-md`   | 소형 컨트롤 — 세그먼트 토글, 인벤토리 행, 닫기 버튼 |
-| `rounded-full` | 원형 연출·바 — 마법진, 타이머 바, 토스트, 파티클    |
+| `rounded-full` | 원형 연출·바 — 마법진, 타이머 바, 토스트, 코인     |
 
 ### 그림자
 
@@ -158,6 +158,6 @@
 
 - **모션·연출 타이밍**: 시퀀스 타이밍("언제")은 데이터 `public/data/animation.json` +
   `components/enhanceTimeline.ts`(타임라인 단일 출처), 모션 "모양" 상수는 각 연출 모듈
-  (`coins.ts`·`particles.ts`·`drops.ts`·`shake.ts`·`goldGain.ts`·`floatingText.ts`)이 소유한다.
+  (`coins.ts`·`drops.ts`·`shake.ts`·`goldGain.ts`·`floatingText.ts`)이 소유한다.
   경계 규칙은 `src/data/loadAnimation.ts` 머리 주석 참조.
 - **사운드**: `lib/sound.ts`의 `SFX_FILES`/`BGM_FILES` 레지스트리(CLAUDE.md 규약).

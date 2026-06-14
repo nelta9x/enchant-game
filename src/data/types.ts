@@ -86,17 +86,17 @@ export type ShakeBand = {
 //    UI 가드 전용(게임 로직 불변) — 0 = 버스트 즉시 재강화 가능.
 //  - enhanceParticlesEnabled / hammerSwingEnabled / hammerSmearEnabled: 연출 on/off 플래그. false 면
 //    해당 연출이 마운트조차 되지 않는다(순수 프레젠테이션 게이트 — 게임 로직·타임라인·잠금·사운드는 영향 없음).
-//      · enhanceParticlesEnabled: 강화 파티클(임팩트 불꽃 캔버스 HitSparkCanvas + 성공/파괴 버스트 캔버스
-//        ParticlePool — 풀이 없으면 버스트 emit 은 자동 no-op).
+//      · enhanceParticlesEnabled: 망치 임팩트 불꽃 캔버스(HitSparkCanvas — 망치가 닿는 순간의 불티·화구).
+//        성공/파괴 결과는 파티클이 아니라 백열(성공)·디졸브(파괴) 연출로 보여 주며 이 플래그와 무관하다.
 //      · hammerSwingEnabled: 망치 본체 내려치기 스윙(motion.img). false 면 망치 자체가 안 보이고 하위
 //        스미어도 함께 사라진다 — 임팩트 앵커(떨림·Hit 불꽃·'캉' 타격음)는 GameScreen 타임라인이 독립 구동.
 //      · hammerSmearEnabled: 망치 스윙 모션 블러 스미어(궤적 잔상 캔버스). hammerSwingEnabled 가 true 일 때만 의미.
 //  - shakeBands: 망치가 닿은 뒤 무기가 떠는 시간(ms)의 검 레벨대별 범위. 강화 대상 검의 레벨로 밴드를 골라
 //    그 [min, max] 구간에서 매회 무작위로 뽑는다(레벨 [1, ∞) 를 덮는 연속 밴드 — shakeBands[0] 이 최저 레벨대).
-//  - particlePoolReserve: 파티클 객체 풀을 시작(warmup) 시 미리 확보할 슬롯 수. 첫 버스트(특히 고레벨 대형
-//    도트 버스트)도 객체를 새로 만들지 않게 한다 — 연사 GC 압박을 0으로. 풀은 이보다 큰 버스트가 오면 lazily
-//    더 늘되 줄지는 않는다(상한이 아니라 사전 확보치). dots = 보통 최고 레벨 버스트 입자 수(particleCount(maxLevel)),
-//    hitSparks = 한 타격의 불티+잉걸불 수, hitLicks = 불혀 수. 0 이면 사전 확보 없이 lazily 성장(이전 동작).
+//  - particlePoolReserve: 임팩트 불꽃(HitSparkCanvas) 객체 풀을 시작(warmup) 시 미리 확보할 슬롯 수. 첫
+//    타격도 객체를 새로 만들지 않게 한다 — 연사 GC 압박을 0으로. 풀은 이보다 큰 타격이 오면 lazily 더 늘되
+//    줄지는 않는다(상한이 아니라 사전 확보치). hitSparks = 한 타격의 불티+잉걸불 수, hitLicks = 불혀 수.
+//    0 이면 사전 확보 없이 lazily 성장(이전 동작).
 export type AnimationConfig = {
   hammerImpactMs: number
   hammerSnapMs: number
@@ -108,7 +108,7 @@ export type AnimationConfig = {
   hammerSwingEnabled: boolean
   hammerSmearEnabled: boolean
   shakeBands: ShakeBand[]
-  particlePoolReserve: { dots: number; hitSparks: number; hitLicks: number }
+  particlePoolReserve: { hitSparks: number; hitLicks: number }
 }
 
 // 의뢰 버킷에서 출제될 거래 1종(언어 중립). 등장 확률(weight) + "지불(cost)" + "보상(reward)"을 아이템별로 둔다.

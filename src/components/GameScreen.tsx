@@ -12,18 +12,14 @@ import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useT, type TranslationKey } from '../i18n'
 import { countOf, PROTECTION_TICKET_ID } from '../lib/items'
 import { sound } from '../lib/sound'
+import { vibrate, HAPTIC_DESTROY, HAPTIC_SUCCESS } from '../lib/haptics'
 import { useEffectStore } from '../store/effectStore'
-import {
-  latestRunning,
-  runningEventsOf,
-  type Effect,
-} from '../store/effectQueue'
+import { latestRunning, type Effect } from '../store/effectQueue'
 import { useGameStore } from '../store/gameStore'
 import { useCommissionStore } from '../store/commissionStore'
 import type { Commission } from '../store/commissionQueue'
 import { useUiStore } from '../store/uiStore'
 import { CommissionBar } from './CommissionBar'
-import { DestructionEffect, type DestructionEvent } from './DestructionEffect'
 import { destructionTargetOf } from './destruction'
 import { coinCount } from './coins'
 import { CoinFlight, COIN_FLIGHT_MS, type CoinFlightEvent } from './CoinFlight'
@@ -33,7 +29,6 @@ import { ItemFlight, ITEM_FLIGHT_MS, type ItemFlightEvent } from './ItemFlight'
 import { HammerStrike, type HammerStrikeEvent } from './HammerStrike'
 import { hammerStrikeMs, type HammerShape } from './hammerTiming'
 import { HitSparkCanvas } from './HitSparkCanvas'
-import { ParticleEmitProvider, ParticlePool } from './ParticlePool'
 import {
   computeEnhanceTimeline,
   rollShakeMs,
@@ -47,12 +42,10 @@ import {
 import { pickFloatingText } from './floatingText'
 import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import { InventoryPanel } from './InventoryPanel'
-import { particleCount } from './particles'
 import { protectionState, isProtectionActive } from './protection'
 import { ActionButton } from './ActionButton'
 import { ShopModal } from './ShopModal'
 import { GameClearModal } from './GameClearModal'
-import { SuccessEffect, type SuccessEvent } from './SuccessEffect'
 import { ShakeAfterimage, type ShakeBurstEvent } from './ShakeBurstEffect'
 import { SwordStage } from './SwordStage'
 import { TopControls } from './TopControls'
@@ -66,30 +59,20 @@ const ANNOUNCE_KEY: Record<string, TranslationKey> = {
   whiffShake: 'toast.whiff',
 }
 
-// 효과 1개를 버스트 이벤트(ShakeBurstEvent)로 투영한다 — sprite 없는 효과(자리만 있는 잠금 등)는 null.
-// 성공·파괴가 동일 형태라 투영을 한 곳에 둔다 — 반환 타입을 그 명명 타입으로 두어 payload 필드를 늘릴 때
-// 투영 누락이 컴파일에서 잡히게 한다. 파티클 emit(전부)·잔상(최신 1개) 양쪽이 이 투영을 공유한다.
+// 효과 1개를 잔상 버스트 이벤트(ShakeBurstEvent)로 투영한다 — sprite 없는 효과(자리만 있는 잠금 등)는 null.
+// 성공·파괴가 동일 형태라 투영을 한 곳에 둔다. 결과 종류(outcome)는 효과 kind 에서 파생한다(잔상이 떨림 끝에
+// 성공=팝업 소멸 / 파괴=디졸브 소멸 중 무엇을 할지 가른다). 잔상 비주얼(최신 1개)이 이 투영을 쓴다.
 function projectBurst(e: Effect): ShakeBurstEvent | null {
   return e.payload?.sprite
     ? {
         id: e.id,
         sprite: e.payload.sprite,
-        particleCount: e.payload.particleCount ?? 0,
-        // 떨림 시작(impact)·길이(shake)는 잔상 떨림→버스트(emit) 시점을 정하는 데 쓴다.
+        outcome: e.kind === 'destruction' ? 'destruction' : 'success',
+        // 떨림 시작(impact)·길이(shake)는 잔상 떨림→결과 정리(burstAt) 시점을 정하는 데 쓴다.
         impactMs: e.payload.impactMs ?? 0,
         shakeMs: e.payload.shakeMs ?? 0,
       }
     : null
-}
-
-// 실행 중 버스트 효과(성공·파괴)를 전부 이벤트로 투영한다 — 각 효과가 burstAt 에 파티클을 emit 해야 하므로
-// (runningEventsOf: 겹친 옛 버스트 유실 방지) 최신 1개가 아니라 해당 kind 를 전부 뽑는다. 잔상 비주얼은
-// 이와 달리 최신 1개만 그린다(latestBurstEvent) — 잔상/파티클의 다중성이 달라 분리한다.
-function toBurstEvents(running: Effect[], kind: string): ShakeBurstEvent[] {
-  return runningEventsOf(running, kind).flatMap((e) => {
-    const ev = projectBurst(e)
-    return ev ? [ev] : []
-  })
 }
 
 // 클릭 순간 캡처한 카드 rect 를 고정해 두는 보이지 않는 비행 출발 anchor(영점 크기·클릭 통과).
@@ -119,8 +102,8 @@ function FlightAnchor({
 
 // 메인 강화 화면. 레퍼런스 레이아웃을 따른 가로 스테이지:
 //   상단(언어·난이도 / 상점·닫기) · 좌(비용카드·인벤토리) · 중앙(검 스테이지) · 우(강화·골드).
-// 강화 1회 결과는 연출(성공=떨림 후 황금 파티클 / 파괴=떨림 후 폭발 / 방지=떨림)로 보여 주고,
-// 결과 문구는 화면에 보이지 않는 sr-only 라이브 리전으로 음성 전달한다.
+// 강화 1회 결과는 연출(성공=떨림 후 새 검 백열 + 레벨 롤업 / 파괴=떨림 후 잔상 디졸브 소멸 / 방지=떨림)로
+// 보여 주고, 결과 문구는 화면에 보이지 않는 sr-only 라이브 리전으로 음성 전달한다.
 export function GameScreen() {
   const t = useT()
   const gold = useGameStore((s) => s.gold)
@@ -244,6 +227,11 @@ export function GameScreen() {
   // 성공 분기). SwordStage 가 shakeKey 와 같은 방식으로 소비해 가격 표시를 한 번 통 튀게 한다. 보관·장착·
   // 판매로 currentSwordId(→가격)가 바뀔 때는 이 분기를 타지 않으므로 pop 이 터지지 않는다.
   const [pricePopKey, setPricePopKey] = useState(0)
+
+  // 강화 성공 보상 연출 트리거(파티클 대체) — 결과 공개(burstAt) 순간 함께 올린다. whiteHotKey 는 새 검을
+  // 흰빛으로 달궜다 식히고(SwordStage 백열), levelRollKey 는 +N 뱃지를 굴려 올린다(레벨 롤업). 성공일 때만 올린다.
+  const [whiteHotKey, setWhiteHotKey] = useState(0)
+  const [levelRollKey, setLevelRollKey] = useState(0)
 
   // 직전 강화의 재강화 잠금 길이(ms) — 매 강화마다 떨림 길이에 따라 다르므로 버튼 충전 오버레이가 같은
   // 길이로 걷히도록 보관한다(handleEnhance 가 타임라인 lockMs 로 갱신). 첫 강화 전엔 현재 검 레벨대의
@@ -395,15 +383,24 @@ export function GameScreen() {
     const burstAtSec = tl.burstAtMs / 1000
 
     // 결과 공개 지연: 강화 전 검을 떨림 동안 이름·스탯에 유지했다가, 떨림이 끝나는 순간(burstAt = revealAt)
-    // 결과 검으로 한 번에 전환한다. 가격 강조·게임 클리어도 그 시점에 함께 푼다(연출 전 스포일 방지).
-    const scheduleReveal = (pricePop: boolean, terminal: boolean) => {
+    // 결과 검으로 한 번에 전환한다. 가격 강조·게임 클리어·성공 보상 연출(백열·레벨 롤업)도 그 시점에 함께
+    // 푼다(연출 전 스포일 방지 + 새 검 등장과 같은 박자).
+    const scheduleReveal = (opts: {
+      pricePop: boolean
+      terminal: boolean
+      reward: boolean // 성공 보상 연출(백열·레벨 롤업) — 성공일 때만 true
+    }) => {
       setHeldSwordId(prevSwordId)
       if (revealTimer.current !== null) clearTimeout(revealTimer.current)
       revealTimer.current = window.setTimeout(() => {
         revealTimer.current = null
         setHeldSwordId(null)
-        if (pricePop) setPricePopKey((k) => k + 1)
-        if (terminal) setCleared(true)
+        if (opts.pricePop) setPricePopKey((k) => k + 1)
+        if (opts.reward) {
+          setWhiteHotKey((k) => k + 1)
+          setLevelRollKey((k) => k + 1)
+        }
+        if (opts.terminal) setCleared(true)
       }, tl.revealAtMs)
     }
 
@@ -454,15 +451,11 @@ export function GameScreen() {
         durationMs: tl.lockMs,
       })
 
-    // "떨림 후 분출 + 새 검 등장 억제"를 한 쌍으로 건다(성공·파괴 공통 안무). 잔상(sprite) 떨림→버스트와
+    // "떨림 후 결과 정리 + 새 검 등장 억제"를 한 쌍으로 건다(성공·파괴 공통 안무). 잔상(sprite) 떨림→정리와
     // 새 검 등장(burstAt 까지 억제)이 항상 같은 타임라인 슬라이스를 쓰도록 한곳에서 enqueue 한다 — 두 분기가
     // 따로 작성하면 한쪽 payload(예: 등장 억제 지연)만 고쳐 잔상 소멸·새 검 등장이 어긋나는(강화 전/후 검 동시
-    // 노출) 발산이 생길 수 있어 일반화한다. 파티클 수는 단계(level)에 비례 — 호출 측이 잔상/도달 검을 해석해 넘긴다.
-    const enqueueShakeBurst = (
-      kind: string,
-      sprite: string,
-      level: number,
-    ) => {
+    // 노출) 발산이 생길 수 있어 일반화한다. 결과 종류(성공=팝업/파괴=디졸브)는 잔상이 kind 로 파생한다(projectBurst).
+    const enqueueShakeBurst = (kind: string, sprite: string) => {
       enqueueEffect({
         kind,
         exclusive: false,
@@ -470,7 +463,6 @@ export function GameScreen() {
         durationMs: tl.burstLifetimeMs,
         payload: {
           sprite,
-          particleCount: particleCount(level),
           impactMs: tl.impactMs,
           shakeMs: tl.shakeMs,
         },
@@ -485,14 +477,16 @@ export function GameScreen() {
     }
 
     if (result.outcome === 'success') {
-      // 성공 = (실패와 동일 안무) 망치 임팩트 → 떨림(무작위) → 황금 파티클 분출 + 상위 검 등장 ∥ 재강화 가드.
-      // 잔상은 강화 전 검(fromId), 파티클 수는 도달 검(toId)의 단계에 비례 — 둘 다 이 뷰 경계에서 해석(원칙 2).
-      // 잔상 소멸·새 검 등장이 같은 burstAt 을 써 정확히 교대한다(강화 전/후 검 동시 노출 없음 — enqueueShakeBurst).
+      // 성공 = (실패와 동일 안무) 망치 임팩트 → 떨림(무작위) → 잔상 팝업 소멸 + 상위 검 백열 등장 ∥ 재강화 가드.
+      // 잔상은 강화 전 검(fromId)이다 — 이 뷰 경계에서 해석(원칙 2). 잔상 소멸·새 검 등장이 같은 burstAt 을 써
+      // 정확히 교대한다(강화 전/후 검 동시 노출 없음 — enqueueShakeBurst). 보상 연출(백열·레벨 롤업·햅틱)은 아래.
       const from = dataManager.getSwordById(result.fromId)
       const next = dataManager.getSwordById(result.toId)
       if (from) {
-        enqueueShakeBurst('successBurst', from.sprite, next?.level ?? 0)
+        enqueueShakeBurst('successBurst', from.sprite)
       }
+      // 성공 햅틱 — 짧고 경쾌한 진동(보상감). 결과가 드러나는 burstAt 에 맞춘다(미지원 단말은 무음 no-op).
+      vibrate(HAPTIC_SUCCESS, tl.burstAtMs)
       // 가치 상승 강조 — 도달 검(toId)이 강화 전(fromId)보다 비싸면 가격 표시를 한 번 통 튀게 한다.
       // "강화 성공으로 올랐다"는 사실은 이 분기에만 있으므로 여기서 판정한다(장착·판매와 구분).
       const pricePop =
@@ -505,19 +499,20 @@ export function GameScreen() {
       // 최고 단계가 바뀌어도 자동 동작한다.
       const terminal = !!next && next.nextId === null
       lockEnhance()
-      // 이름·판매가·가격 강조·클리어 모달을 떨림이 끝나는 burstAt 에 한 번에 공개한다 — store 는 검을 즉시
-      // 교체하지만 그 결과가 연출 전에 새지 않도록 미룬다(스프라이트 등장과 같은 박자).
-      scheduleReveal(pricePop, terminal)
+      // 이름·판매가·가격 강조·클리어 모달 + 보상 연출(백열·레벨 롤업)을 떨림이 끝나는 burstAt 에 한 번에
+      // 공개한다 — store 는 검을 즉시 교체하지만 그 결과가 연출 전에 새지 않도록 미룬다(스프라이트 등장과 같은 박자).
+      scheduleReveal({ pricePop, terminal, reward: true })
     } else if (result.outcome === 'destroyed') {
-      // 파괴 폭발 효과음 — 떨림이 끝나 폭발이 터지는 순간(burstAt)에 맞춰 울린다('캉!' 직후가 아닌 분출 시점).
+      // 파괴 효과음 — 떨림이 끝나 검이 무너지는 순간(burstAt)에 맞춰 울린다('캉!' 직후가 아닌 소멸 시점).
       sound.playSfx('enchant_destroyed', { delayMs: tl.burstAtMs })
-      // 파괴 = 폭발 연출 ∥ 재강화 가드. 파티클 수는 파괴된 검(fromId)의 단계에 비례.
-      // 스프라이트(fromId)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
+      // 파괴 햅틱 — 길고 묵직한 진동(상실감). 검이 무너지는 burstAt 에 맞춘다(미지원 단말은 무음 no-op).
+      vibrate(HAPTIC_DESTROY, tl.burstAtMs)
+      // 파괴 = 잔상 디졸브 소멸 ∥ 재강화 가드. 스프라이트(fromId)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
       const target = destructionTargetOf(result)
       const destroyed = target ? dataManager.getSwordById(target.id) : undefined
       if (target && destroyed) {
         // 잔상은 파괴된 검(fromId), 등장 억제는 떨림 끝(burstAt)까지 — 성공과 동일 안무(enqueueShakeBurst).
-        enqueueShakeBurst('destruction', destroyed.sprite, destroyed.level)
+        enqueueShakeBurst('destruction', destroyed.sprite)
       }
       // 드롭이 있으면 재료가 검 아래로 흩어져 떨어지는 연출(잠금X·병렬). 폭발(burstAt)이 드러난 직후
       // 떨어지도록 등장 시각을 타임라인에서 도출한다(무작위 떨림 길이만큼 함께 늦춰짐). 실제 인벤토리 수량은 store 반영됨.
@@ -536,8 +531,8 @@ export function GameScreen() {
       }
       lockEnhance()
       // 파괴로 시작 검(+1)으로 리셋된 결과도 떨림이 끝난 뒤 이름이 바뀌도록 공개를 미룬다
-      // (떨림·폭발 동안은 파괴된 검 이름을 유지 → 폭발이 드러나는 순간 +1 로 전환).
-      scheduleReveal(false, false)
+      // (떨림·디졸브 동안은 파괴된 검 이름을 유지 → 잔상이 사라지는 순간 +1 로 전환).
+      scheduleReveal({ pricePop: false, terminal: false, reward: false })
     } else if (result.outcome === 'protected') {
       // 방지 = 떨림만(폭발 없음) → 파괴보호장치 덕분에 살아남았음을 인지시킨다. 떨림은 망치가 닿는
       // 순간(impact)부터 무작위 길이(shake)만큼 — 성공/파괴 잔상 떨림과 동일 박자(SwordStage 가 실제 검을 흔든다).
@@ -584,25 +579,9 @@ export function GameScreen() {
   })
 
   // 연출 트리거는 effectStore 의 running 에서 뽑는다(생명주기·타이밍은 Effect 시스템이 소유). 대부분은
-  // "가장 최근" 1개만(latestRunning — 겹친 새 효과 유실 방지)이지만, 성공·파괴 버스트는 running 의 해당
-  // 효과를 전부 렌더한다(toBurstEvents) — 각 버스트가 자기 burstAt(임팩트 + 무작위 떨림 뒤)에 한 번씩
-  // emit 되도록(유실 방지). 최신 1개만 두면 잠금 해제 직후 재강화 시 옛 버스트의 emit 이 발사 전에 잘려
-  // 안 나올 수 있다. 재강화 잠금(lockMs = 버스트 + 가드 ~100ms)은 버스트 효과 수명(burstLifetimeMs =
-  // 버스트 + 파티클 비행 ~660ms)보다 짧아 빠른 재강화 시 버스트 효과가 running 에 여러 개 겹칠 수 있지만,
-  // 파티클 풀은 새 emit 마다 이전 버스트를 교체(replace)하므로 화면엔 늘 최신 한 벌만 보인다(겹침 없음).
-  // 주의: flatMap 이 running 변경마다 새 이벤트 객체를 만들어 각 연출의 useOneShot 백스톱 타이머가 매번
-  // 리셋되지만 무해하다 — 실제 unmount 는 effectStore 의 _finish(durationMs)가 소유하고 백스톱은 보조다.
-  const destructionEvents = useMemo<DestructionEvent[]>(
-    () => toBurstEvents(running, 'destruction'),
-    [running],
-  )
-  const successEvents = useMemo<SuccessEvent[]>(
-    () => toBurstEvents(running, 'successBurst'),
-    [running],
-  )
-  // 잔상(떨림→팝업)은 영속 단일 노드(ShakeAfterimage)가 그린다 — 색 무관(파티클만 색이 다름)이라 성공·파괴를
-  // 합쳐 "가장 최근" 버스트 1개만 그린다(망치·HitSpark 와 같은 latest 패턴). 연사로 버스트가 겹쳐도 잔상은
-  // 최신으로 하드 컷되고, 옛 버스트의 파티클은 위 emitter(successEvents/destructionEvents .map)가 책임진다.
+  // "가장 최근" 1개만 쓴다(latestRunning — 겹친 새 효과 유실 방지). 결과 잔상(떨림→정리)도 영속 단일
+  // 노드(ShakeAfterimage)라 성공·파괴를 합쳐 "가장 최근" 버스트 1개만 그린다(망치·HitSpark 와 같은 latest
+  // 패턴). 연사로 버스트가 겹쳐도 잔상은 최신으로 하드 컷된다 — 결과는 outcome(kind 파생)으로 가른다.
   const latestBurstEvent = useMemo<ShakeBurstEvent | null>(() => {
     const s = latestRunning(running, 'successBurst')
     const d = latestRunning(running, 'destruction')
@@ -717,9 +696,8 @@ export function GameScreen() {
           </div>
 
           {/* 중앙: 검 스테이지 + 결과 연출(오버레이). 고정폭 28rem 트랙이라 검 주위 여백은 트랙이 제공.
-              ParticleEmitProvider 로 감싸 풀(ParticlePool)과 소비자(Hit/버스트)가 같은 emit 을 공유한다. */}
-          <ParticleEmitProvider>
-            <div className="relative flex items-center justify-center">
+              성공=새 검 백열·파괴=잔상 디졸브로 결과를 보여 준다(파티클 분출 없음 — 임팩트 불꽃만 별개로 유지). */}
+          <div className="relative flex items-center justify-center">
               <SwordStage
                 sword={sword}
                 level={sword?.level ?? null}
@@ -740,24 +718,10 @@ export function GameScreen() {
                 }}
                 spriteOverlay={
                   <>
-                    {/* 파티클 풀 — 성공/파괴 버스트 도트를 캔버스 한 장에 그린다(Hit 불꽃은 별개 HitSparkCanvas — 맨 뒤에 둬
-                        검·잔상 위에 파티클이 얹히도록). 풀은 항상 마운트, 소비자가 emit 으로 재생을 요청한다.
-                        데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 — 풀이 없으면 버스트 emit 은
-                        자동 no-op(particleEmit.ts). 잔상 떨림·교대(ShakeBurstEffect)는 영향 없음. */}
-                    {anim.enhanceParticlesEnabled && <ParticlePool />}
-                    {/* 버스트 파티클 emit — 재강화 시 옛 버스트 emitter 가 유지돼야 대기 중 emit 이 안 잘려서, 각
-                        효과를 id 로 키잉해 독립적으로 burstAt 에 emit 한다. 렌더 null(파티클은 풀이 그림)이라
-                        다중·교체에도 레이어 churn 이 없고, 풀은 새 emit 마다 이전 버스트를 교체(replace)하므로
-                        화면엔 최신 한 벌만 보인다. 잔상 비주얼은 아래 영속 노드가 따로 그린다. */}
-                    {destructionEvents.map((ev) => (
-                      <DestructionEffect key={ev.id} event={ev} />
-                    ))}
-                    {successEvents.map((ev) => (
-                      <SuccessEffect key={ev.id} event={ev} />
-                    ))}
-                    {/* 잔상(떨림→팝업·소멸) — 성공·파괴 공통의 영속 단일 캔버스 한 장이 가장 최근 버스트를
-                        그린다(강화마다 마운트/언마운트하지 않아 모바일 교체 프레임 레이어 churn 제거). 소멸
-                        순간 새 검(entranceDelay)과 같은 burstAt 으로 정확히 교대된다. */}
+                    {/* 잔상(떨림→정리) — 성공·파괴 공통의 영속 단일 캔버스 한 장이 가장 최근 버스트를 그린다
+                        (강화마다 마운트/언마운트하지 않아 모바일 교체 프레임 레이어 churn 제거). 떨림이 끝나는
+                        순간(burstAt) 성공은 팝업 소멸, 파괴는 디졸브 소멸하며, 새 검(entranceDelay)과 같은
+                        burstAt 으로 정확히 교대된다(성공 검은 SwordStage 가 백열로 등장시킨다). */}
                     <ShakeAfterimage event={latestBurstEvent} />
                     {/* 망치는 결과 연출 위에 그린다. impactMs 로 닿는 시점을 데이터에서 받는다(떨림·불꽃·
                         타격음과 동일 앵커). 데이터 플래그(hammerSwingEnabled)로 끌 수 있다 — 마운트 자체를
@@ -772,7 +736,7 @@ export function GameScreen() {
                       />
                     )}
                     {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 불티·잉걸불·화구·불혀를 캔버스에 1회 폭발.
-                        가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 별개 캔버스 ParticlePool).
+                        가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(결과 연출과 무관한 임팩트 타격감).
                         ⚠️ 망치보다 "뒤"(DOM 아래)가 아니라 위에 둔다 — 불꽃의 화구·불혀는 임팩트 중심에서
                         피어나는데, 바로 그 자리에 망치 머리가 닿아 정지(holdAfter)하므로 망치 뒤에 깔면 핵심
                         연출이 통째로 가려진다. 임팩트 섬광이 잠깐(≤0.2s) 망치 머리를 삼키는 것이 의도된 강렬함.
@@ -797,6 +761,9 @@ export function GameScreen() {
                 shakeDurationSec={shakeDurationSec}
                 // 강화 성공으로 가치(판매가)가 오른 순간 가격 표시를 한 번 통 튀게 한다.
                 pricePopKey={pricePopKey}
+                // 강화 성공 보상 연출 — 새 검 백열(whiteHotKey) + 레벨 롤업(levelRollKey). 결과 공개 박자에 올린다.
+                whiteHotKey={whiteHotKey}
+                levelRollKey={levelRollKey}
                 // 판매 코인이 뿜어져 나올 출발점(검 박스) 측정용.
                 swordBoxRef={swordBoxRef}
               />
@@ -813,7 +780,6 @@ export function GameScreen() {
                 {announcement}
               </div>
             </div>
-          </ParticleEmitProvider>
 
           {/* 우: 강화 카드(비용 포함) + 판매 버튼(세로 중앙). 판매가는 검 스테이지에 금색으로 표시.
               보관은 좌측 인벤토리의 장착 행 클릭으로 옮겼다(별도 보관 버튼 없음).
