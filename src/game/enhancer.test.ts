@@ -45,7 +45,7 @@ function sword(over: Partial<SwordData> = {}): SwordData {
     // 헛방을 검증하는 테스트는 whiffWeight 를 명시적으로 켠다.
     whiffWeight: 0,
     destroyWeight: 1,
-    dropOnFail: null,
+    dropOnFail: [],
     notes: [],
     sprite: 'placeholder.png',
     ...over,
@@ -135,7 +135,7 @@ describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
   it('파괴보호장치 없이 실패하면 파괴되고 dropOnFail 이 drops 로 산출된다', () => {
     const s = sword({
       successRate: 0.5,
-      dropOnFail: { itemId: 'iron_scrap', count: 1 },
+      dropOnFail: [{ itemId: 'iron_scrap', count: 1, chance: 1 }],
       protectionTickets: 3,
     })
     const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
@@ -147,18 +147,63 @@ describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
   it('dropOnFail 수량이 1보다 크면 그 수량만큼 drops 로 산출된다', () => {
     const s = sword({
       successRate: 0.5,
-      dropOnFail: { itemId: 'iron_scrap', count: 10 },
+      dropOnFail: [{ itemId: 'iron_scrap', count: 10, chance: 1 }],
     })
     const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
     expect(r.outcome).toBe('destroyed')
     expect(r.drops).toEqual([{ itemId: 'iron_scrap', count: 10 }])
   })
 
-  it('dropOnFail 이 없으면 파괴돼도 drops 가 비어 있다', () => {
-    const s = sword({ successRate: 0.5, dropOnFail: null })
+  it('dropOnFail 이 비어 있으면 파괴돼도 drops 가 비어 있다', () => {
+    const s = sword({ successRate: 0.5, dropOnFail: [] })
     const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
     expect(r.outcome).toBe('destroyed')
     expect(r.drops).toEqual([])
+  })
+
+  it('여러 후보가 모두 chance 1 이면 파괴 시 전부 동시에 드랍된다(한 번에 N종)', () => {
+    const s = sword({
+      successRate: 0.5,
+      dropOnFail: [
+        { itemId: 'iron_scrap', count: 2, chance: 1 },
+        { itemId: 'dark_matter', count: 1, chance: 1 },
+      ],
+    })
+    const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
+    expect(r.outcome).toBe('destroyed')
+    expect(r.drops).toEqual([
+      { itemId: 'iron_scrap', count: 2 },
+      { itemId: 'dark_matter', count: 1 },
+    ])
+  })
+
+  it('chance<1 후보는 독립 롤로 포함/제외된다(결정적 rng)', () => {
+    const s = sword({
+      successRate: 0.5,
+      dropOnFail: [{ itemId: 'iron_scrap', count: 1, chance: 0.3 }],
+    })
+    // 1차 rng≥0.5 → 실패(파괴 확정 — 헛방/파괴 weight 0:1 이라 2차는 rng 미소비). 다음 rng = 드랍 롤.
+    const hit = new Enhancer(seq(0.9, 0.2)).enhance({ sword: s, supply: RICH })
+    expect(hit.drops).toEqual([{ itemId: 'iron_scrap', count: 1 }]) // 0.2 < 0.3 → 드랍
+    const miss = new Enhancer(seq(0.9, 0.5)).enhance({ sword: s, supply: RICH })
+    expect(miss.drops).toEqual([]) // 0.5 < 0.3 거짓 → 미드랍
+  })
+
+  it('확정(chance 1) 후보는 rng 미소비로 항상 포함되고, 확률 후보만 굴려진다', () => {
+    const s = sword({
+      successRate: 0.5,
+      dropOnFail: [
+        { itemId: 'iron_scrap', count: 5, chance: 1 }, // 확정 — rng 소비 안 함
+        { itemId: 'dark_matter', count: 1, chance: 0.5 }, // 확률 — rng 1회
+      ],
+    })
+    // seq(0.9, 0.1): 1차 0.9 → 실패. 확정 후보가 rng 를 소비했다면 확률 후보 롤은 0.9 가 되어 미드랍될 것.
+    // 0.1 이 확률 후보 롤로 쓰였다는 것(0.1<0.5 → 드랍)이 곧 확정 후보가 rng 미소비임을 증명한다.
+    const r = new Enhancer(seq(0.9, 0.1)).enhance({ sword: s, supply: RICH })
+    expect(r.drops).toEqual([
+      { itemId: 'iron_scrap', count: 5 },
+      { itemId: 'dark_matter', count: 1 },
+    ])
   })
 })
 
@@ -168,7 +213,7 @@ describe('Enhancer — 헛방(whiff) 분기', () => {
       successRate: 0.5,
       whiffWeight: 1,
       destroyWeight: 0,
-      dropOnFail: { itemId: 'iron_scrap', count: 1 },
+      dropOnFail: [{ itemId: 'iron_scrap', count: 1, chance: 1 }],
     })
     const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
     expect(r.outcome).toBe('whiff')
@@ -251,7 +296,7 @@ describe('Enhancer — 파괴보호장치 (req 4)', () => {
   const protectable = sword({
     level: 14,
     successRate: 0.5,
-    dropOnFail: { itemId: 'iron_scrap', count: 1 },
+    dropOnFail: [{ itemId: 'iron_scrap', count: 1, chance: 1 }],
     protectionTickets: 3,
   })
   const withTickets: EnhanceInput['supply'] = {

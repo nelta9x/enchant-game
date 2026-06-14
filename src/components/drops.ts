@@ -71,8 +71,8 @@ export type DropTokenSpec = {
 // 대표할 수 있다. 각 스택의 수량을 그 스택에 배정된 토큰들에 고르게 분배해(base/remainder) 토큰의
 // count 합이 항상 실제 수량과 같게 한다(수집 시 정확히 그 수만큼 인벤토리로 들어간다). 토큰은 검
 // 중심 아래에 좌우로 흩어지고, 짝/홀로 두 줄을 이뤄 겹침을 줄인다.
-// (dropOnFail 은 항상 단일 스택이므로 실질적으로 단일 스택 경로만 탄다 — 다중 스택은 형태만 일반화.
-//  토큰 예산을 초과하는 다중 스택의 잔여 수량은 토큰으로 표현되지 않지만 flushDrops 가 회수한다.)
+// (파괴 시 dropOnFail 후보가 엔트리별 독립 추첨으로 통과해 여러 종이 동시에 떨어질 수 있으므로
+//  drops 는 다중 스택일 수 있다 — 토큰 예산을 초과하는 잔여 수량은 토큰으로 표현되지 않지만 flushDrops 가 회수한다.)
 export function makeDropTokens(
   drops: readonly { itemId: string; count: number }[],
 ): DropTokenSpec[] {

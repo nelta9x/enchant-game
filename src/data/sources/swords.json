@@ -102,10 +102,7 @@
     "protectionTickets": 0,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "iron_scrap",
-      "count": 1
-    },
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 1, "chance": 1 }],
     "sprite": "wangfu.png"
   },
   {
@@ -121,10 +118,7 @@
     "protectionTickets": 0,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "iron_scrap",
-      "count": 1
-    },
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 1, "chance": 1 }],
     "sprite": "cutlass.png"
   },
   {
@@ -140,10 +134,7 @@
     "protectionTickets": 0,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "iron_scrap",
-      "count": 1
-    },
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 1, "chance": 1 }],
     "sprite": "ssaurabillongsword.png"
   },
   {
@@ -159,10 +150,7 @@
     "protectionTickets": 1,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "iron_scrap",
-      "count": 2
-    },
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 2, "chance": 1 }],
     "sprite": "zard.png"
   },
   {
@@ -178,10 +166,7 @@
     "protectionTickets": 1,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "iron_scrap",
-      "count": 3
-    },
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 3, "chance": 1 }],
     "sprite": "alibaba.png"
   },
   {
@@ -197,10 +182,7 @@
     "protectionTickets": 1,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "iron_scrap",
-      "count": 5
-    },
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 5, "chance": 1 }],
     "sprite": "witsend.png"
   },
   {
@@ -216,10 +198,7 @@
     "protectionTickets": 1,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "dark_matter",
-      "count": 1
-    },
+    "dropOnFail": [{ "itemId": "dark_matter", "count": 1, "chance": 1 }],
     "sprite": "blackwidow.png"
   },
   {
@@ -235,10 +214,7 @@
     "protectionTickets": 2,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "flame_sword_handle",
-      "count": 1
-    },
+    "dropOnFail": [{ "itemId": "flame_sword_handle", "count": 1, "chance": 1 }],
     "sprite": "redlotus.png"
   },
   {
@@ -254,10 +230,7 @@
     "protectionTickets": 3,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "iron_scrap",
-      "count": 10
-    },
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 10, "chance": 1 }],
     "sprite": "sachsen.png"
   },
   {
@@ -273,10 +246,7 @@
     "protectionTickets": 4,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "iron_scrap",
-      "count": 15
-    },
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 15, "chance": 1 }],
     "sprite": "maxcalibur.png"
   },
   {
@@ -292,10 +262,7 @@
     "protectionTickets": 7,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "iron_scrap",
-      "count": 20
-    },
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 20, "chance": 1 }],
     "sprite": "frostfang.png"
   },
   {
@@ -422,10 +389,7 @@
     "protectionTickets": 23,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": {
-      "itemId": "dark_matter",
-      "count": 20
-    },
+    "dropOnFail": [{ "itemId": "dark_matter", "count": 20, "chance": 1 }],
     "sprite": "evilswordapophis.png"
   },
   {

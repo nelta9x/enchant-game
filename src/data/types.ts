@@ -9,9 +9,12 @@ export type Material =
   | { kind: 'item'; itemId: string; count: number }
   | { kind: 'free' }
 
-// 강화 실패(파괴) 시 드랍되는 아이템 + 수량(언어 중립). null = 드랍 없음.
-// 구조는 인벤토리 한 칸(ItemStack)과 같지만 데이터 레이어 독립을 위해 별도로 둔다.
-export type Drop = { itemId: string; count: number }
+// 강화 실패(파괴) 시 드랍될 수 있는 아이템 후보 1건(언어 중립). 파괴 시 후보마다 chance 로 독립
+// 추첨해(가중 추첨 아님) 통과한 것들이 동시에 떨어진다 — 한 번에 0~N종이 산출될 수 있다.
+//  - itemId / count: 떨어질 아이템과 그 수량(count 는 양의 정수, 확률 통과 시 고정 수량)
+//  - chance: 이 후보가 떨어질 독립 확률(0 < chance <= 1). 1 = 항상. successRate 와 같은 0~1 표기.
+// 구조의 itemId/count 부분은 인벤토리 한 칸(ItemStack)과 같지만 데이터 레이어 독립을 위해 별도로 둔다.
+export type Drop = { itemId: string; count: number; chance: number }
 
 // 상점 판매 항목(언어 중립). 항목 식별자(id)는 지급 itemId와 분리한다 —
 // 같은 itemId를 서로 다른 가격(골드 / 아이템)으로 여러 항목에서 팔 수 있기 때문이다.
@@ -201,7 +204,9 @@ export type SwordData = {
   // successRate 가 그대로 담당하고, 실패했을 때만 이 둘로 2차 추첨한다(둘 다 비음 정수, 합 > 0).
   whiffWeight: number // 헛방(검 보존) 가중치
   destroyWeight: number // 파괴 가중치
-  dropOnFail: Drop | null // 파괴 시 드랍되는 아이템 + 수량, null = 없음
+  // 파괴 시 드랍될 수 있는 아이템 후보 목록. 빈 배열 = 드랍 없음. 후보마다 chance 로 독립 추첨하므로
+  // 파괴 1회에 0~N종이 동시에 떨어질 수 있다(엔진이 통과분을 ItemStack[]로 산출).
+  dropOnFail: Drop[]
   notes: SwordNote[]
   // 스프라이트 파일명(예: 'rusty_dagger.png'). 전용 스프라이트가 없는 단계는
   // 로더가 마지막(최고 단계) 보유 스프라이트로 채운다(임시). 디렉토리/URL은 뷰에서 해석.
