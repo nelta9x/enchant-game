@@ -13,8 +13,10 @@ import { ItemIcon } from './ItemIcon'
 //  - 비용 칩은 시각적으로 아이콘+수량만 보여 주되, aria-label 로 스크린리더에 비용을 설명한다(접근성 보존).
 // 상태별 표현:
 //  - 가능(ready = 강화 가능 && 쿨다운 아님): 금색 글로우 + 펄스 링. 클릭 가능.
-//  - 쿨다운(charging): 황금 게이지가 버튼을 좌→우로 점점 채우며 "충전 중"을 프로그래스바처럼 보여 준다.
-//    더 이상 흐리게(disabled) 만들지 않는다 — 풀 밝기 유지, 클릭은 무시(GameScreen 의 잠금 가드).
+//  - 쿨다운(charging): 버튼 표면 자체가 좌→우로 황금색으로 차오른다(프로그래스바). 반투명 덮기가 아니라,
+//    같은 내용(라벨/비용)을 "황금 표면 + 어두운 글자" 사본으로 겹쳐 두고 채움 비율만큼 클립해 드러내
+//    경계에서 글자색까지 뒤집는다 — 칙칙한 알파 블렌딩 없이 또렷한 금빛. 흐리게(disabled) 만들지 않고
+//    풀 밝기 유지, 클릭은 무시(GameScreen 의 잠금 가드).
 //  - 진짜 비활성(검 없음/비용 부족/최종): 흐리게(opacity-40) — 아예 누를 수 없음을 명확히.
 // aria-keyshortcuts="Space"로 데스크탑 단축키를 알린다(ARIA 키 토큰이라 로케일 무관 — i18n 대상 아님.
 // 실제 처리는 useEnhanceHotkey).
@@ -49,10 +51,10 @@ export function EnhanceButton({
     onFire: onEnhance,
   })
 
-  // 쿨다운 게이지(프로그래스바) — 황금 채움이 버튼을 좌→우로 점점 채운다. 채움 경계 보간은 CSS 가
-  // 소유한다(fx-cooldown-fill + @property — index.css): JS(motion)로 매 프레임 배경 문자열을
+  // 쿨다운 채움(프로그래스바) — 황금 표면 사본이 좌→우로 차오른다. 채움 경계(클립 비율) 보간은 CSS 가
+  // 소유한다(fx-cooldown-fill + @property — index.css): JS(motion)로 매 프레임 인라인 스타일을
   // 갱신하면 연사 중(거의 항상 쿨다운) 60fps 스타일 리캘크가 계속 돌기 때문. charging 이 새로 켜질
-  // 때마다 사이클 키를 올려 게이지를 재마운트 → CSS 애니메이션이 처음(0% = 빈 게이지)부터 깨끗하게
+  // 때마다 사이클 키를 올려 채움을 재마운트 → CSS 애니메이션이 처음(0% = 빈 게이지)부터 깨끗하게
   // 재시작한다(연사의 true→false→true 토글마다).
   // 전이 감지는 렌더 중 이전 값 비교(공식 "adjusting state during render" 패턴 — effect 의 set 회피).
   const [cooldownCycle, setCooldownCycle] = useState(0)
@@ -63,7 +65,8 @@ export function EnhanceButton({
   }
 
   // 강화 조건 칩 — 골드/아이템만 표시(무료·최종 단계는 null). 아이콘+수량만 시각화하고 aria-label 로 설명.
-  const renderCost = () => {
+  // onGold: 황금 채움 사본 위에 그릴 때(true)는 글자·구분선을 어두운 잉크색으로 뒤집어 금빛 위에서 읽히게 한다.
+  const renderCost = (onGold: boolean) => {
     if (enchantCost === null || enchantCost.kind === 'free') return null
     const { icon, qty, label } =
       enchantCost.kind === 'gold'
@@ -80,10 +83,16 @@ export function EnhanceButton({
           }
     return (
       <>
-        <span className="relative h-px w-14 bg-on-dark-soft/30" aria-hidden />
         <span
-          className="relative flex items-center justify-center gap-1.5 text-sm font-bold tabular-nums text-on-dark"
-          aria-label={`${t('cost.enhance')}: ${label}`}
+          className={`relative h-px w-14 ${onGold ? 'bg-ink/30' : 'bg-on-dark-soft/30'}`}
+          aria-hidden
+        />
+        <span
+          className={`relative flex items-center justify-center gap-1.5 text-sm font-bold tabular-nums ${
+            onGold ? 'text-ink' : 'text-on-dark'
+          }`}
+          // 황금 사본은 base 와 글자만 같고 시각 중복이라 스크린리더에서 숨긴다(접근성은 base 가 전담).
+          aria-label={onGold ? undefined : `${t('cost.enhance')}: ${label}`}
         >
           {icon}
           {/* 금액/수량 슬롯 고정(min-w) — 비용이 바뀌어도 칩 폭이 변하지 않게 자리를 미리 잡는다. */}
@@ -94,6 +103,26 @@ export function EnhanceButton({
       </>
     )
   }
+
+  // 버튼 안쪽 내용(라벨 + 비용) — base/gold 두 톤으로 두 번 그린다. base 는 평소(어두운 표면 위 금색)이고,
+  // gold 는 쿨다운 채움 사본(황금 표면 위 어두운 글자)이라 채움 경계에서 글자색이 정확히 뒤집힌다.
+  const renderContent = (onGold: boolean) => (
+    <>
+      {/* "강화" 라벨 — base 는 강화 수치용 UI 금색(text-gold, 진짜 비활성만 흐린 색), gold 사본은 잉크색. */}
+      <span
+        className={`relative text-2xl font-extrabold tracking-wide ${
+          onGold
+            ? 'text-ink'
+            : !ready && !charging
+              ? 'text-on-dark-soft'
+              : 'text-gold'
+        }`}
+      >
+        {t('action.enhance')}
+      </span>
+      {renderCost(onGold)}
+    </>
+  )
 
   return (
     <motion.button
@@ -110,7 +139,7 @@ export function EnhanceButton({
         ready
           ? 'cursor-pointer border-gold/60 shadow-[0_0_28px_-4px_var(--color-gold)]' // 가능 — 금색 글로우 + 펄스
           : charging
-            ? 'cursor-wait border-gold/40' // 쿨다운 — 검은 스윕 오버레이가 덮음(흐리지 않게 풀 밝기)
+            ? 'cursor-wait border-gold/40' // 쿨다운 — 황금 채움이 표면을 좌→우로 덮음(흐리지 않게 풀 밝기)
             : 'cursor-not-allowed border-panel-edge opacity-40 saturate-50' // 진짜 비활성 — 흐림
       }`}
     >
@@ -119,34 +148,31 @@ export function EnhanceButton({
       {ready && (
         <span className="fx-pulse-ring pointer-events-none absolute inset-0 rounded-2xl border border-gold-glow" />
       )}
-      {/* "강화" 라벨은 강화 수치(검 +레벨 등)에 쓰는 UI 금색(text-gold)으로 통일해 일관된 느낌을 준다.
-          진짜 비활성일 때만 흐린 색으로 둔다(쿨다운 중엔 켜진 금색 유지 — 곧 다시 가능하다는 인상). */}
-      <span
-        className={`relative text-2xl font-extrabold tracking-wide ${
-          !ready && !charging ? 'text-on-dark-soft' : 'text-gold'
-        }`}
-      >
-        {t('action.enhance')}
-      </span>
-      {renderCost()}
-      {/* 쿨다운 게이지(프로그래스바) — 라벨/비용 위(z-10)에 얹어 버튼 전체를 좌→우로 채운다. 채움은
-          반투명 황금(gold 토큰에서 color-mix 로 파생 — hex 하드코딩 금지)이라 텍스트가 비쳐 가독성을
-          지킨다. 왼쪽부터 채움(좌~경계 = 황금), 경계~우 = 투명 — 같은 길이의 하드 스톱이 또렷한 게이지
-          끝선을 만든다. 채움 경계는 CSS 애니메이션(fx-cooldown-fill, forwards)이 0%→100% 차오르고,
-          쿨다운이 끝나면 opacity 만 0.15s 로 거둔다(정상 종료 땐 이미 가득 차 있고, 타이밍이 어긋나도
-          부드럽게 사라진다). overflow-hidden + rounded-2xl 가 버튼 모양대로 잘라 준다. */}
+      {/* 기본 내용(어두운 표면 위 금색) — 쿨다운 미충전 영역의 모습. */}
+      {renderContent(false)}
+      {/* 쿨다운 황금 채움 — 같은 내용을 "황금 표면 + 어두운 글자" 사본으로 z-10 에 겹쳐 두고, 채움 비율
+          (--cooldown-fill)만큼 좌→우로 클립해 드러낸다. 경계 왼쪽은 이 사본(금빛), 오른쪽은 클립돼 base
+          (어두움)가 비친다 — 같은 자리에 겹쳐 그렸기에 경계에서 표면·글자색이 동시에 뒤집힌다. 표면은
+          불투명 금속 그라데이션(gold→frame 토큰, hex 하드코딩 금지)이라 알파 블렌딩의 칙칙함이 없다.
+          클립 비율은 CSS 애니메이션(fx-cooldown-fill, forwards)이 0%→100% 차오르고, 쿨다운이 끝나면
+          opacity 만 0.15s 로 거둔다(정상 종료 땐 이미 가득 차 있고, 타이밍이 어긋나도 부드럽게 사라진다).
+          overflow-hidden + rounded-2xl 가 버튼 모양대로 잘라 주고, inset-0 + 같은 flex/padding 으로 base
+          와 글자 위치를 픽셀 단위로 맞춘다. */}
       <span
         key={cooldownCycle}
         aria-hidden
-        className={`pointer-events-none absolute inset-0 z-10 rounded-2xl transition-opacity duration-150 ease-out ${
+        className={`pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl px-3 py-5 transition-opacity duration-150 ease-out ${
           charging ? 'opacity-100' : 'opacity-0'
         }`}
         style={{
           background:
-            'linear-gradient(to right, color-mix(in srgb, var(--color-gold) 34%, transparent) var(--cooldown-fill), transparent var(--cooldown-fill))',
+            'linear-gradient(to right, transparent calc(var(--cooldown-fill) - 10px), color-mix(in srgb, var(--color-gold-glow) 70%, transparent) var(--cooldown-fill)), linear-gradient(to bottom, var(--color-gold), var(--color-frame))',
+          clipPath: 'inset(0 calc(100% - var(--cooldown-fill)) 0 0)',
           animation: `fx-cooldown-fill ${Math.max(chargeMs, 0)}ms linear forwards`,
         }}
-      />
+      >
+        {renderContent(true)}
+      </span>
     </motion.button>
   )
 }
