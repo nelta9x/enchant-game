@@ -171,19 +171,20 @@ button {
   animation: fx-pulse-ring 1.6s ease-out infinite;
 }
 
-/* 강화 쿨다운 스윕(EnhanceButton) — conic-gradient 의 경계각(등록된 커스텀 프로퍼티)을 CSS 가
-   보간한다. JS(motion)로 매 프레임 배경 문자열을 갱신하면 연사 중(거의 항상 쿨다운) 60fps 스타일
-   리캘크가 계속 돌기 때문. @property 미지원 브라우저에선 50% 지점 이산 점프로 열화되지만 쿨다운
-   인지는 보존된다(분기 없음). 지속시간은 쿨다운마다 달라 인라인으로 준다. reduced-motion 에도
-   유지 — "언제 다시 누를 수 있나"를 전달하는 정보 연출이라 멈추면 오히려 해롭다. */
-@property --cooldown-sweep {
-  syntax: '<angle>';
+/* 강화 쿨다운 게이지(EnhanceButton) — 황금 채움이 좌→우로 차오르는 프로그래스바. linear-gradient
+   의 채움 경계(등록된 커스텀 프로퍼티)를 CSS 가 보간한다. JS(motion)로 매 프레임 배경 문자열을
+   갱신하면 연사 중(거의 항상 쿨다운) 60fps 스타일 리캘크가 계속 돌기 때문. @property 미지원
+   브라우저에선 50% 지점 이산 점프로 열화되지만 쿨다운 인지는 보존된다(분기 없음). 지속시간은
+   쿨다운마다 달라 인라인으로 준다. reduced-motion 에도 유지 — "언제 다시 누를 수 있나"를 전달하는
+   정보 연출이라 멈추면 오히려 해롭다. */
+@property --cooldown-fill {
+  syntax: '<length-percentage>';
   inherits: false;
-  initial-value: 0deg;
+  initial-value: 0%;
 }
-@keyframes fx-cooldown-sweep {
+@keyframes fx-cooldown-fill {
   to {
-    --cooldown-sweep: 360deg;
+    --cooldown-fill: 100%;
   }
 }
 

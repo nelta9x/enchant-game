@@ -13,13 +13,13 @@ import { ItemIcon } from './ItemIcon'
 //  - 비용 칩은 시각적으로 아이콘+수량만 보여 주되, aria-label 로 스크린리더에 비용을 설명한다(접근성 보존).
 // 상태별 표현:
 //  - 가능(ready = 강화 가능 && 쿨다운 아님): 금색 글로우 + 펄스 링. 클릭 가능.
-//  - 쿨다운(charging): 게임 스킬 아이콘처럼 검은 원형 오버레이가 버튼을 덮고 시계방향으로 걷히며 "충전 중"을
-//    보여 준다. 더 이상 흐리게(disabled) 만들지 않는다 — 풀 밝기 유지, 클릭은 무시(GameScreen 의 잠금 가드).
+//  - 쿨다운(charging): 황금 게이지가 버튼을 좌→우로 점점 채우며 "충전 중"을 프로그래스바처럼 보여 준다.
+//    더 이상 흐리게(disabled) 만들지 않는다 — 풀 밝기 유지, 클릭은 무시(GameScreen 의 잠금 가드).
 //  - 진짜 비활성(검 없음/비용 부족/최종): 흐리게(opacity-40) — 아예 누를 수 없음을 명확히.
 // aria-keyshortcuts="Space"로 데스크탑 단축키를 알린다(ARIA 키 토큰이라 로케일 무관 — i18n 대상 아님.
 // 실제 처리는 useEnhanceHotkey).
-//  - charging: 강화 쿨다운(입력 잠금) 중인지. 쿨다운 오버레이 표시·걷힘 타이밍에 쓴다.
-//  - chargeMs: 쿨다운 길이(= 직전 강화의 타임라인 lockMs = 떨림 끝 + 재강화 가드). 오버레이가 한 바퀴 걷히는 시간 기준.
+//  - charging: 강화 쿨다운(입력 잠금) 중인지. 쿨다운 게이지 표시·채움 타이밍에 쓴다.
+//  - chargeMs: 쿨다운 길이(= 직전 강화의 타임라인 lockMs = 떨림 끝 + 재강화 가드). 게이지가 끝까지 차오르는 시간 기준.
 type EnhanceButtonProps = {
   disabled: boolean
   charging: boolean
@@ -49,11 +49,11 @@ export function EnhanceButton({
     onFire: onEnhance,
   })
 
-  // 쿨다운 오버레이(게임 스킬 아이콘의 "쿨타임 스윕") — 검은 원뿔(conic) 마스크가 버튼을 덮고, 시계방향으로
-  // 투명 영역이 자라며 걷힌다. 각도 보간은 CSS 가 소유한다(fx-cooldown-sweep + @property — index.css):
-  // JS(motion)로 매 프레임 배경 문자열을 갱신하면 연사 중(거의 항상 쿨다운) 60fps 스타일 리캘크가 계속
-  // 돌기 때문. charging 이 새로 켜질 때마다 사이클 키를 올려 오버레이를 재마운트 → CSS 애니메이션이
-  // 처음(0deg = 가득 덮임)부터 깨끗하게 재시작한다(연사의 true→false→true 토글마다).
+  // 쿨다운 게이지(프로그래스바) — 황금 채움이 버튼을 좌→우로 점점 채운다. 채움 경계 보간은 CSS 가
+  // 소유한다(fx-cooldown-fill + @property — index.css): JS(motion)로 매 프레임 배경 문자열을
+  // 갱신하면 연사 중(거의 항상 쿨다운) 60fps 스타일 리캘크가 계속 돌기 때문. charging 이 새로 켜질
+  // 때마다 사이클 키를 올려 게이지를 재마운트 → CSS 애니메이션이 처음(0% = 빈 게이지)부터 깨끗하게
+  // 재시작한다(연사의 true→false→true 토글마다).
   // 전이 감지는 렌더 중 이전 값 비교(공식 "adjusting state during render" 패턴 — effect 의 set 회피).
   const [cooldownCycle, setCooldownCycle] = useState(0)
   const [prevCharging, setPrevCharging] = useState(charging)
@@ -129,12 +129,12 @@ export function EnhanceButton({
         {t('action.enhance')}
       </span>
       {renderCost()}
-      {/* 쿨다운 스윕 오버레이 — 라벨/비용 위(z-10)에 얹어 게임 스킬 아이콘처럼 버튼 전체를 덮는다.
-          12시(0deg)부터 시계방향: 0~각도 = 투명(드러남), 각도~360 = 검정(덮임) — 같은 각도의 하드
-          스톱이 또렷한 파이 경계를 만든다(rgba 0.55 = 쿨타임 특유의 반투명 어둠). 각도는 CSS 애니메이션
-          (fx-cooldown-sweep, forwards)이 한 바퀴 걷고, 쿨다운이 끝나면 opacity 만 0.15s 로 거둔다
-          (정상 종료 땐 이미 전부 투명이라 안 보이고, 타이밍이 어긋나 잔여가 남아도 부드럽게 사라진다).
-          overflow-hidden + rounded-2xl 가 버튼 모양대로 잘라 준다. */}
+      {/* 쿨다운 게이지(프로그래스바) — 라벨/비용 위(z-10)에 얹어 버튼 전체를 좌→우로 채운다. 채움은
+          반투명 황금(gold 토큰에서 color-mix 로 파생 — hex 하드코딩 금지)이라 텍스트가 비쳐 가독성을
+          지킨다. 왼쪽부터 채움(좌~경계 = 황금), 경계~우 = 투명 — 같은 길이의 하드 스톱이 또렷한 게이지
+          끝선을 만든다. 채움 경계는 CSS 애니메이션(fx-cooldown-fill, forwards)이 0%→100% 차오르고,
+          쿨다운이 끝나면 opacity 만 0.15s 로 거둔다(정상 종료 땐 이미 가득 차 있고, 타이밍이 어긋나도
+          부드럽게 사라진다). overflow-hidden + rounded-2xl 가 버튼 모양대로 잘라 준다. */}
       <span
         key={cooldownCycle}
         aria-hidden
@@ -143,8 +143,8 @@ export function EnhanceButton({
         }`}
         style={{
           background:
-            'conic-gradient(from 0deg, transparent var(--cooldown-sweep), rgba(0,0,0,0.55) var(--cooldown-sweep))',
-          animation: `fx-cooldown-sweep ${Math.max(chargeMs, 0)}ms linear forwards`,
+            'linear-gradient(to right, color-mix(in srgb, var(--color-gold) 34%, transparent) var(--cooldown-fill), transparent var(--cooldown-fill))',
+          animation: `fx-cooldown-fill ${Math.max(chargeMs, 0)}ms linear forwards`,
         }}
       />
     </motion.button>
