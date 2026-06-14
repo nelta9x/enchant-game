@@ -13,11 +13,13 @@ import { ItemIcon } from './ItemIcon'
 const GOLD_OUTLINE =
   '1px 0 0 var(--color-gold-ink), -1px 0 0 var(--color-gold-ink), 0 1px 0 var(--color-gold-ink), 0 -1px 0 var(--color-gold-ink), 1px 1px 0 var(--color-gold-ink), -1px 1px 0 var(--color-gold-ink), 1px -1px 0 var(--color-gold-ink), -1px -1px 0 var(--color-gold-ink), 0 2px 3px rgba(0,0,0,0.3)'
 
-// 강화 버튼 표면 = 밝은 골드 배너(레퍼런스 타이틀 바 톤). 왼쪽 옅은 골드(gold-glow)에서 시작해
-// 약 50% 지점부터 오른쪽 끝으로 갈수록 노란 골드(gold)가 강조되는 가로 그라데이션. hex 하드코딩
-// 금지 규약대로 토큰에서 파생.
+// 강화 버튼 표면 = 골드 배너(레퍼런스 타이틀 바 톤). 왼쪽 옅은 골드(gold-glow)에서 시작해 약 50%
+// 지점부터 오른쪽 끝으로 갈수록 노란 골드(gold)가 강조되는 가로 그라데이션. 다만 순 토큰 그대로는
+// 무대 위에서 너무 튀어, 각 스톱을 따뜻한 갈금색(gold-ink) 쪽으로 살짝 섞어 채도·명도를 한 단계
+// 낮춘 "톤다운 골드"를 쓴다. hex 하드코딩 금지 규약대로 토큰에서 color-mix 로 파생(글로벌 gold
+// 토큰은 그대로 — 판매가·+N·재화는 영향 없음).
 const BANNER_BG =
-  'linear-gradient(to right, var(--color-gold-glow), var(--color-gold-glow) 45%, var(--color-gold))'
+  'linear-gradient(to right, color-mix(in srgb, var(--color-gold-glow) 82%, var(--color-gold-ink)), color-mix(in srgb, var(--color-gold-glow) 82%, var(--color-gold-ink)) 45%, color-mix(in srgb, var(--color-gold) 84%, var(--color-gold-ink)))'
 
 // 쿨다운 "리차지" 오버레이 — 평소엔 가득 밝은 배너. 쿨다운 시작에 어둡게 "소진"됐다가 밝은 골드가
 // 좌→우로 다시 차오른다. 이 오버레이는 아직 안 찬(오른쪽) 영역을 어둡게 덮고, 채움 비율(--cooldown-fill)
@@ -128,7 +130,7 @@ export function EnhanceButton({
       // 연사(useHoldRepeat)가 pointercancel 로 끊기지 않게 한다(페이지는 한 화면 맞춤이라 스크롤 손실 없음).
       className={`relative flex w-full touch-none flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 px-3 py-5 transition-opacity ${
         ready
-          ? 'cursor-pointer border-frame shadow-[0_0_28px_-4px_var(--color-gold)]' // 가능 — 금색 글로우 + 펄스
+          ? 'cursor-pointer border-frame shadow-[0_0_20px_-6px_var(--color-gold)]' // 가능 — 금색 글로우(톤다운) + 펄스
           : charging
             ? 'cursor-wait border-frame' // 쿨다운 — 리차지 오버레이가 좌→우로 차오름(흐리지 않게 풀 밝기)
             : 'cursor-not-allowed border-panel-edge opacity-40 saturate-50' // 진짜 비활성 — 흐림
