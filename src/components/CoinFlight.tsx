@@ -84,9 +84,8 @@ function CoinBurst({
 }
 
 // 코인 1개 — 공유 비행 칩(FlightChip)에 코인 PNG 를 실어 보낸다. 튀어올라 체공 후 흡수·페이드
-// 안무는 FlightChip 가 소유하며 아이템 비행과 위치·크기·투명도 곡선을 공유한다. 코인만 다른 점은
-// (1) 빨려들 때 회전한다(FlightChip spin 기본 true — 아이템 비행은 spin=false 로 끈다), (2) 실리는
-// 내용(같은 PNG 1장)과 칩 크기(spec.size).
+// 안무는 FlightChip 가 소유하며 아이템 비행과 위치·크기·투명도 곡선을 공유한다(회전 없음). 코인만
+// 다른 점은 실리는 내용(같은 PNG 1장)과 칩 크기(spec.size).
 function CoinChip({
   spec,
   source,
