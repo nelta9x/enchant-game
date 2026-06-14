@@ -13,11 +13,11 @@ import { ItemIcon } from './ItemIcon'
 const GOLD_OUTLINE =
   '1px 0 0 var(--color-gold-ink), -1px 0 0 var(--color-gold-ink), 0 1px 0 var(--color-gold-ink), 0 -1px 0 var(--color-gold-ink), 1px 1px 0 var(--color-gold-ink), -1px 1px 0 var(--color-gold-ink), 1px -1px 0 var(--color-gold-ink), -1px -1px 0 var(--color-gold-ink), 0 2px 3px rgba(0,0,0,0.3)'
 
-// 강화 버튼 표면 = 밝은 골드 배너(레퍼런스 타이틀 바 톤). 위쪽 밝은 골드(gold-glow)→골드(gold)
-// 세로 그라데이션 위에 옅은 하프톤 점(frame 토큰)을 깔아 캐주얼 게임풍 질감을 준다. hex 하드코딩
+// 강화 버튼 표면 = 밝은 골드 배너(레퍼런스 타이틀 바 톤). 왼쪽 옅은 골드(gold-glow)에서 시작해
+// 약 50% 지점부터 오른쪽 끝으로 갈수록 노란 골드(gold)가 강조되는 가로 그라데이션. hex 하드코딩
 // 금지 규약대로 토큰에서 파생.
 const BANNER_BG =
-  'radial-gradient(circle, color-mix(in srgb, var(--color-frame) 30%, transparent) 0.07rem, transparent 0.11rem) 0 0 / 0.5rem 0.5rem, linear-gradient(to bottom, var(--color-gold-glow), var(--color-gold))'
+  'linear-gradient(to right, var(--color-gold-glow), var(--color-gold-glow) 45%, var(--color-gold))'
 
 // 쿨다운 "리차지" 오버레이 — 평소엔 가득 밝은 배너. 쿨다운 시작에 어둡게 "소진"됐다가 밝은 골드가
 // 좌→우로 다시 차오른다. 이 오버레이는 아직 안 찬(오른쪽) 영역을 어둡게 덮고, 채움 비율(--cooldown-fill)
