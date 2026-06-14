@@ -141,19 +141,30 @@ function parseSword(raw: unknown): ParsedSword {
   if (!rateNull && whiffWeight + destroyWeight <= 0)
     fail(`${ctx} whiffWeight + destroyWeight must be > 0 for an enhanceable sword`)
 
-  let dropOnFail: Drop | null = null
+  // 파괴 시 드랍될 수 있는 후보 목록. 누락/null = [](드랍 없음). 후보마다 itemId/count 를 검증하고,
+  // chance(엔트리별 독립 추첨 확률)는 생략 시 1(항상 드랍), 제공 시 (0, 1] 만 허용한다.
+  let dropOnFail: Drop[] = []
   if (raw.dropOnFail !== null && raw.dropOnFail !== undefined) {
-    const d = raw.dropOnFail
-    if (!isRecord(d)) fail(`${ctx} dropOnFail must be an object or null`)
-    const itemId = d.itemId
-    if (typeof itemId !== 'string' || itemId.length === 0)
-      fail(`${ctx} dropOnFail itemId must be a non-empty string`)
-    const count = d.count
-    if (typeof count !== 'number' || !Number.isInteger(count) || count <= 0)
-      fail(
-        `${ctx} dropOnFail count must be a positive integer (got ${String(count)})`,
-      )
-    dropOnFail = { itemId, count }
+    if (!Array.isArray(raw.dropOnFail))
+      fail(`${ctx} dropOnFail must be an array or null`)
+    dropOnFail = raw.dropOnFail.map((d, i): Drop => {
+      const dctx = `${ctx} dropOnFail[${i}]`
+      if (!isRecord(d)) fail(`${dctx} must be an object`)
+      const itemId = d.itemId
+      if (typeof itemId !== 'string' || itemId.length === 0)
+        fail(`${dctx} itemId must be a non-empty string`)
+      const count = d.count
+      if (typeof count !== 'number' || !Number.isInteger(count) || count <= 0)
+        fail(`${dctx} count must be a positive integer (got ${String(count)})`)
+      let chance = 1
+      if (d.chance !== undefined) {
+        const c = d.chance
+        if (typeof c !== 'number' || !Number.isFinite(c) || c <= 0 || c > 1)
+          fail(`${dctx} chance must be within (0, 1] (got ${String(c)})`)
+        chance = c
+      }
+      return { itemId, count, chance }
+    })
   }
 
   // 전용 스프라이트 파일명(선택). 없으면 null — parseSwords 에서 폴백을 채운다.

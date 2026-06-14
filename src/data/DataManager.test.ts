@@ -135,7 +135,7 @@ describe('아이템 아이콘 ↔ 스프라이트 무결성', () => {
     const ids = new Set<string>()
     for (const sword of dataManager.getSwords()) {
       if (sword.enchantCost?.kind === 'item') ids.add(sword.enchantCost.itemId)
-      if (sword.dropOnFail) ids.add(sword.dropOnFail.itemId)
+      for (const d of sword.dropOnFail) ids.add(d.itemId)
     }
     for (const item of dataManager.getShopItems()) {
       ids.add(item.itemId)

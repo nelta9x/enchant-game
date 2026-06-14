@@ -95,7 +95,7 @@ describe('gameStore — 강화 적용 (seam)', () => {
   it('파괴: 드랍은 대기분에 쌓이고, 수집(flush)되면 기존 스택에 병합된다', () => {
     // 드랍 아이템과 같은 종류를 미리 가방에 쌓아 둔다(병합 대상). 어떤 아이템이 드랍되는지는
     // 데이터에서 픽스처를 고르는 용도일 뿐 — 단언은 수량 관계로만 한다.
-    const dropItem = dataManager.getSwordById('sword_7')?.dropOnFail?.itemId
+    const dropItem = dataManager.getSwordById('sword_7')?.dropOnFail?.[0]?.itemId
     expect(dropItem).toBeDefined()
     const seeded = 3
     const store = createGameStore({

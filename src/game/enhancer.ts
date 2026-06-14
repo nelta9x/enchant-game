@@ -121,7 +121,15 @@ export class Enhancer {
       }
     }
 
-    const drops: ItemStack[] = sword.dropOnFail ? [{ ...sword.dropOnFail }] : []
+    // 파괴 확정 → 드랍 후보를 하나씩 독립 추첨한다(가중 추첨이 아니라 후보별 베르누이 롤이라
+    // 0~N종이 동시에 떨어진다). chance>=1 은 확정 드랍이라 rng 를 소비하지 않는다 — 위 헛방/파괴
+    // 추첨의 "한쪽 weight 0 이면 rng 미소비"와 같은 결정성 원칙(성공 판정 외 경로가 rng 소비를
+    // 늘리지 않게). 이 롤은 파괴 경로에서만 도므로 성공/헛방/방지의 rng 소비 횟수는 불변이다.
+    const drops: ItemStack[] = []
+    for (const d of sword.dropOnFail) {
+      if (d.chance >= 1 || this.rng() < d.chance)
+        drops.push({ itemId: d.itemId, count: d.count })
+    }
     return {
       outcome: 'destroyed',
       fromId,

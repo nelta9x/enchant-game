@@ -116,33 +116,71 @@ describe('parseSwords — 구조 검증', () => {
 })
 
 describe('parseSwords — dropOnFail 구조 검증', () => {
-  it('유효한 dropOnFail(아이템 + 수량)을 파싱한다', () => {
+  it('유효한 dropOnFail 배열(아이템 + 수량 + 확률)을 파싱한다', () => {
     const swords = parseSwords([
-      row({ dropOnFail: { itemId: 'iron_scrap', count: 10 } }),
+      row({
+        dropOnFail: [
+          { itemId: 'iron_scrap', count: 10, chance: 0.5 },
+          { itemId: 'dark_matter', count: 1, chance: 1 },
+        ],
+      }),
     ])
-    expect(swords[0].dropOnFail).toEqual({
-      itemId: 'iron_scrap',
-      count: 10,
-    })
+    expect(swords[0].dropOnFail).toEqual([
+      { itemId: 'iron_scrap', count: 10, chance: 0.5 },
+      { itemId: 'dark_matter', count: 1, chance: 1 },
+    ])
   })
 
-  it('dropOnFail 이 없으면 null 이다', () => {
-    expect(parseSwords([row()])[0].dropOnFail).toBeNull()
+  it('chance 를 생략하면 1(항상 드랍)로 채운다', () => {
+    const swords = parseSwords([
+      row({ dropOnFail: [{ itemId: 'iron_scrap', count: 2 }] }),
+    ])
+    expect(swords[0].dropOnFail).toEqual([
+      { itemId: 'iron_scrap', count: 2, chance: 1 },
+    ])
   })
 
-  it('dropOnFail 이 객체가 아니면 throw (문자열 등)', () => {
+  it('dropOnFail 이 없으면 빈 배열이다', () => {
+    expect(parseSwords([row()])[0].dropOnFail).toEqual([])
+  })
+
+  it('dropOnFail 이 배열이 아니면 throw (객체·문자열 등)', () => {
+    expect(() =>
+      parseSwords([row({ dropOnFail: { itemId: 'iron_scrap', count: 1 } })]),
+    ).toThrow()
     expect(() => parseSwords([row({ dropOnFail: 'iron_scrap' })])).toThrow()
   })
 
-  it('dropOnFail itemId가 비었거나 count가 양의 정수가 아니면 throw', () => {
+  it('엔트리 itemId가 비었거나 count가 양의 정수가 아니면 throw', () => {
     expect(() =>
-      parseSwords([row({ dropOnFail: { itemId: '', count: 1 } })]),
+      parseSwords([row({ dropOnFail: [{ itemId: '', count: 1 }] })]),
     ).toThrow()
     expect(() =>
-      parseSwords([row({ dropOnFail: { itemId: 'x', count: 0 } })]),
+      parseSwords([row({ dropOnFail: [{ itemId: 'x', count: 0 }] })]),
     ).toThrow()
     expect(() =>
-      parseSwords([row({ dropOnFail: { itemId: 'x', count: 1.5 } })]),
+      parseSwords([row({ dropOnFail: [{ itemId: 'x', count: 1.5 }] })]),
+    ).toThrow()
+  })
+
+  it('chance 가 (0, 1] 범위를 벗어나면 throw (0·1초과·음수·문자열)', () => {
+    expect(() =>
+      parseSwords([row({ dropOnFail: [{ itemId: 'x', count: 1, chance: 0 }] })]),
+    ).toThrow()
+    expect(() =>
+      parseSwords([
+        row({ dropOnFail: [{ itemId: 'x', count: 1, chance: 1.5 }] }),
+      ]),
+    ).toThrow()
+    expect(() =>
+      parseSwords([
+        row({ dropOnFail: [{ itemId: 'x', count: 1, chance: -0.1 }] }),
+      ]),
+    ).toThrow()
+    expect(() =>
+      parseSwords([
+        row({ dropOnFail: [{ itemId: 'x', count: 1, chance: 'high' }] }),
+      ]),
     ).toThrow()
   })
 })
