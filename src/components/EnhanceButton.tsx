@@ -153,7 +153,8 @@ export function EnhanceButton({
       {/* 쿨다운 황금 채움 — 같은 내용을 "황금 표면 + 어두운 글자" 사본으로 z-10 에 겹쳐 두고, 채움 비율
           (--cooldown-fill)만큼 좌→우로 클립해 드러낸다. 경계 왼쪽은 이 사본(금빛), 오른쪽은 클립돼 base
           (어두움)가 비친다 — 같은 자리에 겹쳐 그렸기에 경계에서 표면·글자색이 동시에 뒤집힌다. 표면은
-          불투명 금속 그라데이션(gold→frame 토큰, hex 하드코딩 금지)이라 알파 블렌딩의 칙칙함이 없다.
+          불투명 노란 금색 그라데이션(gold-glow→gold 토큰 — 골드 획득 텍스트와 같은 톤, hex 하드코딩
+          금지)이라 알파 블렌딩의 칙칙함이 없다.
           클립 비율은 CSS 애니메이션(fx-cooldown-fill, forwards)이 0%→100% 차오르고, 쿨다운이 끝나면
           opacity 만 0.15s 로 거둔다(정상 종료 땐 이미 가득 차 있고, 타이밍이 어긋나도 부드럽게 사라진다).
           overflow-hidden + rounded-2xl 가 버튼 모양대로 잘라 주고, inset-0 + 같은 flex/padding 으로 base
@@ -166,7 +167,7 @@ export function EnhanceButton({
         }`}
         style={{
           background:
-            'linear-gradient(to right, transparent calc(var(--cooldown-fill) - 10px), color-mix(in srgb, var(--color-gold-glow) 70%, transparent) var(--cooldown-fill)), linear-gradient(to bottom, var(--color-gold), var(--color-frame))',
+            'linear-gradient(to right, transparent calc(var(--cooldown-fill) - 10px), color-mix(in srgb, var(--color-gold-glow) 80%, transparent) var(--cooldown-fill)), linear-gradient(to bottom, var(--color-gold-glow), var(--color-gold))',
           clipPath: 'inset(0 calc(100% - var(--cooldown-fill)) 0 0)',
           animation: `fx-cooldown-fill ${Math.max(chargeMs, 0)}ms linear forwards`,
         }}
