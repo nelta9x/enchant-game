@@ -1,4 +1,4 @@
-import itemsRaw from './sources/items.json'
+import itemsRaw from '../../public/data/items.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
 import type { ItemData } from './types'
 import { isRecord, makeFail } from './validate'

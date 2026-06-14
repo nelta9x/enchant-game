@@ -21,10 +21,12 @@
 - 동적 `import()`·`React.lazy`·코드 분할 금지 (`file://`에서 CORS로 외부 모듈 로드 차단).
 - 외부 CDN `import`·`<script>` 태그 금지. 의존성은 npm으로 번들한다.
 - 자산을 절대경로(`/sprites/...`)로 박지 말 것. URL 조립은 `lib/sprites.ts`·`lib/sound.ts`의 `BASE_URL` 경계에서만.
+- 게임 데이터 JSON(`public/data/*.json`)은 **런타임 `fetch` 금지 → 로더에서 정적 `import`로 번들**한다(`file://`에서 `fetch`는 CORS로 막힘 — 이미지·오디오만 예외). 상세는 "게임 데이터" 섹션.
 
 ## 게임 데이터 = 디자이너 영역
 
-- **편집은 `src/data/sources/*.json`에서.** `types.ts`·로더 `parse*` 함수·`DataManager`는 데이터 레이어의 *뼈대*이니, 데이터를 바꾸려고 여기를 고치지 말 것.
+- **편집은 `public/data/*.json`에서.** `types.ts`·로더 `parse*` 함수·`DataManager`는 데이터 레이어의 *뼈대*이니, 데이터를 바꾸려고 여기를 고치지 말 것. (앞으로 새 데이터 파일도 `public/data`에 둔다.)
+- **로더는 `public/data`의 JSON을 정적 `import`로 읽어 번들한다(상대경로 `../../public/data/*.json`) — `fetch`로 바꾸지 말 것.** `public/`에 있다고 런타임 `fetch`로 전환하면 `file://` 더블클릭에서 CORS로 막혀 게임이 안 뜬다. 빌드 시 HTML에 인라인되며, dist에 동일 JSON 사본이 한 벌 더 복사되는 건 의도된 무해한 동작.
 - 모든 게임 데이터는 `DataManager` 경유로만 접근(단일 출처). `main.tsx`가 시작 시 동기 `load()` 한다.
 - 표시명(검·아이템 이름)을 JSON에 박지 말 것 — i18n 키로 파생한다(검 `sword.<level>.name`, 아이템 `item.<id>`).
 - **새 검/아이템 추가 = JSON 항목 + i18n 키를 한 세트로.** 키를 빠뜨리면 컴파일이 아니라 게임 시작 시 런타임 throw(`assertNameKeysResolve`)로 터진다.

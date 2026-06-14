@@ -1,4 +1,4 @@
-import commissionRaw from './sources/commission.json'
+import commissionRaw from '../../public/data/commission.json'
 import type { CommissionConfig, CommissionItemEntry, GoldBucket } from './types'
 import { isRecord, makeFail } from './validate'
 

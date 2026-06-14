@@ -156,7 +156,7 @@
 
 ## 범위 밖
 
-- **모션·연출 타이밍**: 시퀀스 타이밍("언제")은 데이터 `src/data/sources/animation.json` +
+- **모션·연출 타이밍**: 시퀀스 타이밍("언제")은 데이터 `public/data/animation.json` +
   `components/enhanceTimeline.ts`(타임라인 단일 출처), 모션 "모양" 상수는 각 연출 모듈
   (`coins.ts`·`particles.ts`·`drops.ts`·`shake.ts`·`goldGain.ts`·`floatingText.ts`)이 소유한다.
   경계 규칙은 `src/data/loadAnimation.ts` 머리 주석 참조.
