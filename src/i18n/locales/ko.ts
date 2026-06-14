@@ -47,6 +47,7 @@ export const ko = {
   // 강화 결과 토스트
   'toast.success': '강화 성공',
   'toast.protected': '파괴보호장치로 보호',
+  'toast.whiff': '헛방',
   'toast.destroyed': '검 파괴',
 
   // 게임 클리어(최종 검 완성)
@@ -56,6 +57,8 @@ export const ko = {
 
   // 강화 결과 플로팅 텍스트(무기 근처에 떠오르는 연출 문구 — floatingText.json 의 이벤트별 후보)
   'floatingText.enhanceFail.slip': '아이구! 손이 미끄러졌네.',
+  'floatingText.enhanceWhiff.betterThanBroken': '그래, 부서진 것보단 낫지',
+  'floatingText.enhanceWhiff.notBroken': '휴, 안 깨진 게 어디야...',
 
   // 아이템 표시명 (파괴보호장치 · 잡템 — 인벤토리/드랍 표시에 사용)
   // 재료로 쓰이는 검(sword_<level>)은 검 이름 키(sword.N.name)로 해석한다.

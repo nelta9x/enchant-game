@@ -47,7 +47,7 @@ export type ConsumedMaterials = { gold: number; items: ItemStack[] }
 // 검은 id 로만 식별한다 — 표시용 레벨이 필요하면 소비자가 DataManager.getSwordById(id).level 로 해석한다
 // (순수 엔진은 다른 검을 조회할 수 없으므로 결과에 레벨을 담지 않는다).
 //  - consumed: 차감할 재료   - drops: 산출된 아이템(파괴 조각 등)   - toId: 결과 검 id
-export type EnhanceOutcome = 'success' | 'protected' | 'destroyed'
+export type EnhanceOutcome = 'success' | 'protected' | 'whiff' | 'destroyed'
 
 export type EnhanceResult =
   | {
@@ -66,6 +66,15 @@ export type EnhanceResult =
       consumed: ConsumedMaterials // 강화비용 + 소모된 파괴보호장치
       protectionUsed: number
       drops: ItemStack[] // 항상 [] — 방지 시 드랍 없음
+    }
+  | {
+      // 실패했으나 파괴 없이 강화만 빗나감(헛방) — 검 보존(같은 검 유지).
+      // 파괴보호장치와 달리 추가 소모 없이, 강화 비용만 소모하고 검이 살아남는다.
+      outcome: 'whiff'
+      fromId: string
+      toId: string // = fromId (보존)
+      consumed: ConsumedMaterials // 강화 비용(헛방도 비용은 소모)
+      drops: ItemStack[] // 항상 [] — 파괴가 아니므로 드랍 없음
     }
   | {
       // 실패 + 검 파괴.

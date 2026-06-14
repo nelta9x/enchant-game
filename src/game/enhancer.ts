@@ -1,4 +1,5 @@
 import type { SwordData } from '../data/types'
+import { weightedIndex } from '../lib/weightedPick'
 import { countOf } from './inventory'
 import type { ConsumedMaterials, EnhanceResult, ItemStack } from './types'
 
@@ -85,7 +86,7 @@ export class Enhancer {
       }
     }
 
-    // 실패. 파괴보호장치 사용 시 검 보존(파괴보호장치만 추가 소모, 드랍 없음), 아니면 파괴.
+    // 실패. 우선순위: 파괴보호장치(사용 시 검 보존, 파괴보호장치만 추가 소모) > 헛방/파괴 가중 추첨.
     if (useProtection === true) {
       const used = sword.protectionTickets as number // validate 가 number>0 보장
       return {
@@ -98,6 +99,25 @@ export class Enhancer {
         },
         protectionUsed: used,
         drops: [],
+      }
+    }
+
+    // 파괴보호 미사용 실패 → 헛방(whiff, 파괴 없는 실패) vs 파괴를 weight 로 추첨한다.
+    // 한쪽 weight 가 0 이면 결과가 정해져 추첨이 불필요하다 → rng 를 소비하지 않는다
+    // (성공률 판정의 rng 소비 횟수 불변 — 통계 검증의 결정성 보호).
+    const whiffW = sword.whiffWeight
+    const destroyW = sword.destroyWeight
+    const isWhiff =
+      whiffW > 0 && destroyW > 0
+        ? weightedIndex([whiffW, destroyW], (w) => w, this.rng) === 0
+        : whiffW > 0
+    if (isWhiff) {
+      return {
+        outcome: 'whiff',
+        fromId,
+        toId: fromId, // 검 보존(파괴 없음)
+        consumed: baseConsumed, // 강화 비용만 소모(검은 살아남음)
+        drops: [], // 파괴가 아니므로 드랍 없음
       }
     }
 

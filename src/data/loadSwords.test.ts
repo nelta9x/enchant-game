@@ -147,6 +147,45 @@ describe('parseSwords — dropOnFail 구조 검증', () => {
   })
 })
 
+describe('parseSwords — 헛방/파괴 weight 검증', () => {
+  it('생략 시 기본값(헛방 0 · 파괴 1)으로 채운다(= 기존 "실패 = 파괴" 동작)', () => {
+    const s = parseSwords([row()])[0]
+    expect(s.whiffWeight).toBe(0)
+    expect(s.destroyWeight).toBe(1)
+  })
+
+  it('제공한 weight 를 그대로 파싱한다', () => {
+    const s = parseSwords([row({ whiffWeight: 3, destroyWeight: 7 })])[0]
+    expect(s.whiffWeight).toBe(3)
+    expect(s.destroyWeight).toBe(7)
+  })
+
+  it('weight 가 비음 정수가 아니면 throw (음수 · 소수 · 문자열)', () => {
+    expect(() => parseSwords([row({ whiffWeight: -1 })])).toThrow()
+    expect(() => parseSwords([row({ destroyWeight: 1.5 })])).toThrow()
+    expect(() => parseSwords([row({ whiffWeight: 'lots' })])).toThrow()
+  })
+
+  it('강화 가능한 검에서 헛방·파괴 weight 가 둘 다 0이면 throw(추첨 불가)', () => {
+    expect(() =>
+      parseSwords([row({ whiffWeight: 0, destroyWeight: 0 })]),
+    ).toThrow()
+  })
+
+  it('최종 단계(successRate null)는 weight 합 0 이어도 통과(강화 불가 → 무의미)', () => {
+    const s = parseSwords([
+      row({
+        enchantCost: null,
+        successRate: null,
+        whiffWeight: 0,
+        destroyWeight: 0,
+      }),
+    ])[0]
+    expect(s.whiffWeight).toBe(0)
+    expect(s.destroyWeight).toBe(0)
+  })
+})
+
 describe('parseSwords — 진행 체인(nextId) · id 무결성', () => {
   it('nextId가 null(최종 단계)이거나 실재하는 검 id면 통과', () => {
     const swords = parseSwords([

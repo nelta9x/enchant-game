@@ -10,6 +10,8 @@
     "successRate": 1,
     "sellPrice": null,
     "protectionTickets": 0,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "sword.png"
   },
   {
@@ -23,6 +25,8 @@
     "successRate": 0.99,
     "sellPrice": 250,
     "protectionTickets": 0,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "sabre.png"
   },
   {
@@ -36,6 +40,8 @@
     "successRate": 0.98,
     "sellPrice": 500,
     "protectionTickets": 0,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "vikingsword.png"
   },
   {
@@ -49,6 +55,8 @@
     "successRate": 0.97,
     "sellPrice": 1000,
     "protectionTickets": 0,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "kukri.png"
   },
   {
@@ -62,6 +70,8 @@
     "successRate": 0.95,
     "sellPrice": 1500,
     "protectionTickets": 0,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "kriss.png"
   },
   {
@@ -75,6 +85,8 @@
     "successRate": 0.93,
     "sellPrice": 2500,
     "protectionTickets": 0,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "gladius.png"
   },
   {
@@ -88,6 +100,8 @@
     "successRate": 0.91,
     "sellPrice": 3500,
     "protectionTickets": 0,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "iron_scrap",
       "count": 1
@@ -105,6 +119,8 @@
     "successRate": 0.89,
     "sellPrice": 5500,
     "protectionTickets": 0,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "iron_scrap",
       "count": 1
@@ -122,6 +138,8 @@
     "successRate": 0.85,
     "sellPrice": 10000,
     "protectionTickets": 0,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "iron_scrap",
       "count": 1
@@ -139,6 +157,8 @@
     "successRate": 0.8,
     "sellPrice": 20000,
     "protectionTickets": 1,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "iron_scrap",
       "count": 2
@@ -156,6 +176,8 @@
     "successRate": 0.8,
     "sellPrice": 35100,
     "protectionTickets": 1,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "iron_scrap",
       "count": 3
@@ -173,6 +195,8 @@
     "successRate": 0.75,
     "sellPrice": 160000,
     "protectionTickets": 1,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "iron_scrap",
       "count": 5
@@ -190,6 +214,8 @@
     "successRate": 0.7,
     "sellPrice": 350000,
     "protectionTickets": 1,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "dark_matter",
       "count": 1
@@ -207,6 +233,8 @@
     "successRate": 0.7,
     "sellPrice": 1000000,
     "protectionTickets": 2,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "flame_sword_handle",
       "count": 1
@@ -224,6 +252,8 @@
     "successRate": 0.65,
     "sellPrice": 3000000,
     "protectionTickets": 3,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "iron_scrap",
       "count": 10
@@ -241,6 +271,8 @@
     "successRate": 0.6,
     "sellPrice": 7500000,
     "protectionTickets": 4,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "iron_scrap",
       "count": 15
@@ -258,6 +290,8 @@
     "successRate": 0.6,
     "sellPrice": 14200000,
     "protectionTickets": 7,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "iron_scrap",
       "count": 20
@@ -275,6 +309,8 @@
     "successRate": 0.55,
     "sellPrice": 20000000,
     "protectionTickets": 9,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "doombringer.png"
   },
   {
@@ -288,6 +324,8 @@
     "successRate": 0.5,
     "sellPrice": 30000000,
     "protectionTickets": 10,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "diffusalblade.png"
   },
   {
@@ -301,6 +339,8 @@
     "successRate": 0.5,
     "sellPrice": 47500000,
     "protectionTickets": 12,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "flameblade.png"
   },
   {
@@ -314,6 +354,8 @@
     "successRate": 0.45,
     "sellPrice": 68300000,
     "protectionTickets": 15,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "bloodthirster.png"
   },
   {
@@ -328,6 +370,8 @@
     "successRate": 0.4,
     "sellPrice": 101000000,
     "protectionTickets": 17,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "notes": ["storable"],
     "sprite": "mastersword.png"
   },
@@ -343,6 +387,8 @@
     "successRate": 0.4,
     "sellPrice": 160000000,
     "protectionTickets": 20,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "notes": ["storable"],
     "sprite": "grandfather.png"
   },
@@ -358,6 +404,8 @@
     "successRate": 0.4,
     "sellPrice": 230000000,
     "protectionTickets": 22,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "infinityedge.png"
   },
   {
@@ -372,6 +420,8 @@
     "successRate": 0.4,
     "sellPrice": 300000000,
     "protectionTickets": 23,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "dropOnFail": {
       "itemId": "dark_matter",
       "count": 20
@@ -390,6 +440,8 @@
     "successRate": 0.35,
     "sellPrice": 400000000,
     "protectionTickets": 23,
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "divinerapier.png"
   },
   {
@@ -403,6 +455,8 @@
     "successRate": 0.5,
     "sellPrice": 1800000000,
     "protectionTickets": "disabled",
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "ashbringer.png"
   },
   {
@@ -417,6 +471,8 @@
     "successRate": 0.4,
     "sellPrice": 2500000000,
     "protectionTickets": "disabled",
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "frostmourne.png"
   },
   {
@@ -429,6 +485,8 @@
     "successRate": 0.15,
     "sellPrice": null,
     "protectionTickets": "disabled",
+    "whiffWeight": 3,
+    "destroyWeight": 7,
     "sprite": "holyswordonidance.png"
   },
   {

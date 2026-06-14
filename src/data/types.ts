@@ -197,6 +197,10 @@ export type SwordData = {
   successRate: number | null // 0~1, null = 최종 단계
   sellPrice: number | null // null = 판매 불가
   protectionTickets: number | 'disabled' // 'disabled' = 파괴보호장치 사용 불가
+  // 강화 실패(파괴보호 미사용) 시 헛방(파괴 없는 실패) vs 파괴를 가르는 가중치. 성공/실패 1차 판정은
+  // successRate 가 그대로 담당하고, 실패했을 때만 이 둘로 2차 추첨한다(둘 다 비음 정수, 합 > 0).
+  whiffWeight: number // 헛방(검 보존) 가중치
+  destroyWeight: number // 파괴 가중치
   dropOnFail: Drop | null // 파괴 시 드랍되는 아이템 + 수량, null = 없음
   notes: SwordNote[]
   // 스프라이트 파일명(예: 'rusty_dagger.png'). 전용 스프라이트가 없는 단계는

@@ -51,6 +51,19 @@ export function parseMaterial(raw: unknown, ctx: string): Material {
   failMaterial(`${ctx} unknown material kind: ${String(kind)}`)
 }
 
+// 가중치 필드(헛방/파괴) 검증 — 생략 시 기본값, 제공 시 비음 정수만 허용한다.
+function parseWeight(
+  raw: unknown,
+  ctx: string,
+  field: string,
+  fallback: number,
+): number {
+  if (raw === undefined || raw === null) return fallback
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 0)
+    fail(`${ctx} ${field} must be a non-negative integer (got ${String(raw)})`)
+  return raw
+}
+
 function parseNotes(raw: unknown, ctx: string): SwordNote[] {
   if (raw === undefined) return []
   if (!Array.isArray(raw)) fail(`${ctx} notes must be an array`)
@@ -120,6 +133,14 @@ function parseSword(raw: unknown): ParsedSword {
     protectionTickets = p
   }
 
+  // 강화 실패 시 헛방(파괴 없는 실패) vs 파괴를 가르는 가중치. 생략 시 기본값(헛방 0 / 파괴 1)은
+  // 기존 동작("실패 = 파괴")을 보존한다 — 헛방을 쓰려면 데이터에서 명시적으로 weight 를 켠다.
+  const whiffWeight = parseWeight(raw.whiffWeight, ctx, 'whiffWeight', 0)
+  const destroyWeight = parseWeight(raw.destroyWeight, ctx, 'destroyWeight', 1)
+  // 강화 가능한 검은 실패 시 적어도 하나의 결과가 가능해야 한다(둘 다 0 = 추첨 불가 데이터 오류).
+  if (!rateNull && whiffWeight + destroyWeight <= 0)
+    fail(`${ctx} whiffWeight + destroyWeight must be > 0 for an enhanceable sword`)
+
   let dropOnFail: Drop | null = null
   if (raw.dropOnFail !== null && raw.dropOnFail !== undefined) {
     const d = raw.dropOnFail
@@ -156,6 +177,8 @@ function parseSword(raw: unknown): ParsedSword {
     successRate,
     sellPrice,
     protectionTickets,
+    whiffWeight,
+    destroyWeight,
     dropOnFail,
     notes: parseNotes(raw.notes, ctx),
     sprite,

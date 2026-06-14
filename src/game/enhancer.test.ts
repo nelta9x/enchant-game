@@ -20,6 +20,13 @@ function mulberry32(seed: number): () => number {
 const alwaysSucceeds = () => 0
 const alwaysFails = () => 1
 
+// 결정적 시퀀스 rng — 호출마다 values 를 차례로 반환(끝나면 처음부터 순환). 헛방/파괴 2차 굴림처럼
+// "1차는 실패시키고 2차에서 특정 분기를 강제"하는 다단 판정을 결정적으로 검증하는 데 쓴다.
+function seq(...values: number[]): () => number {
+  let i = 0
+  return () => values[i++ % values.length]
+}
+
 // 검 정의 픽스처. 엔진 테스트에 필요한 필드만 골라 덮어쓴다.
 function sword(over: Partial<SwordData> = {}): SwordData {
   const level = over.level ?? 10
@@ -33,6 +40,11 @@ function sword(over: Partial<SwordData> = {}): SwordData {
     successRate: 0.5,
     sellPrice: 1000,
     protectionTickets: 0,
+    // 헛방/파괴 가중치 기본값은 "실패 = 파괴"(헛방 0)로 둔다 — 기존 실패 테스트가 그대로 파괴를 내고,
+    // 추첨(rng)도 소비하지 않아(엔진이 한쪽 weight 0 이면 단락) 통계 테스트의 결정성이 유지된다.
+    // 헛방을 검증하는 테스트는 whiffWeight 를 명시적으로 켠다.
+    whiffWeight: 0,
+    destroyWeight: 1,
     dropOnFail: null,
     notes: [],
     sprite: 'placeholder.png',
@@ -147,6 +159,91 @@ describe('Enhancer — 파괴 시 드랍 (req 3)', () => {
     const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
     expect(r.outcome).toBe('destroyed')
     expect(r.drops).toEqual([])
+  })
+})
+
+describe('Enhancer — 헛방(whiff) 분기', () => {
+  it('헛방 weight 만 양수면 실패 시 항상 헛방 — 검 보존·드랍 없음(dropOnFail 있어도)', () => {
+    const s = sword({
+      successRate: 0.5,
+      whiffWeight: 1,
+      destroyWeight: 0,
+      dropOnFail: { itemId: 'iron_scrap', count: 1 },
+    })
+    const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
+    expect(r.outcome).toBe('whiff')
+    expect(r.toId).toBe(s.id) // 검 보존(같은 검 id)
+    expect(r.drops).toEqual([]) // 파괴가 아니므로 드랍 없음
+  })
+
+  it('파괴 weight 만 양수면 실패 시 항상 파괴(헛방 0 = 기존 동작)', () => {
+    const s = sword({ successRate: 0.5, whiffWeight: 0, destroyWeight: 1 })
+    const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
+    expect(r.outcome).toBe('destroyed')
+    expect(r.toId).toBeNull()
+  })
+
+  it('헛방이어도 강화 비용은 소모된다(검만 보존)', () => {
+    const s = sword({
+      enchantCost: { kind: 'gold', amount: 100 },
+      successRate: 0.5,
+      whiffWeight: 1,
+      destroyWeight: 0,
+    })
+    const r = new Enhancer(alwaysFails).enhance({ sword: s, supply: RICH })
+    expect(r.outcome).toBe('whiff')
+    expect(r.consumed.gold).toBe(100)
+  })
+
+  // 두 가지 비율로 검증해 "weight 가 분포를 좌우함"을 증명한다(3:7 만 보면 엔진이 weight 를 무시하고
+  // 30% 동전을 던져도 통과하므로 7:3 도 함께 본다). successRate 0 으로 매 시도를 실패시켜 2차 굴림만 본다.
+  it('헛방/파괴 관측 비율이 weight(3:7 / 7:3)에 수렴한다', () => {
+    const N = 20000
+    for (const [w, d, expected] of [
+      [3, 7, 0.3],
+      [7, 3, 0.7],
+    ] as const) {
+      const enhancer = new Enhancer(mulberry32(4321))
+      const s = sword({ successRate: 0, whiffWeight: w, destroyWeight: d })
+      let whiff = 0
+      for (let i = 0; i < N; i++) {
+        if (enhancer.enhance({ sword: s, supply: RICH }).outcome === 'whiff')
+          whiff++
+      }
+      expect(Math.abs(whiff / N - expected)).toBeLessThan(0.03)
+    }
+  })
+
+  it('파괴보호장치가 헛방보다 우선한다(실패+useProtection → 헛방 굴림 전에 protected)', () => {
+    const s = sword({
+      level: 14,
+      successRate: 0.5,
+      whiffWeight: 3,
+      destroyWeight: 7,
+      protectionTickets: 3,
+    })
+    const supply: EnhanceInput['supply'] = {
+      gold: 1000,
+      items: [{ itemId: PROTECTION_TICKET_ID, count: 5 }],
+    }
+    const r = new Enhancer(alwaysFails).enhance({
+      sword: s,
+      supply,
+      useProtection: true,
+    })
+    expect(r.outcome).toBe('protected')
+  })
+
+  it('헛방·파괴 weight 가 둘 다 양수면 2차 굴림으로 갈린다(결정적 rng)', () => {
+    const s = sword({ successRate: 0.5, whiffWeight: 3, destroyWeight: 7 })
+    // 1차 rng=1 → 1 < 0.5 거짓(실패). 2차에서 분기:
+    //  weightedIndex([3,7], r): r=rng×10. rng=0 → 0<3 → idx0(헛방). rng=0.9 → 9, 폴백 idx1(파괴).
+    expect(
+      new Enhancer(seq(1, 0)).enhance({ sword: s, supply: RICH }).outcome,
+    ).toBe('whiff')
+    expect(
+      new Enhancer(seq(1, 0.9)).enhance({ sword: s, supply: RICH }).outcome,
+    ).toBe('destroyed')
   })
 })
 

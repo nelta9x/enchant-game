@@ -13,6 +13,14 @@ beforeAll(() => {
 // 실패는 rng=1 — 성공 판정이 `rng < rate`라 rate=1 인 검도 확실히 실패한다(0.9999 는 부적합).
 const ALWAYS_SUCCESS = () => new Enhancer(() => 0)
 const ALWAYS_FAIL = () => new Enhancer(() => 1)
+// 결정적 시퀀스 rng — 호출마다 차례로 반환(끝나면 순환). 다단 판정(성공/실패 → 헛방/파괴)을 강제한다.
+const seq = (...values: number[]): (() => number) => {
+  let idx = 0
+  return () => values[idx++ % values.length]
+}
+// 헛방 강제 엔진: 1차 rng=1 → 실패, 2차 rng=0 → weightedIndex 가 헛방(idx0)을 고른다
+// (sword_7 은 whiffWeight·destroyWeight 둘 다 양수라 실패 시 2차 굴림이 일어난다).
+const WHIFF = () => new Enhancer(seq(1, 0))
 
 describe('gameStore — 강화 적용 (seam)', () => {
   it('성공: 골드 차감 + 단계 +1', () => {
@@ -107,6 +115,29 @@ describe('gameStore — 강화 적용 (seam)', () => {
       seeded + dropped,
     )
     expect(store.getState().pendingDrops).toEqual([])
+  })
+
+  it('헛방: 검 보존(현재 검 유지) + 강화 비용만 차감 + 드랍 없음', () => {
+    // sword_7 은 dropOnFail 을 가진 단계지만, 헛방은 파괴가 아니라 드랍이 없어야 한다.
+    const sword7 = dataManager.getSwordById('sword_7')
+    const cost = sword7?.enchantCost
+    const before = 1_000_000
+    const store = createGameStore({
+      enhancer: WHIFF(),
+      gold: before,
+      currentSwordId: 'sword_7',
+      items: [],
+    })
+    const r = store.getState().enhance(false)
+    expect(r?.outcome).toBe('whiff')
+    // 검 보존 — 파괴(시작 검 리셋)와 달리 현재 검을 그대로 유지한다.
+    expect(store.getState().currentSwordId).toBe('sword_7')
+    // 파괴가 아니므로 드랍(대기분)도 없다.
+    expect(store.getState().pendingDrops).toEqual([])
+    expect(r?.drops).toEqual([])
+    // 비용은 소모된다(파생값 — 데이터의 enchantCost 로 단언, 액수 하드코딩 아님).
+    if (cost?.kind === 'gold')
+      expect(store.getState().gold).toBe(before - cost.amount)
   })
 
   it('방지: 단계 유지 + 파괴보호장치 차감 + 드랍 없음', () => {

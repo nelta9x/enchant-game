@@ -48,6 +48,7 @@ export const en: Record<TranslationKey, string> = {
   // 강화 결과 토스트
   'toast.success': 'Enchanted',
   'toast.protected': 'Protected',
+  'toast.whiff': 'Miss',
   'toast.destroyed': 'Destroyed',
 
   // 게임 클리어(최종 검 완성)
@@ -57,6 +58,8 @@ export const en: Record<TranslationKey, string> = {
 
   // 강화 결과 플로팅 텍스트
   'floatingText.enhanceFail.slip': 'Oops! My hand slipped.',
+  'floatingText.enhanceWhiff.betterThanBroken': 'Well, better than shattered.',
+  'floatingText.enhanceWhiff.notBroken': 'Phew, at least it didn’t break...',
 
   // 아이템 표시명
   'item.protection_ticket': 'Protection Ticket',

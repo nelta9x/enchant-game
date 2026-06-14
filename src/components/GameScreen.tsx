@@ -63,6 +63,7 @@ const ANNOUNCE_KEY: Record<string, TranslationKey> = {
   successBurst: 'toast.success',
   destruction: 'toast.destroyed',
   protectedShake: 'toast.protected',
+  whiffShake: 'toast.whiff',
 }
 
 // 효과 1개를 버스트 이벤트(ShakeBurstEvent)로 투영한다 — sprite 없는 효과(자리만 있는 잠금 등)는 null.
@@ -426,7 +427,9 @@ export function GameScreen() {
         ? 'enhanceSuccess'
         : result.outcome === 'protected'
           ? 'enhanceProtected'
-          : 'enhanceFail' // 'destroyed' → 실패(네이밍 브릿지)
+          : result.outcome === 'whiff'
+            ? 'enhanceWhiff' // 헛방(파괴 없는 실패) 전용 슬롯
+            : 'enhanceFail' // 'destroyed' → 실패(네이밍 브릿지)
     const pickedTextKey = pickFloatingText(
       dataManager.getFloatingTexts(floatEventKey),
     )
@@ -547,6 +550,20 @@ export function GameScreen() {
       })
       // 재강화 가드는 성공·파괴와 동일하게 건다 — 마우스·스페이스 모두 일관되도록.
       lockEnhance()
+    } else if (result.outcome === 'whiff') {
+      // 헛방 = 떨림만(폭발·드랍 없음, 검 보존) → 강화가 빗나갔을 뿐 검은 살아남았음을 인지시킨다.
+      // 방지와 동일한 "떨림만" 안무를 쓰되 별개 kind 로 둔다 — 결계(파괴보호) 플레어는 켜지 않는다
+      // (whiffShake 는 검 떨림만 구동하고, protectedShake 만 결계를 번쩍인다 — 아래 shakeKey/blockKey 분리).
+      // 검 이름·스프라이트는 그대로라 scheduleReveal·버스트(분출) 없이 떨림만 띄운다.
+      enqueueEffect({
+        kind: 'whiffShake',
+        exclusive: false,
+        locksEnhance: false,
+        durationMs: tl.protectedDurationMs,
+        payload: { impactMs: tl.impactMs, shakeMs: tl.shakeMs },
+      })
+      // 재강화 가드는 성공·파괴·방지와 동일하게 건다.
+      lockEnhance()
     }
   }
 
@@ -620,15 +637,26 @@ export function GameScreen() {
   useEffect(() => {
     if (dropEvent === null) flushDrops()
   }, [dropEvent, flushDrops])
-  // 방지(protected) 떨림 트리거 + 이번 강화의 임팩트·떨림 길이(SwordStage 가 실제 검을 그 박자로 흔든다).
+  // 실제 검 떨림은 방지(protected)·헛방(whiff) 공통(둘 다 "떨림만" 안무) — 둘 중 최신 효과로 구동한다
+  // (id 단조 증가 → 큰 쪽이 최신, latestBurstEvent 합치기 패턴 재사용). 단, 결계(파괴보호) 플레어는
+  // 방지일 때만 번쩍여야 하므로 protectedFx 만 따로 둔다(blockKey).
   const protectedFx = latestRunning(running, 'protectedShake')
-  const shakeKey = protectedFx?.id ?? 0
-  const shakeImpactSec = (protectedFx?.payload?.impactMs ?? 0) / 1000
-  // payload.shakeMs 가 실제 떨림 길이다(방지 효과가 돌 때만 의미). 폴백(효과 없음 → shakeKey 0 이라 안 흔듦)은
+  const whiffFx = latestRunning(running, 'whiffShake')
+  const shakeFx =
+    protectedFx && whiffFx
+      ? protectedFx.id > whiffFx.id
+        ? protectedFx
+        : whiffFx
+      : (protectedFx ?? whiffFx)
+  const shakeKey = shakeFx?.id ?? 0
+  const shakeImpactSec = (shakeFx?.payload?.impactMs ?? 0) / 1000
+  // payload.shakeMs 가 실제 떨림 길이다(방지·헛방 효과가 돌 때만 의미). 폴백(효과 없음 → shakeKey 0 이라 안 흔듦)은
   // 현재 검 레벨대의 최소 떨림이면 충분하다.
   const shakeDurationSec =
-    (protectedFx?.payload?.shakeMs ??
+    (shakeFx?.payload?.shakeMs ??
       shakeRangeForLevel(anim.shakeBands, sword?.level ?? 1).minMs) / 1000
+  // 결계(파괴보호) 플레어는 방지(protected)일 때만 — 헛방은 결계를 번쩍이지 않는다.
+  const blockKey = protectedFx?.id ?? 0
 
   // 결과를 스크린리더에 알린다(시각 연출은 aria-hidden). 가장 최근 알림 대상 효과의 문구.
   let announceFx: { id: number; kind: string } | null = null
@@ -700,13 +728,14 @@ export function GameScreen() {
                 displaySword={revealedSword}
                 displayLevel={revealedSword?.level ?? null}
                 // 보호 결계: 순수 상태 + 토글(발동)·상점(부족 보충)·플레어(방지 발동) 트리거.
-                // blockKey 는 protectedShake 와 같은 트리거(shakeKey)를 공유 — 막아낸 순간 결계가 번쩍인다.
+                // blockKey 는 protectedShake(방지) 전용 트리거 — 막아낸 순간 결계가 번쩍인다. 헛방(whiffShake)은
+                // 검만 떨고(shakeKey 공유) 결계는 번쩍이지 않으므로 shakeKey 가 아니라 blockKey 를 쓴다.
                 // 플레어는 망치가 닿는 순간(impact)에 맞춰 늦춘다(막아냄은 임팩트에 일어난다).
                 protection={{
                   state: protection,
                   onToggle: toggleProtection,
                   onShop: openShop,
-                  blockKey: shakeKey,
+                  blockKey: blockKey,
                   flareDelaySec: anim.hammerImpactMs / 1000,
                 }}
                 spriteOverlay={

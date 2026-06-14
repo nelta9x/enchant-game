@@ -1,5 +1,9 @@
 {
   "enhanceFail": [{ "text": "floatingText.enhanceFail.slip", "weight": 1 }],
   "enhanceSuccess": [],
-  "enhanceProtected": []
+  "enhanceProtected": [],
+  "enhanceWhiff": [
+    { "text": "floatingText.enhanceWhiff.betterThanBroken", "weight": 1 },
+    { "text": "floatingText.enhanceWhiff.notBroken", "weight": 1 }
+  ]
 }
