@@ -47,7 +47,6 @@ export type CoinSpec = {
   drift: number // 체공 중 수평 분산(px, ±) — 정점에서 흩어져 머무는 느낌
   settle: number // 체공 중 살짝 내려앉는 양(px) — 정점에서 잠깐 떠 있다 가라앉음
   hold: number // 체공이 끝나고 흡수가 시작되는 시점(0..1, 코인마다 달라 동기화를 깬다)
-  spin: number // 회전(부호 = 방향, 크기 = 바퀴수) — 빨려들 때 빛을 반사하듯 돈다
   size: number // 코인 한 변(px)
   stagger: number // 방출 지연(s) — 0..COIN_STAGGER_SPAN 에 고르게 분포(스트림처럼 도착)
 }
@@ -62,10 +61,9 @@ export function makeCoins(count: number): CoinSpec[] {
     const drift = (i % 2 ? 1 : -1) * (8 + (i % 3) * 9) // ±8~26 — 체공 수평 분산
     const settle = 6 + (i % 4) * 6 // 6~24 — 체공 중 가라앉는 양
     const hold = 0.32 + (i % 4) * 0.09 // 0.32~0.59 — 코인마다 다른 체공 길이(동기화 방지)
-    const spin = (i % 2 ? 1 : -1) * (1 + (i % 4) * 0.6) // ±1~2.8 바퀴
     const size = 22 + (i % 3) * 5 // 22~32
     const stagger = (i / n) * COIN_STAGGER_SPAN
-    return { angle, rise, drift, settle, hold, spin, size, stagger }
+    return { angle, rise, drift, settle, hold, size, stagger }
   })
 }
 
