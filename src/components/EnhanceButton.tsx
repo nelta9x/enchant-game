@@ -28,10 +28,6 @@ type EnhanceButtonProps = {
   enchantCost: Material | null
 }
 
-// ⚠️ 모바일 진단용 임시 플래그 — 강화 가능(ready) 시 버튼의 황금 글로우(box-shadow)와 펄스 링을 끈다
-// (프레임 비용 격리). true 면 ready 상태에서도 글로우·펄스를 렌더하지 않는다. 진단이 끝나면 false 로 되돌릴 것.
-const DISABLE_READY_GLOW = true
-
 export function EnhanceButton({
   disabled,
   charging,
@@ -99,11 +95,6 @@ export function EnhanceButton({
     )
   }
 
-  // 강화 가능(ready) 시 버튼의 황금 글로우(box-shadow) — 진단 플래그(DISABLE_READY_GLOW)면 끈다.
-  const readyGlow = DISABLE_READY_GLOW
-    ? ''
-    : 'shadow-[0_0_28px_-4px_var(--color-gold)]'
-
   return (
     <motion.button
       type="button"
@@ -117,7 +108,7 @@ export function EnhanceButton({
       // 연사(useHoldRepeat)가 pointercancel 로 끊기지 않게 한다(페이지는 한 화면 맞춤이라 스크롤 손실 없음).
       className={`relative flex w-full touch-none flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border bg-gradient-to-b from-panel-soft to-panel px-3 py-5 transition-opacity ${
         ready
-          ? `cursor-pointer border-gold/60 ${readyGlow}` // 가능 — 금색 글로우(진단 시 off) + 펄스
+          ? 'cursor-pointer border-gold/60 shadow-[0_0_28px_-4px_var(--color-gold)]' // 가능 — 금색 글로우 + 펄스
           : charging
             ? 'cursor-wait border-gold/40' // 쿨다운 — 검은 스윕 오버레이가 덮음(흐리지 않게 풀 밝기)
             : 'cursor-not-allowed border-panel-edge opacity-40 saturate-50' // 진짜 비활성 — 흐림
@@ -125,7 +116,7 @@ export function EnhanceButton({
     >
       {/* 활성 시 천천히 번지는 펄스 링(카드 외곽) — 쿨다운·불가에는 끈다.
           상시 펄스라 CSS(.fx-pulse-ring — index.css)가 소유한다(메인 스레드 0). */}
-      {ready && !DISABLE_READY_GLOW && (
+      {ready && (
         <span className="fx-pulse-ring pointer-events-none absolute inset-0 rounded-2xl border border-gold-glow" />
       )}
       {/* "강화" 라벨은 강화 수치(검 +레벨 등)에 쓰는 UI 금색(text-gold)으로 통일해 일관된 느낌을 준다.

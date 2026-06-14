@@ -5,8 +5,7 @@ import { drawSpriteContain, spriteStore } from '../lib/spriteStore'
 // ImageBitmap 풀을 재사용한다. 강화로 장착검·비용·보상 스프라이트가 바뀔 때 <img src> 교체가 내던 재디코드·
 // 재업로드(특히 모바일 WebKit) 없이 블릿만 하게 한다. 미적재면 적재 즉시 1회 재그리기(self-heal), 미존재/
 // 실패면 default.png 폴백. backing store·object-contain·픽셀아트 보간은 drawSpriteContain 이 소유한다.
-// (검 본체 SwordStage 와 달리 등장 애니메이션·FREEZE 진단이 없는 정적 아이콘 전용 — drawSpriteContain 의
-//  freeze 인자를 쓰지 않아 진단 플래그의 영향을 받지 않는다.)
+// (검 본체 SwordStage 와 달리 등장 애니메이션이 없는 정적 아이콘 전용.)
 export function SpriteCanvas({
   url,
   alt,

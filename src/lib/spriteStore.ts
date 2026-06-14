@@ -105,30 +105,14 @@ class SpriteStore {
 // 앱 전역 단일 스토어(DataManager 와 같은 싱글턴 관례).
 export const spriteStore = new SpriteStore()
 
-// ⚠️ 모바일 진단용 임시 플래그(export — SwordStage 도 참조) — "강화 시 검 교체"가 모바일(iOS WebKit) 프레임
-// 저하 원인인지 격리. true 면 ① drawSpriteContain(…, freeze=true) 호출(검 본체·잔상)이 "처음 그린 스프라이트"로
-// 고정돼 같은 ImageBitmap 만 블릿하고(= 교체 비용 0), ② SwordStage 가 등장 페이드(opacity 0→1)를 건너뛰어 검이
-// 강화마다 사라졌다 나오지 않고 늘 떠 있게 한다. freeze=false 인 아이템 아이콘(SpriteCanvas)에는 영향 없다.
-// 이름·레벨 뱃지·스탯은 정상. 진단이 끝나면 false 로 되돌리거나 제거할 것.
-export const FREEZE_SWORD_SPRITE = true
-let frozenSprite: string | null = null
-
 // 캔버스에 스프라이트를 object-contain 으로 그린다(뷰 경계 헬퍼) — 검 본체(SwordStage)·잔상(ShakeBurstEffect)·
 // 아이템 아이콘(SpriteCanvas)이 같은 블릿을 공유한다(구현 분기 방지). backing store 는 표시 크기×DPR(crisp),
 // 보간은 nearest(픽셀아트 — <img> 의 imageRendering:pixelated 와 동일), 미로드/없는 경로면 get 의 default.png
 // 폴백(never null). 그릴 게 없으면(컨텍스트 없음·0 크기·소스 0 크기) 조용히 반환한다.
-//   · freeze: 진단 플래그(FREEZE_SWORD_SPRITE)가 켜졌을 때만 의미 — true 면 "처음 그린 URL"로 고정한다(검 전용).
-//     아이템 아이콘은 false(기본)라 각자 실제 스프라이트를 그린다(진단과 무관).
 export function drawSpriteContain(
   canvas: HTMLCanvasElement,
   url: string,
-  freeze = false,
 ): void {
-  // ⚠️ 진단(FREEZE_SWORD_SPRITE) — freeze=true(검 본체·잔상)면 처음 그린 URL 로 고정해 강화 교체를 없앤다.
-  if (FREEZE_SWORD_SPRITE && freeze) {
-    if (frozenSprite === null) frozenSprite = url
-    url = frozenSprite ?? url
-  }
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const dpr = Math.min(3, window.devicePixelRatio || 1)
