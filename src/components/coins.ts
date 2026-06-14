@@ -40,7 +40,7 @@ export function coinArrivalTimes(count: number): number[] {
 // 튀어오르는 부채꼴 반각(rad). 코인은 검에서 "위쪽으로 넓게 흩뿌려" 튀어오른 뒤 골드창으로 빨려든다.
 const COIN_FAN_SPREAD = 1.4 // 수직(↑) 기준 ±80° — 넓게 흩뿌림
 
-// 코인 1개의 분출 파라미터(인덱스로 결정 — Math.random 없이 결정적인 좌표 생성 원칙).
+// 코인 1개의 분출 파라미터(인덱스로 결정 — Math.random 없이 결정적; makeParticles 와 동일 원칙).
 export type CoinSpec = {
   angle: number // 튀어오름 방향(rad) — 위쪽(-π/2) 중심 부채꼴. frac 단조 → 코인마다 다른 각도
   rise: number // 튀어오름 정점까지 거리(px) — 코인마다 달라 흩뿌려진 구름이 된다

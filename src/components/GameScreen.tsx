@@ -32,7 +32,8 @@ import { dropAppearSec, dropLifetimeMs } from './drops'
 import { ItemFlight, ITEM_FLIGHT_MS, type ItemFlightEvent } from './ItemFlight'
 import { HammerStrike, type HammerStrikeEvent } from './HammerStrike'
 import { hammerStrikeMs, type HammerShape } from './hammerTiming'
-import { HitSparkCanvas, ParticleEmitProvider } from './HitSparkCanvas'
+import { HitSparkCanvas } from './HitSparkCanvas'
+import { ParticleEmitProvider, ParticlePool } from './ParticlePool'
 import {
   computeEnhanceTimeline,
   rollShakeMs,
@@ -46,6 +47,7 @@ import {
 import { pickFloatingText } from './floatingText'
 import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import { InventoryPanel } from './InventoryPanel'
+import { particleCount } from './particles'
 import { protectionState, isProtectionActive } from './protection'
 import { ActionButton } from './ActionButton'
 import { ShopModal } from './ShopModal'
@@ -72,6 +74,7 @@ function projectBurst(e: Effect): ShakeBurstEvent | null {
     ? {
         id: e.id,
         sprite: e.payload.sprite,
+        particleCount: e.payload.particleCount ?? 0,
         // 떨림 시작(impact)·길이(shake)는 잔상 떨림→버스트(emit) 시점을 정하는 데 쓴다.
         impactMs: e.payload.impactMs ?? 0,
         shakeMs: e.payload.shakeMs ?? 0,
@@ -458,8 +461,8 @@ export function GameScreen() {
     // "떨림 후 분출 + 새 검 등장 억제"를 한 쌍으로 건다(성공·파괴 공통 안무). 잔상(sprite) 떨림→버스트와
     // 새 검 등장(burstAt 까지 억제)이 항상 같은 타임라인 슬라이스를 쓰도록 한곳에서 enqueue 한다 — 두 분기가
     // 따로 작성하면 한쪽 payload(예: 등장 억제 지연)만 고쳐 잔상 소멸·새 검 등장이 어긋나는(강화 전/후 검 동시
-    // 노출) 발산이 생길 수 있어 일반화한다. 분출 불꽃 색(성공=금/파괴=적)은 kind 로 뷰가 바인딩한다.
-    const enqueueShakeBurst = (kind: string, sprite: string) => {
+    // 노출) 발산이 생길 수 있어 일반화한다. 파티클 수는 단계(level)에 비례 — 호출 측이 잔상/도달 검을 해석해 넘긴다.
+    const enqueueShakeBurst = (kind: string, sprite: string, level: number) => {
       enqueueEffect({
         kind,
         exclusive: false,
@@ -467,6 +470,7 @@ export function GameScreen() {
         durationMs: tl.burstLifetimeMs,
         payload: {
           sprite,
+          particleCount: particleCount(level),
           impactMs: tl.impactMs,
           shakeMs: tl.shakeMs,
         },
@@ -481,13 +485,13 @@ export function GameScreen() {
     }
 
     if (result.outcome === 'success') {
-      // 성공 = (실패와 동일 안무) 망치 임팩트 → 떨림(무작위) → 황금 불꽃 분출 + 상위 검 등장 ∥ 재강화 가드.
-      // 잔상은 강화 전 검(fromId) — 이 뷰 경계에서 해석(원칙 2). 잔상 소멸·새 검 등장이 같은 burstAt 을 써
-      // 정확히 교대한다(강화 전/후 검 동시 노출 없음 — enqueueShakeBurst).
+      // 성공 = (실패와 동일 안무) 망치 임팩트 → 떨림(무작위) → 황금 파티클 분출 + 상위 검 등장 ∥ 재강화 가드.
+      // 잔상은 강화 전 검(fromId), 파티클 수는 도달 검(toId)의 단계에 비례 — 둘 다 이 뷰 경계에서 해석(원칙 2).
+      // 잔상 소멸·새 검 등장이 같은 burstAt 을 써 정확히 교대한다(강화 전/후 검 동시 노출 없음 — enqueueShakeBurst).
       const from = dataManager.getSwordById(result.fromId)
       const next = dataManager.getSwordById(result.toId)
       if (from) {
-        enqueueShakeBurst('successBurst', from.sprite)
+        enqueueShakeBurst('successBurst', from.sprite, next?.level ?? 0)
       }
       // 가치 상승 강조 — 도달 검(toId)이 강화 전(fromId)보다 비싸면 가격 표시를 한 번 통 튀게 한다.
       // "강화 성공으로 올랐다"는 사실은 이 분기에만 있으므로 여기서 판정한다(장착·판매와 구분).
@@ -507,13 +511,13 @@ export function GameScreen() {
     } else if (result.outcome === 'destroyed') {
       // 파괴 폭발 효과음 — 떨림이 끝나 폭발이 터지는 순간(burstAt)에 맞춰 울린다('캉!' 직후가 아닌 분출 시점).
       sound.playSfx('enchant_destroyed', { delayMs: tl.burstAtMs })
-      // 파괴 = 적색 불꽃 폭발 연출 ∥ 재강화 가드.
+      // 파괴 = 폭발 연출 ∥ 재강화 가드. 파티클 수는 파괴된 검(fromId)의 단계에 비례.
       // 스프라이트(fromId)는 이 뷰 경계에서 해석해 payload 로 넘긴다(원칙 2).
       const target = destructionTargetOf(result)
       const destroyed = target ? dataManager.getSwordById(target.id) : undefined
       if (target && destroyed) {
         // 잔상은 파괴된 검(fromId), 등장 억제는 떨림 끝(burstAt)까지 — 성공과 동일 안무(enqueueShakeBurst).
-        enqueueShakeBurst('destruction', destroyed.sprite)
+        enqueueShakeBurst('destruction', destroyed.sprite, destroyed.level)
       }
       // 드롭이 있으면 재료가 검 아래로 흩어져 떨어지는 연출(잠금X·병렬). 폭발(burstAt)이 드러난 직후
       // 떨어지도록 등장 시각을 타임라인에서 도출한다(무작위 떨림 길이만큼 함께 늦춰짐). 실제 인벤토리 수량은 store 반영됨.
@@ -719,7 +723,7 @@ export function GameScreen() {
           </div>
 
           {/* 중앙: 검 스테이지 + 결과 연출(오버레이). 고정폭 28rem 트랙이라 검 주위 여백은 트랙이 제공.
-              ParticleEmitProvider 로 감싸 불꽃 캔버스(HitSparkCanvas)와 소비자(BurstEmitter)가 같은 emit 을 공유한다. */}
+              ParticleEmitProvider 로 감싸 풀(ParticlePool)과 소비자(Hit/버스트)가 같은 emit 을 공유한다. */}
           <ParticleEmitProvider>
             <div className="relative flex min-h-0 w-full flex-1 items-center justify-center lg:w-auto lg:flex-none">
               <SwordStage
@@ -742,10 +746,15 @@ export function GameScreen() {
                 }}
                 spriteOverlay={
                   <>
-                    {/* 버스트 불꽃 emit — 재강화 시 옛 버스트 emitter 가 유지돼야 대기 중 emit 이 안 잘려서, 각
-                        효과를 id 로 키잉해 독립적으로 burstAt 에 emit 한다. 렌더 null(불꽃은 아래 HitSparkCanvas 가
-                        그림)이라 다중·교체에도 레이어 churn 이 없고, 캔버스는 새 emit 마다 이전 버스트를 교체
-                        (replace)하므로 화면엔 최신 한 벌만 보인다. 색만 달리해 성공=금/파괴=적으로 물든다. */}
+                    {/* 파티클 풀 — 성공/파괴 버스트 도트를 캔버스 한 장에 그린다(Hit 불꽃은 별개 HitSparkCanvas — 맨 뒤에 둬
+                        검·잔상 위에 파티클이 얹히도록). 풀은 항상 마운트, 소비자가 emit 으로 재생을 요청한다.
+                        데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 — 풀이 없으면 버스트 emit 은
+                        자동 no-op(particleEmit.ts). 잔상 떨림·교대(ShakeBurstEffect)는 영향 없음. */}
+                    {anim.enhanceParticlesEnabled && <ParticlePool />}
+                    {/* 버스트 파티클 emit — 재강화 시 옛 버스트 emitter 가 유지돼야 대기 중 emit 이 안 잘려서, 각
+                        효과를 id 로 키잉해 독립적으로 burstAt 에 emit 한다. 렌더 null(파티클은 풀이 그림)이라
+                        다중·교체에도 레이어 churn 이 없고, 풀은 새 emit 마다 이전 버스트를 교체(replace)하므로
+                        화면엔 최신 한 벌만 보인다. 잔상 비주얼은 아래 영속 노드가 따로 그린다. */}
                     {destructionEvents.map((ev) => (
                       <DestructionEffect key={ev.id} event={ev} />
                     ))}
@@ -768,14 +777,19 @@ export function GameScreen() {
                         smearEnabled={anim.hammerSmearEnabled}
                       />
                     )}
-                    {/* 분출 불꽃 — 위 BurstEmitter 의 emit(떨림 끝 burstAt)을 받아 결과 색(성공=금/파괴=적)으로
-                        불티·잉걸불·화구·불혀를 캔버스에 1회 폭발(옛 도트 버스트를 대체). 캔버스는 emit 컨텍스트의
-                        등록자라 위 emitter 들과 ParticleEmitProvider 로 연결된다.
-                        ⚠️ 망치보다 "뒤"(DOM 아래)가 아니라 위에 둔다 — 불꽃의 화구·불혀는 검 중심에서 피어나는데,
-                        망치 뒤에 깔면 핵심 연출이 가려진다. paint order 의존을 의도적으로 고정(HitSparkCanvas 가
-                        나중 형제라 망치 위에 그려진다). 데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 —
-                        마운트 자체를 차단하면 등록자가 없어 버스트 emit 은 자동 no-op(particleEmit.ts). */}
-                    {anim.enhanceParticlesEnabled && <HitSparkCanvas />}
+                    {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 불티·잉걸불·화구·불혀를 캔버스에 1회 폭발.
+                        가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 별개 캔버스 ParticlePool).
+                        ⚠️ 망치보다 "뒤"(DOM 아래)가 아니라 위에 둔다 — 불꽃의 화구·불혀는 임팩트 중심에서
+                        피어나는데, 바로 그 자리에 망치 머리가 닿아 정지(holdAfter)하므로 망치 뒤에 깔면 핵심
+                        연출이 통째로 가려진다. 임팩트 섬광이 잠깐(≤0.2s) 망치 머리를 삼키는 것이 의도된 강렬함.
+                        paint order 의존을 의도적으로 고정(HitSparkCanvas 가 나중 형제라 망치 위에 그려진다).
+                        데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 — 마운트 자체를 차단. */}
+                    {anim.enhanceParticlesEnabled && (
+                      <HitSparkCanvas
+                        event={hammerStrikeEvent}
+                        impactMs={anim.hammerImpactMs}
+                      />
+                    )}
                     {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
                     <FloatingTextEffect event={floatingText} />
                   </>
