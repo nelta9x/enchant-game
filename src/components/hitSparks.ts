@@ -9,9 +9,11 @@
 // (떨림 끝 = 결과 공개)에 맞춘다 — 호출 측(HitSparkCanvas)이 그 타이밍을 소유한다.
 //
 // 좌표/물리는 결정적이지 않아도 된다(시각 연출 — 게임 로직 아님). 매 타격마다 Math.random 으로 약간씩 다른
-// 산란을 줘 더 자연스럽다. 색은 index.css 의 @theme 토큰(소스 hex 금지)을 런타임 1회 해석해 쓴다.
+// 산란을 줘 더 자연스럽다. 색은 index.css 의 @theme 토큰(소스 hex 금지)을 cssColorToken 으로 1회 해석해 쓴다.
 //
 // 튜닝값(개수·굵기·스케일 등) — 브라우저에서 눈으로 맞추는 값이다. 한곳에 모아 두어 연출을 조정한다.
+import { cssColorToken } from '../lib/cssToken'
+
 const hitSparkSettings = {
   // ── 빠른 불티(용접 결 — 가늘고 빠른 실) ──
   // 이 불꽃이 옛 도트 버스트(성공=금/파괴=적)를 대체하므로, 한 가닥짜리 임팩트 불티가 아니라 사방으로
@@ -91,7 +93,7 @@ type Lick = {
 // ── @theme 토큰(hex) → rgb 1회 해석 + 캐시 ─────────────────────────────────────
 // 결과(성공=금/파괴=적)마다 화염색이 다르므로 색쌍(coreVar|edgeVar)별로 팔레트를 캐시한다 — 변종이 둘뿐이라
 // Map 으로 충분하다. 캐시는 정적이다(런타임 테마 전환 경로 없음 — hit 토큰은 index.css 의 정적 @theme 상수).
-// 다크모드/테마 토글을 도입하면 paletteCache·glowSprites 를 무효화(clear)해야 한다.
+// 다크모드/테마 토글을 도입하면 paletteCache·glowSprites(및 cssColorToken 의 캐시)를 무효화(clear)해야 한다.
 type Palette = {
   cool: number[][]
   arcCore: number[] // 화염 백열 중심색 — 화구·불혀 그라데이션의 가장 뜨거운 속(아주 작은 핫스팟)
@@ -117,10 +119,11 @@ function hexToRgb(hex: string): number[] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
-// 'var(--x)' 래퍼 또는 생 hex 를 받아 실제 hex 문자열로 푼다(소비자는 'var(--color-gold)' 형태를 넘긴다).
-function resolveColorExpr(root: CSSStyleDeclaration, expr: string): string {
+// 토큰명('--color-x') 또는 'var(--color-x)' 래퍼 또는 생 hex 를 rgb 로 푼다(소비자는 'var(--color-gold)'
+// 형태를 넘긴다). @theme 토큰 해석·캐시는 공유 헬퍼 cssColorToken 에 위임한다(색의 단일 출처 — index.css).
+function exprToRgb(expr: string): number[] {
   const m = expr.match(/var\((--[\w-]+)\)/)
-  return (m ? root.getPropertyValue(m[1]) : expr).trim()
+  return hexToRgb(m ? cssColorToken(m[1]) : expr)
 }
 
 // 결과 색쌍(coreVar=밝은 글로우 / edgeVar=베이스)으로 식어가는 4-stop 화염 램프를 만든다 — 결과색이
@@ -132,14 +135,11 @@ function resolvePalette(coreVar: string, edgeVar: string): Palette {
   const key = coreVar + '|' + edgeVar
   const cached = paletteCache.get(key)
   if (cached) return cached
-  const root = getComputedStyle(document.documentElement)
-  const tok = (name: string) => hexToRgb(root.getPropertyValue(name).trim())
-  const expr = (e: string) => hexToRgb(resolveColorExpr(root, e))
-  const glow = expr(coreVar)
-  const base = expr(edgeVar)
+  const glow = exprToRgb(coreVar)
+  const base = exprToRgb(edgeVar)
   const pal: Palette = {
     cool: [glow, base, darken(base, 0.5), darken(base, 0.2)],
-    arcCore: tok('--color-hit-arc-core'),
+    arcCore: hexToRgb(cssColorToken('--color-hit-arc-core')),
     glow,
   }
   paletteCache.set(key, pal)
@@ -372,6 +372,9 @@ export class HitSparkSystem {
     const pal = this.pal
     if (!pal) return // 팔레트는 burst 가 채운다 — 루프는 burst 이후에만 도므로 사실상 항상 설정돼 있다.
     const S = hitSparkSettings
+    // 결과 글로우 후광 스프라이트는 이번 프레임 내내 한 장(색 고정)이라 한 번만 뽑아 화구·불혀·불티 패스가
+    // 공유한다 — 불혀 중첩 루프(혀×단)에서 매번 getGlowSprite 를 부르며 키 문자열을 재조립하던 비용 제거.
+    const glow = getGlowSprite(pal.glow)
     ctx.clearRect(0, 0, this.w, this.h)
 
     // 중심 발화점 심지 섬광은 제거됐다(화구·불혀가 임팩트 순간을 담당) — 충격파 + 화구 + 불혀를
@@ -424,7 +427,7 @@ export class HitSparkSystem {
         const gr = r * 1.7
         ctx.globalAlpha = fa * S.fireGlow
         ctx.drawImage(
-          getGlowSprite(pal.glow),
+          glow,
           this.cx - gr,
           this.cy - gr,
           gr * 2,
@@ -488,7 +491,7 @@ export class HitSparkSystem {
           if (S.lickGlow > 0) {
             const gr = r2 * 1.9
             ctx.globalAlpha = sa * S.lickGlow
-            ctx.drawImage(getGlowSprite(pal.glow), -gr, -gr, gr * 2, gr * 2)
+            ctx.drawImage(glow, -gr, -gr, gr * 2, gr * 2)
           }
           ctx.restore()
         }
@@ -557,13 +560,12 @@ export class HitSparkSystem {
     // 패스 1 — additive 후광 블룸: 미리 구운 글로우 스프라이트를 가산 합성으로 불티마다 blit 한다. 겹치는
     // 불티의 빛이 누적돼 발광체처럼 보인다. shadowBlur 와 달리 캐시 텍스처 복사라 임팩트 때 프레임을 안 떨군다.
     if (S.glow > 0) {
-      const sprite = getGlowSprite(pal.glow)
       ctx.globalCompositeOperation = 'lighter'
       for (let i = 0; i < this.sparkCount; i++) {
         const p = this.sparks[i]
         const r = p.head * 2 + S.glow * this.k // 후광 반경(px) — 머리가 굵은 잉걸불일수록 크다
         ctx.globalAlpha = p.ra < 1 ? p.ra : 1
-        ctx.drawImage(sprite, p.x - r, p.y - r, r * 2, r * 2)
+        ctx.drawImage(glow, p.x - r, p.y - r, r * 2, r * 2)
       }
       ctx.globalAlpha = 1
       ctx.globalCompositeOperation = 'source-over'
