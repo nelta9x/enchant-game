@@ -30,8 +30,7 @@ export function SuccessRateSigil({
 
   return (
     <div
-      className={`pointer-events-none absolute ${terminal ? 'opacity-30' : 'opacity-45'}`}
-      style={{ right: '-25%', bottom: '-2%' }}
+      className={`pointer-events-none absolute right-0 bottom-0 lg:right-[-25%] lg:bottom-[-2%] ${terminal ? 'opacity-30' : 'opacity-45'}`}
       aria-label={`${t('stat.successRate')}: ${terminal ? t('sword.maxLevel') : text}`}
     >
       {/* 룬은 일반 마법진 색(ink-soft) — currentColor 로 그려지므로 여기 color 로 물들인다. */}

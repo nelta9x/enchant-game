@@ -668,14 +668,17 @@ export function GameScreen() {
 
   // lg+(데스크탑)에선 바깥 패딩을 없애 카드가 브라우저를 꽉 채우게 한다 — 베젤(검정) 여백 제거.
   // <lg(세로형)에선 베젤 프레임을 유지한다.
+  // items-stretch: 카드를 래퍼 높이(100svh − 패딩)에 늘려 세로 화면을 꽉 채운다 — 카드 자신은
+  // min-h-svh 를 두지 않는다(카드+패딩 = svh 가 돼 스크롤 0; min-h-svh 면 패딩만큼 넘쳤다).
+  // 내용이 넘치면 카드가 자라 overflow-y-auto 로 스크롤된다(짧은 화면 안전망).
   return (
-    <div className="flex min-h-svh items-center justify-center overflow-x-hidden overflow-y-auto bg-bezel p-3 sm:p-6 lg:p-0">
+    <div className="flex min-h-svh items-stretch justify-center overflow-x-hidden overflow-y-auto bg-bezel p-3 sm:p-6 lg:p-0">
       {/* lg+(데스크탑): 레이아웃은 고정 비율(좌 16rem · 가운데 28rem · 우 16rem)이며, 화면이 커지면
           루트 font-size 가 커져(아래 index.css clamp) rem 기반 UI 전체가 통째로 균일하게 스케일된다
           (가운데만 비어 보이던 1fr 제거 → 빈 공간이 비례적으로 늘지 않음). 컬럼 트랙은 justify-center 로
           가운데 정렬하고, bg-stage 가 화면 전체를 덮어 양옆 여백도 베이지(검정 없음). 미디어쿼리(lg)는
           초기 16px 기준이라 스케일과 무관하게 1024px 에서 고정 — <lg 는 세로 단일 컬럼(16px). */}
-      <div className="relative flex w-full flex-col rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5 lg:min-h-svh lg:rounded-none lg:border-0 lg:px-0">
+      <div className="relative flex w-full flex-col rounded-2xl border border-stage-edge bg-stage p-4 shadow-2xl sm:p-5 lg:rounded-none lg:border-0 lg:px-0">
         {/* 상단 컨트롤은 아래 메인 그리드와 같은 폭으로 가운데 정렬한다. 그리드는 full-width 안에서
             lg:grid-cols-[16rem_28rem_16rem] + gap-2(0.25rem×2=0.5rem, 갭 2개=1rem) = 61rem 만 justify-center 로
             가운데에 쓰는데, TopControls 만 full-width 라 상단바가 좌우로 더 넓게 튀어나와 보였다(불일치).
@@ -689,13 +692,16 @@ export function GameScreen() {
         {/* 상단 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
         <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={!shopOpen} />
 
-        {/* 좁은 화면(<lg)은 단일 컬럼으로 세로 스택 — 3열은 고정폭 검 스테이지(검 박스 240·이름 배너 320)가
-            들어갈 만큼 넓을 때만 쓴다. sm(640) 기준이면 640~1024 구간에서 가운데 트랙이 눌려 좌우 패널과
-            겹치므로, 전환 기준을 lg(1024)로 둔다(성공률을 검 오른쪽으로 옮기는 lg 기준과도 일치). */}
-        <div className="mt-3 grid grid-cols-1 gap-2 lg:my-auto lg:min-h-[34rem] lg:justify-center lg:grid-cols-[16rem_28rem_16rem]">
+        {/* 좁은 화면(<lg)은 단일 컬럼 세로 스택, lg+ 는 3열 그리드 — 3열은 고정폭 검 스테이지(검 박스 240·
+            이름 배너 320)가 들어갈 만큼 넓을 때만 쓴다. sm(640) 기준이면 640~1024 구간에서 가운데 트랙이
+            눌려 좌우 패널과 겹치므로, 전환 기준을 lg(1024)로 둔다(성공률을 검 오른쪽으로 옮기는 lg 와 일치).
+            세로형: flex-1 로 카드의 남는 세로 공간을 이 컨테이너가 모두 차지하고, 안에서 검 스테이지 셀이
+            다시 flex-1 로 늘어 위(마법진)·아래(강화/판매/인벤토리) 앵커를 만든다. lg+: lg:grid + lg:flex-none
+            로 기존 3열 고정 레이아웃(my-auto 세로 중앙)을 그대로 복원한다. */}
+        <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2 lg:my-auto lg:grid lg:min-h-[34rem] lg:flex-none lg:justify-center lg:grid-cols-[16rem_28rem_16rem]">
           {/* 좌: 인벤토리(강화비용·판매가는 우측 버튼으로 통합 — 별도 비용 카드 없음).
               세로형(<lg)에선 강화 버튼처럼 컬럼 폭을 꽉 채우고, lg+(3열)에선 컬럼을 채운다. */}
-          <div className="order-last flex w-full min-h-0 flex-col lg:order-none lg:justify-center">
+          <div className="order-last flex w-full min-h-0 flex-none flex-col lg:order-none lg:justify-center">
             {/* ref: 파괴 드롭이 빨려 들어갈 도착점 측정용 — 패널을 감싸 드롭이 보이는 인벤토리로 들어가게 한다.
                 lg+(데스크탑)에선 컬럼 높이에서 세로 중앙 정렬(고정 높이 박스, 꽉 채우지 않음). */}
             <div ref={inventoryRef}>
@@ -719,7 +725,7 @@ export function GameScreen() {
           {/* 중앙: 검 스테이지 + 결과 연출(오버레이). 고정폭 28rem 트랙이라 검 주위 여백은 트랙이 제공.
               ParticleEmitProvider 로 감싸 풀(ParticlePool)과 소비자(Hit/버스트)가 같은 emit 을 공유한다. */}
           <ParticleEmitProvider>
-            <div className="relative flex items-center justify-center">
+            <div className="relative flex min-h-0 w-full flex-1 items-center justify-center lg:w-auto lg:flex-none">
               <SwordStage
                 sword={sword}
                 level={sword?.level ?? null}
@@ -818,7 +824,7 @@ export function GameScreen() {
           {/* 우: 강화 카드(비용 포함) + 판매 버튼(세로 중앙). 판매가는 검 스테이지에 금색으로 표시.
               보관은 좌측 인벤토리의 장착 행 클릭으로 옮겼다(별도 보관 버튼 없음).
               보유 골드는 좌측 인벤토리 헤더 우측 배지로 옮겼다(스크롤 영역 밖 고정). */}
-          <div className="flex flex-col items-center justify-center">
+          <div className="flex flex-none flex-col items-center justify-center">
             {/* 액션 패널 = 인벤토리 패널과 동일 크기. 폭은 컬럼(16rem)으로 이미 같고, 높이는 인벤토리
                 패널 높이(헤더 2.8125rem[골드 알약 py-1 포함] + 목록 17.25rem + 테두리 0.125rem = 20.1875rem)에
                 맞춘다. lg+ 에선 그 높이의 2행 그리드(강화 2 : 판매 1)로 버튼이 행을 채운다(items-stretch).

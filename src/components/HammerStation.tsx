@@ -14,11 +14,11 @@ const HAMMER_SPRITE = itemSpriteUrl('horadric_hammer.png')
 
 export function HammerStation() {
   return (
-    // 위치: 검 우상단 — 좌상단 보호 결계(ProtectionWard)와 좌우 대칭(같은 -25%/-2% 오프셋, 좌→우 반전).
-    // 검 박스가 overflow-visible 라 박스 밖으로 살짝 나가도 잘리지 않는다(다른 코너 결계와 동일).
+    // 위치: 검 우상단 — 좌상단 보호 결계(ProtectionWard)와 좌우 대칭(좌→우 반전, 같은 오프셋 규약).
+    // 세로형(<lg)에선 박스가 컬럼 폭을 채워 -25% 바깥 오프셋이 화면 밖으로 잘리므로 안쪽 코너에 붙인다
+    // (right-0/top-0). lg+ 에선 기존 -25%/-2% 바깥 오프셋(다른 두 코너 결계와 동일).
     <div
-      className="pointer-events-none absolute"
-      style={{ right: '-25%', top: '-2%' }}
+      className="pointer-events-none absolute right-0 top-0 lg:right-[-25%] lg:top-[-2%]"
       aria-hidden
     >
       {/* 룬은 일반 마법진 색(ink-soft) — currentColor 로 그려지므로 여기 color 로 물들인다.

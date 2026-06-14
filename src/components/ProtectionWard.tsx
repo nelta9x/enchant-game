@@ -60,8 +60,10 @@ export function ProtectionWard({
       />
 
       {/* 보호 결계 서클 — 검 좌상단(마력의 근원). 검 캔버스와 닿지 않게 바깥(코너)으로 띄운다.
-          크기·오프셋은 코너 3종 동일(h-20, -25%/-2%) — 키울 때 안쪽 모서리를 고정하려 오프셋을 바깥으로 민다. */}
-      <div className="absolute" style={{ left: '-25%', top: '-2%' }}>
+          크기·오프셋은 코너 3종 동일 — 키울 때 안쪽 모서리를 고정하려 오프셋을 바깥으로 민다.
+          세로형(<lg)에선 박스가 컬럼 폭을 꽉 채워 -25% 바깥 오프셋이 화면 밖으로 잘리므로, 박스 안쪽
+          코너에 붙인다(left-0/top-0 — 전체가 화면에 보인다). lg+ 에선 기존 -25%/-2% 바깥 오프셋 복원. */}
+      <div className="absolute left-0 top-0 lg:left-[-25%] lg:top-[-2%]">
         <ProtectionSigil
           state={state}
           onToggle={onToggle}
