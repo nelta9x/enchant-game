@@ -1,38 +1,17 @@
-// 강화 망치 임팩트의 불꽃(프레젠테이션 전용) — 작은 캔버스 한 장이 매 임팩트마다 세 겹을 폭발시킨다:
-// ① 빠른 불티(용접 결의 가는 실 — 탄도 비행) 다수, ② 잉걸불(크고 느린 불씨 소수 — 공기 저항에 곧
-// 멈춰 난류로 춤추다 수명 말기엔 떠오르며 사그라듦), ③ 임팩트 화구·불혀(따뜻한 가산 섬광 + 발화점에서
-// 솟아오르는 화염 혀 — 사실적 불티 위에 얹는 한 줌의 양식화). 밀도 높은 가는 실 + 픽셀 단위 묘사는
-// 작은 스테이지에서 DOM 으로는 묻혀 캔버스로 그린다. 성공/실패 버스트는 별개 캔버스(ParticlePool)
-// — 이 시스템은 hit 만 담당한다.
+// 강화 망치 임팩트의 불꽃(프레젠테이션 전용) — 작은 캔버스 한 장이 매 임팩트마다 화염 섬광을 폭발시킨다:
+// ① 임팩트 화구(따뜻한 가산 섬광), ② 충격파 링(원점에서 팽창하는 백열 고리), ③ 불혀(발화점에서
+// 솟아오르는 화염 혀). 가는 불티·잉걸불(날아가는 불티 줄무늬)은 제거됐다 — 화구·충격파·불혀만 남겨
+// 임팩트를 "번쩍이는 화염 섬광"으로 표현한다. 픽셀 단위 가산 합성 묘사는 작은 스테이지에서 DOM 으로는
+// 묻혀 캔버스로 그린다. 성공/실패 버스트는 별개 캔버스(ParticlePool) — 이 시스템은 hit 만 담당한다.
 //
 // 좌표/물리는 결정적이지 않아도 된다(시각 연출 — 게임 로직 아님). 매 타격마다 Math.random 으로 약간씩 다른
 // 산란을 줘 더 자연스럽다. 색은 index.css 의 @theme 토큰(소스 hex 금지)을 런타임 1회 해석해 쓴다.
 //
-// 튜닝값(개수·굵기·스케일 등) — 브라우저에서 눈으로 맞추는 값이다. 한곳에 모아 두어 연출을 조정한다.
+// 튜닝값(개수·반경·스케일 등) — 브라우저에서 눈으로 맞추는 값이다. 한곳에 모아 두어 연출을 조정한다.
 const hitSparkSettings = {
-  // ── 빠른 불티(용접 결 — 가늘고 빠른 실) ──
-  count: 8, // 한 타격당 불티 수 — 폭발감은 화구·불혀가 담당하므로 실은 몇 가닥만
-  thick: 0.9, // 불티 코어 선 굵기(px, k 로 스케일) — 테두리 없이 코어 단독이라 이만큼은 굵어야 베이지 위에서 읽힌다
-  scale: 1, // 전체 스케일(속도·길이·아크 반경)
-  fanDeg: 70, // 위(−90°) 중심 부채꼴 폭 — 넓혀서 "분출"이 아니라 "폭발"로
-  baseVel: 300, // 기준 속도(px/s) — ×scale×k, 불티별 sp(0.6~1.9) 난수 배수
-  gravity: 700, // 중력(px/s², ×k) — 호 그리며 낙하
-  lifeMin: 0.1, // 불티 최소 수명(초) — +lifeVar 난수
-  lifeVar: 0.3, // 수명 변주 — 제각각 사그라듦
-  lenFactor: 0.01, // 실 길이 = min(cap, |v|×이값) — 빠를수록 긴 실(모션블러)
-  lenCap: 10, // 실 길이 상한(×scale×k)
-  arcR: 10, // 발화점 반경(×scale×k) — 불혀 가로 산란의 기준(심지 섬광은 제거됨)
-  glow: 18, // 불티 후광 반경(px, ×k) — additive 로 깔아 발광체처럼(0 이면 글로우 없음)
-  // ── 잉걸불(크고 느린 불씨 소수 — 식는 동안 잔류해 타격의 여운을 만든다) ──
-  emberCount: 5, // 한 타격당 잉걸불 수
-  emberVelMul: 1.15, // 초기 속도 = baseVel × 이 값 — 망치 머리(≈±50px) 가장자리 밖까지 나가 멈추도록
-  emberLifeMin: 0.45, // 잉걸불 최소 수명(초) — 불티보다 길게 잔류
-  emberLifeVar: 0.3,
-  emberDrag: 5, // 공기 저항(1/s, 지수 감쇠) — 튀어나온 직후 급감속해 허공에 머문다
-  emberFlutter: 320, // 난류 좌우 흔들림(가속 px/s², ×k) — 느려진 불씨가 춤추는 요동
-  emberBuoyancy: 1.6, // 수명 말기 중력 상쇄 — 유효 중력 = g×(1 − 이값×life²), 1 보다 크면 끝에서 떠오른다
-  emberHead: 2.6, // 잉걸불 크기 가중(px, ×k) — 글로우 후광 반경에 들어가 불씨가 더 크게 빛난다
-  // ── 임팩트 화구(따뜻한 폭발 섬광 — 가산 합성으로 불혀·불티와 겹쳐 중심이 백열로 탄다) ──
+  scale: 1, // 전체 스케일(반경) — rem 스케일과 별개로 연출 크기를 통째로 키우는 손잡이
+  arcR: 10, // 발화점 반경(×scale×k) — 불혀 가로 산란의 기준
+  // ── 임팩트 화구(따뜻한 폭발 섬광 — 가산 합성으로 불혀와 겹쳐 중심이 백열로 탄다) ──
   fireR: 46, // 화구 최대 반경(×scale×k) — 망치 머리를 잠깐 삼키고 가장자리가 머리 밖으로 비어져 나오는 크기
   fireDur: 0.13, // 화구 길이(초) — 짧게 번쩍하고 꺼진다
   fireGlow: 0.6, // 화구 후광 강도(0~1, 0 이면 없음) — 글로우 스프라이트를 크게 덧대 빛이 번진다
@@ -40,7 +19,7 @@ const hitSparkSettings = {
   shockR: 64, // 링 최대 반경(×scale×k)
   shockDur: 0.18, // 링 길이(초) — 화구보다 살짝 길게 남아 팽창이 읽힌다
   // ── 불혀(발화점에서 솟아오르며 수축·깜빡이다 꺼지는 화염 혀) ──
-  lickCount: 6, // 한 타격당 불혀 수 — 작아진 대신 여러 가닥이 춤춘다
+  lickCount: 6, // 한 타격당 불혀 수 — 여러 가닥이 춤춘다
   lickRise: 150, // 상승 속도(px/s, ×scale×k) — 망치 머리 위로 솟아오르도록
   lickLife: 0.38, // 기본 수명(초) — ×(0.7~1.3) 난수
   lickR: 26, // 기본 반경(px, ×scale×k) — ×(0.7~1.4) 난수, 수명 따라 수축
@@ -49,27 +28,6 @@ const hitSparkSettings = {
 
 const REF_W = 460 // 데모 기준 캔버스 폭 — 실제 캔버스 폭과의 비(k)로 모든 px 를 스케일(rem 스케일 대응)
 const TAU = Math.PI * 2
-
-type Spark = {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  t: number
-  life: number
-  max: number
-  ph: number // 플리커 위상
-  head: number // 개체 크기 가중 — 글로우 blit 반경에 들어간다(머리 백열 점은 제거됨)
-  // 잉걸불 물리(빠른 불티는 전부 0 — 순수 탄도). 0/양수 분기로 두 계층이 한 배열을 공유한다.
-  drag: number // 공기 저항(1/s) — 지수 감쇠
-  flut: number // 난류 좌우 요동(가속 px/s², ×k)
-  buoy: number // 수명 말기 부력 — 유효 중력 = g×(1 − buoy×life²)
-  // 렌더 스크래치(매 프레임 패스 0에서 갱신, 패스 1·2가 읽음) — frame[]/alive[]/coolAt 새 배열 할당 제거용.
-  rtx: number // 꼬리 끝 x(글로우는 머리 x,y 를 쓴다)
-  rty: number // 꼬리 끝 y
-  ra: number // alpha(자글거림 × 페이드)
-  rc: number[] // 화염색 — coolInto 가 채우는 길이 3 재사용 버퍼
-}
 
 // 불혀 — 발화점에서 솟아오르며 수축·깜빡이다 꺼지는 화염 혀(가산 합성 그라데이션 블롭).
 type Lick = {
@@ -86,7 +44,7 @@ type Lick = {
 // 캐시는 정적이다 — 현재 코드베이스에 런타임 테마 전환 경로가 없다(hit 토큰은 index.css 의 정적 @theme 상수).
 // 다크모드/테마 토글을 도입하면 palette·glowSprite 를 무효화(null 리셋)해야 한다.
 type Palette = {
-  cool: number[][]
+  cool: number[][] // 식어가는 화염 램프(머리→꼬리) — 화구·불혀·충격파 그라데이션에 쓰인다
   arcCore: number[] // 화염 백열 중심색 — 화구·불혀 그라데이션의 가장 뜨거운 속
 }
 let palette: Palette | null = null
@@ -121,31 +79,10 @@ function resolvePalette(): Palette {
   return palette
 }
 
-// 식어가는 화염색을 out 버퍼(길이 3)에 채운다 — 매 프레임 새 배열을 반환하던 coolAt 의 인플레이스 버전
-// (불티마다 1회 호출이라 핫패스. 반환 할당 0으로 GC 압박 제거).
-function coolInto(cool: number[][], t: number, out: number[]): void {
-  let seg: number, f: number
-  if (t < 0.32) {
-    seg = 0
-    f = t / 0.32
-  } else if (t < 0.66) {
-    seg = 1
-    f = (t - 0.32) / 0.34
-  } else {
-    seg = 2
-    f = (t - 0.66) / 0.34
-  }
-  const a = cool[seg]
-  const b = cool[seg + 1]
-  out[0] = a[0] + (b[0] - a[0]) * f
-  out[1] = a[1] + (b[1] - a[1]) * f
-  out[2] = a[2] + (b[2] - a[2]) * f
-}
-
 const rgba = (c: number[], a: number) =>
   `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`
 
-// 부드러운 글로우 스프라이트(오프스크린, 1회 구움) — 가산 합성으로 불티마다 blit 해 발광 후광을 낸다.
+// 부드러운 글로우 스프라이트(오프스크린, 1회 구움) — 가산 합성으로 화구·불혀에 blit 해 발광 후광을 낸다.
 // shadowBlur(매 draw 가우시안 블러)는 임팩트 때 프레임을 떨어뜨려, 캐시한 텍스처 복사(drawImage)로 대체한다.
 // 색은 머리 노랑(--color-hit-flash)으로 고정 — 캐시는 정적(런타임 테마 전환 경로 없음; 도입 시 무효화 필요).
 let glowSprite: HTMLCanvasElement | null = null
@@ -168,14 +105,13 @@ function getGlowSprite(): HTMLCanvasElement {
   return glowSprite
 }
 
-// ── 캔버스 스파크 시스템 ────────────────────────────────────────────────────────
-// 임팩트마다 burst() 로 이전 불티를 비우고 새 불티로 교체하며(replace), 살아 있는 불티가 있는 동안에만 rAF 루프를 돈다(평소 0 비용).
+// ── 캔버스 불꽃 시스템 ──────────────────────────────────────────────────────────
+// 임팩트마다 burst() 로 이전 불혀를 비우고 새로 교체하며(replace), 살아 있는 연출이 있는 동안에만 rAF 루프를
+// 돈다(평소 0 비용). 화구·충격파(시간값)와 불혀(풀)만 그린다 — 날아가는 불티·잉걸불 줄무늬는 제거됐다.
 export class HitSparkSystem {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
-  // 풀(증가만) — 0..sparkCount / 0..lickCount 가 활성. burst 마다 객체를 새로 만들지 않고 슬롯 필드만 덮어쓴다.
-  private sparks: Spark[] = []
-  private sparkCount = 0
+  // 불혀 풀(증가만) — 0..lickCount 가 활성. burst 마다 객체를 새로 만들지 않고 슬롯 필드만 덮어쓴다.
   private licks: Lick[] = []
   private lickCount = 0
   private fireT = 1e9 // 큰 값 = 초기엔 화구 없음(첫 burst 에서 0 으로 리셋)
@@ -187,7 +123,6 @@ export class HitSparkSystem {
   private bw = 0 // 현재 backing store 픽셀 폭(리사이즈 감지)
   private bh = 0
   private k = 1 // 스케일 = 캔버스 CSS 폭 / REF_W (rem 스케일 대응)
-  private g = 0 // 중력(px/s², ×k) — burst 에서 설정값으로 채운다
   private running = false
   private prev = 0
   private raf = 0
@@ -215,17 +150,6 @@ export class HitSparkSystem {
   }
 
   // 풀 슬롯 접근 — 없으면 1회 생성, 있으면 재사용(필드는 호출 측 burst 가 덮어쓴다).
-  private spark(i: number): Spark {
-    let s = this.sparks[i]
-    if (!s) {
-      s = {
-        x: 0, y: 0, vx: 0, vy: 0, t: 0, life: 0, max: 0, ph: 0, head: 0,
-        drag: 0, flut: 0, buoy: 0, rtx: 0, rty: 0, ra: 0, rc: [0, 0, 0],
-      }
-      this.sparks[i] = s
-    }
-    return s
-  }
   private lick(i: number): Lick {
     let l = this.licks[i]
     if (!l) {
@@ -248,54 +172,10 @@ export class HitSparkSystem {
     this.cy = rect.height / 2 + origin.y
     this.k = rect.width / REF_W
     const S = hitSparkSettings
-    this.g = S.gravity * this.k
 
-    // 새 타격이 이전 불티를 대체한다(replace — 누적 금지). 단 객체를 버리지 않고 풀 슬롯(spark()/lick())의
-    // 필드만 덮어써 재사용한다 — 첫 타격 이후 Spark/Lick 할당이 0이라 연사 시 GC 압박이 없다. sparkCount/
-    // lickCount 를 이번 개수로 맞춰 이전 타격의 잔여 슬롯을 활성 범위 밖으로 버린다(도트 버스트와 같은 정책).
-    let si = 0
-    const fanRad = (S.fanDeg * Math.PI) / 180
-    const v = S.baseVel * S.scale * this.k
-    // 빠른 불티 — 용접 결의 가는 실. 탄도 비행(잉걸불 물리 필드 전부 0).
-    for (let i = 0; i < S.count; i++) {
-      const ang =
-        -Math.PI / 2 +
-        (Math.random() - 0.5) * fanRad +
-        (Math.random() - 0.5) * 0.25
-      const sp = 0.6 + Math.random() * 1.3 // 0.6~1.9
-      const s = this.spark(si++)
-      s.x = this.cx
-      s.y = this.cy
-      s.vx = Math.cos(ang) * sp * v
-      s.vy = Math.sin(ang) * sp * v
-      s.t = 0
-      s.life = 0
-      s.max = S.lifeMin + Math.random() * S.lifeVar
-      s.ph = Math.random() * TAU
-      s.head = S.thick * this.k * (0.7 + Math.random() * 0.6)
-      s.drag = 0
-      s.flut = 0
-      s.buoy = 0
-    }
-    // 잉걸불 — 더 넓은 부채꼴로 느리게 톡 튀어, 드래그에 멈춰 춤추다 떠오르며 사그라든다.
-    for (let i = 0; i < S.emberCount; i++) {
-      const ang = -Math.PI / 2 + (Math.random() - 0.5) * fanRad * 1.5
-      const sp = (0.45 + Math.random() * 0.55) * S.emberVelMul
-      const s = this.spark(si++)
-      s.x = this.cx
-      s.y = this.cy
-      s.vx = Math.cos(ang) * sp * v
-      s.vy = Math.sin(ang) * sp * v
-      s.t = 0
-      s.life = 0
-      s.max = S.emberLifeMin + Math.random() * S.emberLifeVar
-      s.ph = Math.random() * TAU
-      s.head = S.emberHead * this.k * (0.7 + Math.random() * 0.6)
-      s.drag = S.emberDrag
-      s.flut = S.emberFlutter
-      s.buoy = S.emberBuoyancy
-    }
-    this.sparkCount = si
+    // 새 타격이 이전 불혀를 대체한다(replace — 누적 금지). 단 객체를 버리지 않고 풀 슬롯(lick())의 필드만
+    // 덮어써 재사용한다 — 첫 타격 이후 Lick 할당이 0이라 연사 시 GC 압박이 없다. lickCount 를 이번 개수로
+    // 맞춰 이전 타격의 잔여 슬롯을 활성 범위 밖으로 버린다.
     // 불혀 — 발화점 주변에 흩어져 솟기 시작(가로 산란을 넓혀 망치 머리 양옆에서도 혀가 비어져 나온다).
     let li = 0
     for (let i = 0; i < S.lickCount; i++) {
@@ -325,7 +205,6 @@ export class HitSparkSystem {
     this.prev = ts
     this.draw(dt)
     if (
-      this.sparkCount === 0 &&
       this.lickCount === 0 &&
       this.fireT >= hitSparkSettings.fireDur &&
       this.shockT >= hitSparkSettings.shockDur
@@ -343,8 +222,7 @@ export class HitSparkSystem {
     const S = hitSparkSettings
     ctx.clearRect(0, 0, this.w, this.h)
 
-    // 중심 발화점 심지 섬광은 제거됐다(화구·불혀가 임팩트 순간을 담당) — 충격파 + 화구 + 불혀를
-    // 가산 합성(lighter)으로: 서로·불티 글로우와 겹치는 픽셀이 백열로 탄다.
+    // 충격파 + 화구 + 불혀를 가산 합성(lighter)으로: 서로 겹치는 픽셀이 백열로 탄다.
     ctx.globalCompositeOperation = 'lighter'
 
     // 충격파 링 — 폭발의 "펑": 머리 끝에서 빠르게 팽창(점점 감속)하며 가늘어지고 사라지는 백열 고리.
@@ -472,91 +350,12 @@ export class HitSparkSystem {
     }
 
     ctx.globalCompositeOperation = 'source-over'
-
-    ctx.lineCap = 'round'
-    const cap = S.lenCap * S.scale * this.k
-    const coreW = S.thick * this.k
-
-    // 물리 전진 + 렌더값 산출 — 살아 있는 불티를 앞으로 swap 압축하고(죽은 것은 꼬리에 보존·재사용),
-    // 렌더값(꼬리 끝·alpha·색)을 Spark 슬롯에 저장한다. 그린 패스를 두 번(글로우→코어) 돌려야 하는데,
-    // 슬롯에 담아 두면 frame[]/alive[]/coolAt 의 매 프레임 새 배열 할당이 모두 사라진다(핫패스 GC 압박 제거).
-    let w = 0
-    for (let r = 0; r < this.sparkCount; r++) {
-      const p = this.sparks[r]
-      p.t += dt
-      p.life = p.t / p.max
-      if (p.life >= 1) continue
-      // 유효 중력 — 잉걸불(buoy>0)은 수명 말기에 중력이 뒤집혀 떠오르며 사그라든다(뜨거운 공기 부력).
-      p.vy += this.g * (p.buoy > 0 ? 1 - p.buoy * p.life * p.life : 1) * dt
-      if (p.drag > 0) {
-        // 공기 저항(지수 감쇠) — 폭발적으로 튀어나온 직후 급감속해 허공에 머문다. 실 길이가 속도에
-        // 비례하므로 감속과 함께 줄무늬가 자연히 깜빡이는 점(잉걸불)으로 바뀐다.
-        const f = Math.exp(-p.drag * dt)
-        p.vx *= f
-        p.vy *= f
-      }
-      if (p.flut > 0) {
-        // 난류 요동 — 위상·주기를 불씨마다 달리한 저주파 좌우 가속(춤추는 표류). 드래그가 폭주를 막는다.
-        p.vx += Math.sin(p.t * (3 + (p.ph % 3)) + p.ph) * p.flut * this.k * dt
-      }
-      p.x += p.vx * dt
-      p.y += p.vy * dt
-      const mag = Math.hypot(p.vx, p.vy) || 1
-      const len =
-        Math.min(cap, mag * S.lenFactor) * (1 - 0.3 * p.life) + 3 * this.k
-      const ux = p.vx / mag
-      const uy = p.vy / mag
-      // 잉걸불은 더 깊게 자글거린다(타닥거림) — 빠른 불티는 기존 얕은 플리커 유지.
-      const fmin = p.drag > 0 ? 0.35 : 0.62
-      const flick = fmin + (1 - fmin) * Math.abs(Math.sin(p.life * 26 + p.ph))
-      // 렌더값을 슬롯에 저장(두 패스가 읽는다). 수명 내내 선형으로 흐려짐(비행하며 식어 사그라듦) + 자글거림.
-      p.rtx = p.x - ux * len
-      p.rty = p.y - uy * len
-      p.ra = flick * (1 - p.life)
-      coolInto(pal.cool, p.life, p.rc)
-      if (w !== r) {
-        const tmp = this.sparks[w]
-        this.sparks[w] = p
-        this.sparks[r] = tmp
-      }
-      w++
-    }
-    this.sparkCount = w
-
-    // 패스 1 — additive 후광 블룸: 미리 구운 글로우 스프라이트를 가산 합성으로 불티마다 blit 한다. 겹치는
-    // 불티의 빛이 누적돼 발광체처럼 보인다. shadowBlur 와 달리 캐시 텍스처 복사라 임팩트 때 프레임을 안 떨군다.
-    if (S.glow > 0) {
-      const sprite = getGlowSprite()
-      ctx.globalCompositeOperation = 'lighter'
-      for (let i = 0; i < this.sparkCount; i++) {
-        const p = this.sparks[i]
-        const r = p.head * 2 + S.glow * this.k // 후광 반경(px) — 머리가 굵은 잉걸불일수록 크다
-        ctx.globalAlpha = p.ra < 1 ? p.ra : 1
-        ctx.drawImage(sprite, p.x - r, p.y - r, r * 2, r * 2)
-      }
-      ctx.globalAlpha = 1
-      ctx.globalCompositeOperation = 'source-over'
-    }
-
-    // 패스 2 — 또렷한 코어(글로우 위): 식어가는 화염색 줄무늬 한 겹.
-    // (머리 백열 점·어두운 테두리는 제거됐다 — 어두운 테두리는 화염 속에서 재 부스러기처럼 이물감을
-    //  줘서 뺐고, 배경 대비는 굵어진 코어 + 패스 1 글로우 후광이 담당한다.)
-    for (let i = 0; i < this.sparkCount; i++) {
-      const p = this.sparks[i]
-      ctx.strokeStyle = rgba(p.rc, p.ra)
-      ctx.lineWidth = coreW
-      ctx.beginPath()
-      ctx.moveTo(p.rtx, p.rty)
-      ctx.lineTo(p.x, p.y)
-      ctx.stroke()
-    }
   }
 
   // 첫 타격의 일회성 비용(캔버스 버퍼 할당·팔레트 해석·글로우 스프라이트 굽기 + 풀 슬롯 확보)을 마운트로 옮겨
-  // 첫 burst 가 프레임을 떨구지 않게 한다. 풀 사전 확보(spark()/lick() 가 슬롯 생성)는 rect 무관, backing
-  // store·글로우는 레이아웃이 잡힌 뒤에만(rect 0 이면 건너뛰고 첫 burst 에서 잡는다 — 무해).
-  warmup(sparkReserve = 0, lickReserve = 0) {
-    for (let i = 0; i < sparkReserve; i++) this.spark(i)
+  // 첫 burst 가 프레임을 떨구지 않게 한다. 풀 사전 확보(lick() 가 슬롯 생성)는 rect 무관, backing store·글로우는
+  // 레이아웃이 잡힌 뒤에만(rect 0 이면 건너뛰고 첫 burst 에서 잡는다 — 무해).
+  warmup(lickReserve = 0) {
     for (let i = 0; i < lickReserve; i++) this.lick(i)
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
@@ -567,8 +366,6 @@ export class HitSparkSystem {
   dispose() {
     this.running = false
     if (this.raf) cancelAnimationFrame(this.raf)
-    this.sparks = []
-    this.sparkCount = 0
     this.licks = []
     this.lickCount = 0
   }
