@@ -200,8 +200,6 @@
     "destroyWeight": 7,
     "dropOnFail": [
       { "itemId": "iron_scrap", "count": 8, "chance": 1 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
     ],
     "sprite": "blackwidow.png"
@@ -415,6 +413,21 @@
     "destroyWeight": 7,
     "dropOnFail": [
       { "itemId": "iron_scrap", "count": 70, "chance": 1 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
