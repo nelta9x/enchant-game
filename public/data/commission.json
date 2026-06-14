@@ -1,6 +1,5 @@
 {
   "maxCommissions": 3,
-  "tickIntervalMs": 1000,
   "unlockAtLevel": 10,
   "buckets": [
     {
@@ -34,10 +33,13 @@
           "rewardItemCount": 1
         }
       ],
-      "durationMinMs": 30000,
-      "durationMaxMs": 30000,
-      "spawnIntervalMinMs": 5000,
-      "spawnIntervalMaxMs": 30000
+      "refreshWeights": [
+        { "value": 1, "weight": 1 },
+        { "value": 2, "weight": 1 },
+        { "value": 3, "weight": 1 },
+        { "value": 4, "weight": 1 },
+        { "value": 5, "weight": 1 }
+      ]
     },
     {
       "minGold": 1000000,
@@ -68,10 +70,13 @@
           "rewardItemCount": 5
         }
       ],
-      "durationMinMs": 10000,
-      "durationMaxMs": 60000,
-      "spawnIntervalMinMs": 5000,
-      "spawnIntervalMaxMs": 30000
+      "refreshWeights": [
+        { "value": 1, "weight": 1 },
+        { "value": 2, "weight": 1 },
+        { "value": 3, "weight": 1 },
+        { "value": 4, "weight": 1 },
+        { "value": 5, "weight": 1 }
+      ]
     },
     {
       "minGold": 5000000,
@@ -152,10 +157,13 @@
           "rewardItemCount": 1
         }
       ],
-      "durationMinMs": 30000,
-      "durationMaxMs": 60000,
-      "spawnIntervalMinMs": 5000,
-      "spawnIntervalMaxMs": 5000
+      "refreshWeights": [
+        { "value": 1, "weight": 1 },
+        { "value": 2, "weight": 1 },
+        { "value": 3, "weight": 1 },
+        { "value": 4, "weight": 1 },
+        { "value": 5, "weight": 1 }
+      ]
     },
     {
       "minGold": 20000000,
@@ -202,10 +210,13 @@
           "rewardItemCount": 1
         }
       ],
-      "durationMinMs": 20000,
-      "durationMaxMs": 60000,
-      "spawnIntervalMinMs": 5000,
-      "spawnIntervalMaxMs": 5000
+      "refreshWeights": [
+        { "value": 1, "weight": 1 },
+        { "value": 2, "weight": 1 },
+        { "value": 3, "weight": 1 },
+        { "value": 4, "weight": 1 },
+        { "value": 5, "weight": 1 }
+      ]
     }
   ]
 }

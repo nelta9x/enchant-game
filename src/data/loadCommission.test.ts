@@ -34,10 +34,10 @@ function bucket(over: Record<string, unknown> = {}): Record<string, unknown> {
     minGold: 0,
     maxGold: null,
     items: [itemEntry(), itemEntry({ itemId: 'iron_scrap', weight: 2 })],
-    durationMinMs: 60_000,
-    durationMaxMs: 120_000,
-    spawnIntervalMinMs: 5_000,
-    spawnIntervalMaxMs: 30_000,
+    refreshWeights: [
+      { value: 1, weight: 1 },
+      { value: 5, weight: 1 },
+    ],
     ...over,
   }
 }
@@ -46,7 +46,6 @@ function bucket(over: Record<string, unknown> = {}): Record<string, unknown> {
 function cfg(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     maxCommissions: 3,
-    tickIntervalMs: 250,
     unlockAtLevel: 10,
     buckets: [bucket()],
     ...over,
@@ -75,7 +74,6 @@ describe('parseCommissionConfig — 구조 검증', () => {
     }
     expect(parse()).toEqual({
       maxCommissions: 3,
-      tickIntervalMs: 250,
       unlockAtLevel: 10,
       buckets: [
         {
@@ -85,10 +83,10 @@ describe('parseCommissionConfig — 구조 검증', () => {
             { itemId: 'sword_3', weight: 3, ...itemFields },
             { itemId: 'iron_scrap', weight: 2, ...itemFields },
           ],
-          durationMinMs: 60_000,
-          durationMaxMs: 120_000,
-          spawnIntervalMinMs: 5_000,
-          spawnIntervalMaxMs: 30_000,
+          refreshWeights: [
+            { value: 1, weight: 1 },
+            { value: 5, weight: 1 },
+          ],
         },
       ],
     })
@@ -101,13 +99,12 @@ describe('parseCommissionConfig — 구조 검증', () => {
 
   it('글로벌 필드 누락/비숫자/비유한 값은 throw', () => {
     expect(() => parse({ maxCommissions: 'x' })).toThrow()
-    expect(() => parse({ tickIntervalMs: Infinity })).toThrow()
+    expect(() => parse({ maxCommissions: Infinity })).toThrow()
     expect(() => parse({ maxCommissions: undefined })).toThrow()
   })
 
   it('정수여야 하는 글로벌 필드에 소수가 오면 throw', () => {
     expect(() => parse({ maxCommissions: 2.5 })).toThrow()
-    expect(() => parse({ tickIntervalMs: 12.5 })).toThrow()
   })
 
   it('unlockAtLevel 은 필수다 — 누락/비숫자/비유한/소수면 throw', () => {
@@ -121,10 +118,6 @@ describe('parseCommissionConfig — 구조 검증', () => {
 describe('parseCommissionConfig — 글로벌 의미 검증', () => {
   it('maxCommissions < 1 이면 throw', () => {
     expect(() => parse({ maxCommissions: 0 })).toThrow()
-  })
-
-  it('tickIntervalMs <= 0 이면 throw', () => {
-    expect(() => parse({ tickIntervalMs: 0 })).toThrow()
   })
 
   it('unlockAtLevel < 0 이면 throw, 0 은 허용(처음부터 활성)', () => {
@@ -160,7 +153,9 @@ describe('parseCommissionConfig — buckets 구조 검증', () => {
 
   it('weight 가 0 이하거나 비숫자면 throw', () => {
     expect(() =>
-      parse({ buckets: [bucket({ items: [{ itemId: 'sword_3', weight: 0 }] })] }),
+      parse({
+        buckets: [bucket({ items: [{ itemId: 'sword_3', weight: 0 }] })],
+      }),
     ).toThrow()
     expect(() =>
       parse({
@@ -201,7 +196,9 @@ describe('parseCommissionConfig — buckets 구조 검증', () => {
     expect(() =>
       parse({
         buckets: [
-          bucket({ items: [itemEntry({ additiveMin: 200, additiveMax: 100 })] }),
+          bucket({
+            items: [itemEntry({ additiveMin: 200, additiveMax: 100 })],
+          }),
         ],
       }),
     ).toThrow()
@@ -209,19 +206,42 @@ describe('parseCommissionConfig — buckets 구조 검증', () => {
 
   it('아이템별 incentive/additive 누락/비숫자는 throw', () => {
     expect(() =>
-      parse({ buckets: [bucket({ items: [{ itemId: 'sword_3', weight: 1 }] })] }),
+      parse({
+        buckets: [bucket({ items: [{ itemId: 'sword_3', weight: 1 }] })],
+      }),
     ).toThrow() // incentiveMin 등 누락
   })
 
-  it('durationMin > durationMax 이면 throw', () => {
+  it('refreshWeights 가 비어있거나 배열이 아니면 throw', () => {
+    expect(() => parse({ buckets: [bucket({ refreshWeights: [] })] })).toThrow()
     expect(() =>
-      parse({ buckets: [bucket({ durationMinMs: 200_000 })] }),
+      parse({ buckets: [bucket({ refreshWeights: 'x' })] }),
     ).toThrow()
   })
 
-  it('spawnIntervalMin > spawnIntervalMax 이면 throw', () => {
+  it('refreshWeights 의 value 가 1 미만/정수 아니면 throw', () => {
     expect(() =>
-      parse({ buckets: [bucket({ spawnIntervalMinMs: 40_000 })] }),
+      parse({
+        buckets: [bucket({ refreshWeights: [{ value: 0, weight: 1 }] })],
+      }),
+    ).toThrow()
+    expect(() =>
+      parse({
+        buckets: [bucket({ refreshWeights: [{ value: 2.5, weight: 1 }] })],
+      }),
+    ).toThrow()
+  })
+
+  it('refreshWeights 의 weight 가 0 이하/비숫자면 throw', () => {
+    expect(() =>
+      parse({
+        buckets: [bucket({ refreshWeights: [{ value: 1, weight: 0 }] })],
+      }),
+    ).toThrow()
+    expect(() =>
+      parse({
+        buckets: [bucket({ refreshWeights: [{ value: 1, weight: 'x' }] })],
+      }),
     ).toThrow()
   })
 })
@@ -387,7 +407,6 @@ describe('parseCommissionConfig — 물물교환(아이템 보상) 항목', () =
     if (e.costKind === 'item') expect(e.requiredCount).toBe(1)
     expect(e.rewardKind).toBe('gold')
   })
-
 })
 
 describe('loadCommission — 번들 데이터 진입점', () => {
@@ -433,8 +452,13 @@ describe('loadCommission — 번들 데이터 진입점', () => {
           expect(e.rewardItemCount).toBeGreaterThanOrEqual(1)
         }
       }
-      expect(b.durationMinMs).toBeLessThanOrEqual(b.durationMaxMs)
-      expect(b.spawnIntervalMinMs).toBeLessThanOrEqual(b.spawnIntervalMaxMs)
+      // 세션 갱신 후보(가중 추첨): 비어있지 않고, 각 후보는 value>=1(정수)·weight>0.
+      expect(b.refreshWeights.length).toBeGreaterThan(0)
+      for (const w of b.refreshWeights) {
+        expect(Number.isInteger(w.value)).toBe(true)
+        expect(w.value).toBeGreaterThanOrEqual(1)
+        expect(w.weight).toBeGreaterThan(0)
+      }
     }
   })
 })

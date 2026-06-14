@@ -4,7 +4,6 @@ import { dataManager } from '../data/DataManager'
 import { useT } from '../i18n'
 import { itemDisplayName } from '../lib/items'
 import { formatAmount } from '../lib/format'
-import { cssColorToken } from '../lib/cssToken'
 import { useCommissionHotkey } from '../hooks/useCommissionHotkey'
 import { useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
@@ -92,12 +91,12 @@ export function CommissionBar({
   // (출제 안 함) 일반 렌더 경로가 전 슬롯 EmptySlot + idle 타이머 스페이서로 같은 높이의 빈 영역을 확보해,
   // 해제 전후로 아래 UI 위치가 흔들리지 않게 한다(픽셀 단위로 동일한 footprint). 해제는 단조라 한 번뿐.
 
-  // 통합 세션 타이머: 세션의 모든 제안이 같은 만료를 공유하므로 아무 제안(active[0])에서 createdAt/expiresAt 를
-  // 읽어 카드 묶음 아래 단일 바로 표현한다. 세션이 비면(쿨다운/잠금) null → 바는 보이지 않는 동일 높이
-  // 스페이서로 자리만 지킨다(아래 SessionTimerBar active=false). active 의 id 는 단조 증가하고 complete/만료가
-  // 세션을 통째로 비우므로, 한 세션이 떠 있는 동안 active[0].id 는 안정적이다 (세션 단위 key) — 새 세션이
-  // 시작될 때만 바뀌어 바가 처음부터 다시 줄어든다.
-  const session = active[0] ?? null
+  // 세션 갱신 게이지: 세션이 갱신되기까지 남은 강화 시도 수를 카드 묶음 아래 세그먼트 바로 표현한다.
+  // 총 칸(attemptsTotal)은 세션 시작 시 뽑은 카운터, 켜진 칸(attemptsRemaining)은 남은 시도 수 —
+  // 강화 시도마다 한 칸씩 꺼지고 0 이 되는 순간 세션이 통째로 새로 뜬다. 세션이 없으면(잠금/전부 납품 후
+  // 빈 상태에서 total 0) 동일 높이 스페이서로 자리만 지킨다(SessionSegments 내부).
+  const attemptsRemaining = useCommissionStore((s) => s.attemptsRemaining)
+  const attemptsTotal = useCommissionStore((s) => s.attemptsTotal)
 
   return (
     <div
@@ -130,16 +129,10 @@ export function CommissionBar({
             )}
           </div>
         </div>
-        {/* 타이머 바 슬롯은 세션이 없어도(쿨다운/잠금) 항상 자식으로 두어 부모 flex-col gap-1.5 의 간격과
-            바 높이를 항상 확보한다 — 세션이 떴다 사라질 때 아래 UI 가 흔들리지 않게. 비활성 구간은
-            보이지 않는 동일 높이 스페이서로 그린다(SessionTimerBar 내부). key 는 세션 id 기반을 유지하되
-            쿨다운 구간은 'idle' 로 두어 idle↔세션 전환 시 remount → 새 세션 애니메이션이 처음부터 재생된다. */}
-        <SessionTimerBar
-          key={session?.id ?? 'idle'}
-          createdAt={session?.createdAt ?? 0}
-          expiresAt={session?.expiresAt ?? 0}
-          active={session !== null}
-        />
+        {/* 세그먼트 바 슬롯은 세션이 없어도(잠금/빈) 항상 자식으로 두어 부모 flex-col gap-1.5 의 간격과
+            바 높이를 항상 확보한다 — 세션이 떴다 사라질 때 아래 UI 가 흔들리지 않게. 비활성 구간(total 0)은
+            보이지 않는 동일 높이 스페이서로 그린다(SessionSegments 내부). */}
+        <SessionSegments remaining={attemptsRemaining} total={attemptsTotal} />
       </div>
     </div>
   )
@@ -284,51 +277,37 @@ function KeyHint({ slot, active }: { slot: number; active: boolean }) {
   )
 }
 
-// 통합 세션 타이머 바 — 세션의 모든 제안이 공유하는 만료까지 남은 시간을 카드 묶음 "아래" 단일 바로 표현한다
-// (카드별 바가 아니라 세션 1개 바 = 통합 지속시간). 슬롯은 레이아웃 안정을 위해 항상 마운트돼 있고(쿨다운/잠금
-// 구간은 active=false 로 보이지 않는 동일 높이 스페이서), 세션 id(쿨다운은 'idle') 로 key 되어 idle↔세션 전환 시
-// remount 된다. 세션 생성(createdAt) 직후 같은 렌더 커밋에서 활성 마운트되므로 전체 길이(expiresAt-createdAt)를
-// 기준으로 scaleX 1→0 을 선형 애니메이션한다(매 프레임 재렌더·rAF·Date.now 폴링 없이 컴포지터가 처리 — 카드
-// 타이머가 쓰던 것과 동일 철학, 순수 렌더 유지). 새 세션이 시작될 때만 key 가 바뀌어 처음부터 다시 줄어든다.
-// 시간이 줄수록 황금→적색으로 물들어 임박을 알린다(motion 은 CSS var 키프레임 보간을 못 하므로 진행색은
-// 토큰을 런타임에 1회 해석한 실제 값(cssColorToken)을 쓴다 — index.css 단일 출처 유지, hex 사본 없음).
-function SessionTimerBar({
-  createdAt,
-  expiresAt,
-  active,
+// 세션 갱신 세그먼트 바 — 세션이 갱신되기까지 남은 강화 시도 수를 카드 묶음 "아래" 칸 나뉜 바로 표현한다.
+// total(세션 시작 시 뽑은 카운터)만큼 칸을 그리고 앞 remaining 칸을 켠다 — 강화 시도마다 한 칸씩 꺼지고,
+// 마지막 칸이 꺼지는 시도에 세션이 통째로 새로 떠 total 칸이 다시 가득 찬다. 시간 애니메이션은 없다(정적
+// 켜짐/꺼짐, 전환은 CSS color/opacity). 슬롯은 레이아웃 안정을 위해 항상 마운트돼 있고, 세션이 없으면
+// (total 0 — 잠금/전부 납품 후) 보이지 않는 동일 높이 스페이서만 그린다. 마지막 한 칸만 남으면 임박
+// 경고로 황금→적색(bg-danger), 그 외 켜진 칸은 황금(bg-gold), 꺼진 칸은 어두운 트랙.
+function SessionSegments({
+  remaining,
+  total,
 }: {
-  createdAt: number
-  expiresAt: number
-  // 세션이 떠 있는지. false(쿨다운/잠금)면 같은 높이의 보이지 않는 스페이서만 그려 레이아웃 높이만 유지한다.
-  active: boolean
+  remaining: number
+  total: number
 }) {
-  // 비활성 구간: 트랙·애니메이션 없이 동일 높이(h-1.5) 투명 스페이서. 빈 회색 트랙을 굳이 보여 주지 않는다
-  // (EmptySlot 이 허전한 placeholder 를 비우는 것과 같은 철학). 토큰 해석도 건너뛴다.
-  if (!active) return <span className="block h-1.5 w-full" aria-hidden />
-
-  const totalSec = Math.max(0, expiresAt - createdAt) / 1000
-  const gold = cssColorToken('--color-gold')
-  const danger = cssColorToken('--color-danger')
+  if (total <= 0) return <span className="block h-1.5 w-full" aria-hidden />
 
   return (
-    <span
-      className="relative block h-1.5 w-full overflow-hidden rounded-full bg-black/25"
-      aria-hidden
-    >
-      <motion.span
-        className="block h-full origin-left rounded-full"
-        initial={{ scaleX: 1, backgroundColor: 'var(--color-gold)' }}
-        animate={{
-          scaleX: 0,
-          // 줄어드는 내내 황금색을 유지하다 끝부분(60%~)에서 적색으로 — 임박 경고.
-          backgroundColor: [gold, gold, danger],
-        }}
-        transition={{
-          duration: totalSec,
-          ease: 'linear',
-          backgroundColor: { duration: totalSec, times: [0, 0.6, 1] },
-        }}
-      />
+    <span className="flex h-1.5 w-full gap-1" aria-hidden>
+      {Array.from({ length: total }, (_, i) => {
+        const lit = i < remaining
+        const cls = !lit
+          ? 'bg-black/25'
+          : remaining <= 1
+            ? 'bg-danger'
+            : 'bg-gold'
+        return (
+          <span
+            key={i}
+            className={`h-full flex-1 rounded-full transition-colors ${cls}`}
+          />
+        )
+      })}
     </span>
   )
 }

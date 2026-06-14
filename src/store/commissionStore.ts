@@ -5,48 +5,44 @@ import {
   bootstrapCommissionQueue,
   commissionPool,
   complete,
-  tick,
+  attempt,
   type CommissionQueueState,
   type BucketSettings,
   type PoolEntry,
 } from './commissionQueue'
 import { useGameStore } from './gameStore'
 
-// 골드 버킷 정의에서 생성에 필요한 설정 묶음만 뽑는다(코어 BucketSettings 형태로).
+// 골드 버킷 정의에서 세션 생성에 필요한 설정 묶음만 뽑는다(코어 BucketSettings 형태로).
 // (보상 배수/가산은 아이템별이라 여기 없고 buildPool 이 PoolEntry 로 실어 나른다.)
 function settingsOf(bucket: GoldBucket): BucketSettings {
-  return {
-    durationMinMs: bucket.durationMinMs,
-    durationMaxMs: bucket.durationMaxMs,
-    spawnIntervalMinMs: bucket.spawnIntervalMinMs,
-    spawnIntervalMaxMs: bucket.spawnIntervalMaxMs,
-  }
+  return { refreshWeights: bucket.refreshWeights }
 }
 
-// 의뢰(Commission) 시스템의 얇은 셸 — 순수 전이 코어(commissionQueue)에 "시간"과 "데이터"만 입힌다.
-// 생성/만료/재생성 규칙은 전부 코어에 있고, 여기서는 setInterval 로 주기적으로 tick(Date.now()) 을 돌리고,
-// 출제 풀(DataManager)·보유 골드(gameStore)·튜닝 설정(DataManager)을 읽어 주입한다. effectStore 와 같은 셸 패턴.
+// 의뢰(Commission) 시스템의 얇은 셸 — 순수 전이 코어(commissionQueue)에 "강화 시도 신호"와 "데이터"만 입힌다.
+// 생성/갱신 규칙은 전부 코어에 있고, 여기서는 강화가 일어날 때마다 GameScreen 이 notifyAttempt() 를 호출하면
+// 출제 풀(DataManager)·보유 골드(gameStore)·튜닝 설정(DataManager)을 읽어 코어에 주입한다. 타이머는 없다
+// (시간 기반에서 강화 시도 기반으로 전환 — fulfill 과 동일하게 호출 측이 imperative 하게 밀어 넣는다).
 //
 // 설정(config)은 DataManager.getCommissionConfig() 에서 읽는다. 단 이 호출은 반드시 load 이후여야 하므로
 // (DataManager.ensureLoaded), 모듈 평가 시점에 즉시 도는 zustand 초기화에서는 읽지 않는다 — 초기 상태는
 // config 없는 빈 큐로 두고, start()(App useEffect → load 이후)에서 bootstrapCommissionQueue 로 재초기화한다.
 //
-// 출제 풀은 "보유 골드"가 고른다: 매 tick 현재 골드로 담당 버킷(currentBucket)을 골라 그 items[] 을 제안 풀로
-// 삼는다. 세션이 시작될 때 spawnSession 이 그 풀에서 서로 다른 항목 maxCommissions 개를 골라 한 번에 출제한다.
-// 골드가 바뀌어 버킷이 달라지면 다음 세션부터 반영된다(이미 발급된 제안은 freeze 유지).
+// 출제 풀은 "보유 골드"가 고른다: 매 갱신 시 현재 골드로 담당 버킷(currentBucket)을 골라 그 items[] 을 제안
+// 풀로 삼는다. 세션이 갱신될 때 spawnSession 이 그 풀에서 서로 다른 항목 maxCommissions 개를 골라 한 번에
+// 출제한다. 골드가 바뀌어 버킷이 달라지면 다음 갱신부터 반영된다(이미 발급된 제안은 freeze 유지).
 //
 // 완료는 두 store 에 걸친 트랜잭션이다: PlayerState 변경(검 소모+골드)은 gameStore 가 소유하고,
-// 제안 생명주기(선택 시 세션 전체 제거 + 다음 세션 예약)는 여기가 소유한다 — gameStore 가 완료를 수락(true)할
-// 때만 complete 를 적용해 두 store 의 일관성을 보장한다. complete 는 고른 제안만이 아니라 그 세션의 모든 제안을
-// 비운다(하나를 고르면 세션이 끝난다) — 나머지 제안은 비용 없이 사라지고 다음 tick 이 쿨다운을 세서 재시작한다.
+// 제안 생명주기(선택 시 그 카드 제거)는 여기가 소유한다 — gameStore 가 완료를 수락(true)할 때만 complete 를
+// 적용해 두 store 의 일관성을 보장한다. complete 는 고른 카드 하나만 제거하고 나머지·갱신 카운터는 그대로 둔다
+// (납품은 세션을 갱신하지 않는다 — 세션 전체는 강화 시도로 카운터가 0 이 될 때만 새로 뜬다).
 
 type CommissionActions = {
-  // 주기 tick 시작(App 마운트 시 1회). 이미 돌고 있으면 무시. config 로 큐를 초기화한 뒤 첫 tick 을 돈다.
+  // 큐 시작(App 마운트 시 1회). 이미 시작했으면 무시. config 로 큐를 초기화한다(잠금 해제 상태면 첫 세션을 채운다).
   start: () => void
-  // tick 정지 + 큐 비우기(App 언마운트 시).
+  // 큐 정지 + 비우기(App 언마운트 시).
   stop: () => void
-  // 내부: 시간 전진 1회 — 설정·풀·보유 골드를 읽어 tick 에 주입.
-  _tick: () => void
+  // 강화 시도 1회 알림 — GameScreen 이 enhance() 직후 호출. 잠금/부트스트랩/카운터 차감·갱신을 처리한다.
+  notifyAttempt: () => void
   // 의뢰 완료 시도: gameStore 가 검 소모+보상을 수락하면 complete 적용 후 true. 미보유면 false(무변화).
   fulfill: (id: number) => boolean
 }
@@ -56,8 +52,6 @@ export type CommissionStore = CommissionQueueState & CommissionActions
 type CreateOpts = {
   // 생성 rng(테스트에서 결정적 주입). 미지정 시 Math.random.
   rng?: () => number
-  // 시각 공급원(테스트에서 가짜 타이머와 함께 주입 가능). 미지정 시 Date.now.
-  now?: () => number
   // 튜닝 설정(테스트에서 production 값과 독립된 픽스처 주입). 미지정 시 DataManager 에서 읽는다(load 이후).
   config?: CommissionConfig
 }
@@ -65,22 +59,21 @@ type CreateOpts = {
 // 의뢰 store 팩토리. 기본 인스턴스(useCommissionStore)는 앱 전역 공유, 테스트는 독립 인스턴스를 만든다.
 export function createCommissionStore(opts: CreateOpts = {}) {
   const rng = opts.rng ?? Math.random
-  const now = opts.now ?? Date.now
-  // 설정 해석: 명시 주입이 있으면 그것을, 없으면 DataManager 에서 읽는다(반드시 load 이후 — start/_tick/fulfill 안에서만 호출).
+  // 설정 해석: 명시 주입이 있으면 그것을, 없으면 DataManager 에서 읽는다(반드시 load 이후 — start/notifyAttempt/fulfill 안에서만 호출).
   const getConfig = (): CommissionConfig =>
     opts.config ?? dataManager.getCommissionConfig()
-  // setInterval 핸들은 store 상태가 아니라 클로저에 둔다(직렬화/구독 대상 아님).
-  let timer: ReturnType<typeof setInterval> | null = null
-  // 잠금 해제 후 "첫 세션을 채웠는지" 일방향 래치(타이머와 같은 클로저 상태). maxLevelReached 는 단조라
-  // 잠금→해제는 한 번뿐이므로 해제 시 한 번만 부트스트랩하고 이후엔 일반 tick 으로 굴린다. start/stop 에서 리셋.
+  // 시작 여부 래치(타이머가 없으므로 start/stop 의 가드 역할). 시작 후 stop 전까지 notifyAttempt 가 동작한다.
+  let started = false
+  // 잠금 해제 후 "첫 세션을 채웠는지" 일방향 래치. maxLevelReached 는 단조라 잠금→해제는 한 번뿐이므로
+  // 해제 시 한 번만 부트스트랩하고 이후엔 일반 attempt 로 굴린다. start/stop 에서 리셋.
   let bootstrapped = false
 
   // 제안 활성화 게이트: 도달 강화 레벨(maxLevelReached, 단조)이 설정 임계(unlockAtLevel) 이상이면 활성.
-  // gold 와 마찬가지로 gameStore 에서 매 tick 새로 읽는다(달성 즉시 다음 tick 에 반영).
+  // gold 와 마찬가지로 gameStore 에서 매번 새로 읽는다(달성 즉시 다음 알림에 반영).
   const isUnlocked = (config: CommissionConfig): boolean =>
     useGameStore.getState().maxLevelReached >= config.unlockAtLevel
 
-  // 현재 보유 골드가 담당하는 버킷을 읽는다. 매 tick 새로 읽어 골드 변동이 다음 스폰부터 반영된다.
+  // 현재 보유 골드가 담당하는 버킷을 읽는다. 매 갱신 새로 읽어 골드 변동이 다음 스폰부터 반영된다.
   // 로더가 보장(정렬·연속·첫 minGold=0·마지막 maxGold=null)하므로 "maxGold 가 null 이거나 gold < maxGold 인
   // 첫 버킷"이 담당이다(minGold 는 스폰 시 읽지 않는다). find 가 못 찾는 경우(방어)는 마지막 버킷으로 폴백.
   const currentBucket = (config: CommissionConfig): GoldBucket => {
@@ -91,28 +84,28 @@ export function createCommissionStore(opts: CreateOpts = {}) {
     )
   }
 
-  // 출제 풀 조립: 현재 버킷의 items[] 에 basePrice 를 붙여 PoolEntry[] 로. start(부트스트랩)·_tick 이 공유.
+  // 출제 풀 조립: 현재 버킷의 items[] 에 basePrice 를 붙여 PoolEntry[] 로. start(부트스트랩)·notifyAttempt 가 공유.
   const buildPool = (bucket: GoldBucket): PoolEntry[] =>
     commissionPool(bucket.items, (id) => dataManager.getItemBasePrice(id))
 
   return create<CommissionStore>((set, get) => ({
-    // 초기 상태는 빈 큐(정지) — start()에서 bootstrapCommissionQueue 로 채우고 타이머를 켠다(모듈 평가 시 load 전이라 config 미접근).
+    // 초기 상태는 빈 큐 — start()에서 bootstrapCommissionQueue 로 채운다(모듈 평가 시 load 전이라 config 미접근).
     active: [],
-    nextSpawnAt: null,
+    attemptsRemaining: 0,
+    attemptsTotal: 0,
     nextId: 1,
 
     start: () => {
-      if (timer !== null) return
+      if (started) return
+      started = true
       const config = getConfig()
       bootstrapped = false
-      // 시작 시점에 이미 해제됐으면(예: 도달 레벨이 임계 이상) 즉시 첫 세션을 채운다 — 빈 바를 한 쿨다운
-      // 내내 두지 않으려는 선택. 아직 잠겨 있으면 초기 빈 상태(active:[]) 그대로 두고 타이머만 켠다.
-      // 그러면 해제되는 첫 _tick 이 부트스트랩한다(아래). 어느 쪽이든 잠금 중엔 set 을 하지 않아 리렌더 0.
+      // 시작 시점에 이미 해제됐으면(예: 도달 레벨이 임계 이상) 즉시 첫 세션을 채운다. 아직 잠겨 있으면 초기
+      // 빈 상태(active:[]) 그대로 두고, 해제되는 첫 notifyAttempt 가 부트스트랩한다(아래). 잠금 중엔 set 0회.
       if (isUnlocked(config)) {
         const bucket = currentBucket(config)
         set(
           bootstrapCommissionQueue(
-            now(),
             rng,
             buildPool(bucket),
             settingsOf(bucket),
@@ -121,29 +114,25 @@ export function createCommissionStore(opts: CreateOpts = {}) {
         )
         bootstrapped = true
       }
-      timer = setInterval(() => get()._tick(), config.tickIntervalMs)
     },
 
     stop: () => {
-      if (timer !== null) {
-        clearInterval(timer)
-        timer = null
-      }
+      started = false
       bootstrapped = false
-      set({ active: [], nextSpawnAt: null, nextId: 1 })
+      set({ active: [], attemptsRemaining: 0, attemptsTotal: 0, nextId: 1 })
     },
 
-    _tick: () => {
+    notifyAttempt: () => {
+      if (!started) return
       const config = getConfig()
-      // 잠금 중이면 아무것도 하지 않는다 — 초기 빈 상태(active:[], nextSpawnAt:null)를 그대로 두므로
-      // set 호출이 없어 구독자 리렌더가 발생하지 않는다(잠금 구간이 길어도 비용 0). 풀 조립도 건너뛴다.
+      // 잠금 중이면 아무것도 하지 않는다 — 초기 빈 상태를 그대로 두므로 set 호출이 없어 리렌더가 없다.
       if (!isUnlocked(config)) return
       const bucket = currentBucket(config)
       if (!bootstrapped) {
-        // 해제 직후 첫 tick — start 가 잠금 상태로 켜졌던 경로의 진입점. 즉시 첫 세션을 채운다(start 부트스트랩과 동일).
+        // 해제 직후 첫 알림 — 이 강화 시도가 잠금을 넘긴 경우. 즉시 첫 세션을 채우고 카운터는 차감하지 않는다
+        // (해제 교차 시도는 첫 세션을 "만드는" 시도이지 그 세션의 시도를 소비하는 게 아니다).
         set(
           bootstrapCommissionQueue(
-            now(),
             rng,
             buildPool(bucket),
             settingsOf(bucket),
@@ -153,16 +142,15 @@ export function createCommissionStore(opts: CreateOpts = {}) {
         bootstrapped = true
         return
       }
-      const { state } = tick(
-        get(),
-        now(),
-        rng,
-        buildPool(bucket),
-        settingsOf(bucket),
-        config.maxCommissions,
+      set(
+        attempt(
+          get(),
+          rng,
+          buildPool(bucket),
+          settingsOf(bucket),
+          config.maxCommissions,
+        ),
       )
-      set(state)
-      // 만료된 의뢰(expired)는 단순히 active 에서 제거된다 — 별도 패널티 없음.
     },
 
     fulfill: (id) => {

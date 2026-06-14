@@ -1,5 +1,10 @@
 import commissionRaw from '../../public/data/commission.json'
-import type { CommissionConfig, CommissionItemEntry, GoldBucket } from './types'
+import type {
+  CommissionConfig,
+  CommissionItemEntry,
+  GoldBucket,
+  RefreshWeight,
+} from './types'
 import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(commission.json)을 검증해 CommissionConfig 로 만드는 로더(loadShop 패턴 미러링).
@@ -173,32 +178,41 @@ function parseBucket(
   const minGold = fint('minGold', 0)
   const maxGold = raw.maxGold === null ? null : fint('maxGold', 1)
 
-  const durationMinMs = fint('durationMinMs', 1)
-  const durationMaxMs = fint('durationMaxMs', 1)
-  const spawnIntervalMinMs = fint('spawnIntervalMinMs', 1)
-  const spawnIntervalMaxMs = fint('spawnIntervalMaxMs', 1)
+  // refreshWeights: 세션 갱신까지의 강화 시도 횟수 후보(가중 추첨). 비어있지 않은 배열.
+  // 각 항목 { value: 정수 >= 1, weight: 유한수 > 0 } — items[] 의 weight 검증 관례를 그대로 따른다.
+  const rawWeights = raw.refreshWeights
+  if (!Array.isArray(rawWeights) || rawWeights.length === 0)
+    fail(`${where}.refreshWeights must be a non-empty array`)
+  const refreshWeights: RefreshWeight[] = rawWeights.map((rw, i) => {
+    const rwWhere = `${where}.refreshWeights[${i}]`
+    if (!isRecord(rw)) fail(`${rwWhere} must be an object`)
+    const value = rw.value
+    if (typeof value !== 'number' || !Number.isFinite(value))
+      fail(`${rwWhere}.value must be a finite number`)
+    if (!Number.isInteger(value)) fail(`${rwWhere}.value must be an integer`)
+    if (value < 1) fail(`${rwWhere}.value must be >= 1`)
+    const weight = rw.weight
+    if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0)
+      fail(
+        `${rwWhere}.weight must be a finite number > 0 (got ${String(weight)})`,
+      )
+    return { value, weight }
+  })
 
   // 의미(범위·관계) 검증 — reducer 가 전제하는 불변.
   if (maxGold !== null && minGold >= maxGold)
     fail(`${where}.minGold must be < maxGold`)
-  if (durationMinMs > durationMaxMs)
-    fail(`${where}.durationMinMs must be <= durationMaxMs`)
-  if (spawnIntervalMinMs > spawnIntervalMaxMs)
-    fail(`${where}.spawnIntervalMinMs must be <= spawnIntervalMaxMs`)
 
   return {
     minGold,
     maxGold,
     items,
-    durationMinMs,
-    durationMaxMs,
-    spawnIntervalMinMs,
-    spawnIntervalMaxMs,
+    refreshWeights,
   }
 }
 
 // 순수 검증기: 임의 입력(unknown)을 검증된 CommissionConfig 로 변환한다.
-// 글로벌 시스템 파라미터(maxCommissions=세션 크기 / tickIntervalMs) + 골드 버킷 정의(buckets[])를 검증한다.
+// 글로벌 시스템 파라미터(maxCommissions=세션 크기 / unlockAtLevel) + 골드 버킷 정의(buckets[])를 검증한다.
 // knownItemIds: 출제 가능 itemId 집합(판매 가능 검 ∪ 아이템 카탈로그) — 버킷 itemId 무결성 검증에 쓴다.
 export function parseCommissionConfig(
   raw: unknown,
@@ -209,7 +223,6 @@ export function parseCommissionConfig(
   // maxCommissions = 한 세션에 한 번에 출제되는 제안 수(세션 크기). 풀의 서로 다른 항목 수가 이보다 적으면
   // 있는 만큼만 출제하므로(min), 여기서는 1 이상만 강제한다(버킷별 항목 수와의 관계는 강제하지 않는다).
   const maxCommissions = intAtLeast(raw, 'maxCommissions', 1)
-  const tickIntervalMs = intAtLeast(raw, 'tickIntervalMs', 1)
   // 제안 활성화 도달 레벨(maxLevelReached 기준). 정수 >= 0(0 = 처음부터 활성). 다른 글로벌 필드와 같이
   // 필수+검증으로 둔다 — 누락/오타가 조용히 0(항상 활성)으로 새지 않고 로드 시점에 즉시 실패하게.
   const unlockAtLevel = intAtLeast(raw, 'unlockAtLevel', 0)
@@ -239,7 +252,7 @@ export function parseCommissionConfig(
   if (buckets[buckets.length - 1].maxGold !== null)
     fail('the last bucket maxGold must be null (spans to infinity)')
 
-  return { maxCommissions, tickIntervalMs, unlockAtLevel, buckets }
+  return { maxCommissions, unlockAtLevel, buckets }
 }
 
 // 게임 시작 시 호출되는 로드 진입점. 번들된 데이터 파일을 검증해 CommissionConfig 로 만든다.
