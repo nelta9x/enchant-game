@@ -15,8 +15,8 @@
 //    갱신한다(쿨다운 없음 — 즉시 교체). 카운트다운 UI 는 세그먼트 바로 표현한다(총 칸 attemptsTotal, 켜진
 //    칸 attemptsRemaining — 시도마다 한 칸씩 꺼짐).
 //  - 세션은 "한 번에" 출제되고 도중에 보충하지 않는다(트리클 아님).
-//  - 제안 선택(complete): 고른 카드 "하나만" 사라지고 나머지는 그대로 남는다 — 카운터도 건드리지 않는다.
-//    즉 납품은 세션을 갱신하지 않는다. 세션이 통째로 새로 뜨는 것은 오직 attemptsRemaining 이 0 이 될 때뿐.
+//  - 제안 선택(complete): 고른 것을 포함해 이번 세션의 카드를 "전부" 비운다 — 단 카운터는 건드리지 않는다.
+//    즉 "하나를 고르면 카드들은 사라지고 갱신 바만 남는다". 새 카드는 오직 attemptsRemaining 이 0 이 될 때 뜬다.
 //  - 시간 개념(타임스탬프·만료·쿨다운)은 없다 — 탭 throttle·드리프트에 영향받지 않고 rng 주입으로 결정적.
 
 import type {
@@ -270,12 +270,14 @@ export function attempt(
   return { ...state, attemptsRemaining: state.attemptsRemaining - 1 }
 }
 
-// 제안 선택(납품): 고른 id 가 active 에 있으면 그 카드 "하나만" 제거한다 — 나머지 제안과 갱신 카운터는
-// 그대로 둔다(납품은 세션을 갱신하지 않는다). 없는 id 면 무변화(참조 동일 반환).
+// 제안 선택(납품): 고른 id 가 active 에 있으면 이번 세션의 제안을 "전부" 비운다(고른 것 + 나머지 모두) —
+// 단, 갱신 카운터(attemptsRemaining/attemptsTotal)는 건드리지 않는다. 즉 "하나를 고르면 카드들은 사라지고
+// 갱신 바만 남는다". 새 제안은 강화 시도로 카운터가 0 이 될 때 뜬다(납품 자체는 세션을 갱신하지 않는다).
+// 없는 id 면 무변화(참조 동일 반환).
 export function complete(
   state: CommissionQueueState,
   id: number,
 ): CommissionQueueState {
   if (!state.active.some((c) => c.id === id)) return state
-  return { ...state, active: state.active.filter((c) => c.id !== id) }
+  return { ...state, active: [] }
 }

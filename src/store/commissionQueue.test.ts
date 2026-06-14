@@ -453,24 +453,16 @@ describe('attempt — 강화 시도 반영(차감/갱신)', () => {
   })
 })
 
-describe('complete — 제안 선택 시 그 카드만 제거(세션 갱신 아님)', () => {
-  it('고른 id 만 사라지고 나머지·카운터는 그대로 남는다', () => {
+describe('complete — 제안 선택 시 세션 카드 전부 제거(바만 남김, 갱신 아님)', () => {
+  it('고른 id 가 있으면 세션 카드를 전부 비우고 카운터는 그대로 둔다', () => {
     const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1) // 3개, remaining 3
     const target = s.active[1].id
     const s2 = complete(s, target)
-    expect(s2.active).toHaveLength(2) // 하나만 제거
-    expect(ids(s2)).not.toContain(target)
-    // 나머지 카드 유지 + 카운터 불변.
+    expect(s2.active).toHaveLength(0) // 고른 것 + 나머지 전부 사라짐
+    // 카운터는 불변 — 갱신은 강화 시도로 카운터가 0 이 될 때만(바만 남는다).
     expect(s2.attemptsRemaining).toBe(3)
     expect(s2.attemptsTotal).toBe(3)
-  })
-
-  it('마지막 카드까지 납품하면 active 는 비지만 카운터는 남는다(갱신은 카운터 0에서만)', () => {
-    let s = refresh(RNG, POOL3, SETTINGS, SESSION, 1)
-    for (const c of [...s.active]) s = complete(s, c.id)
-    expect(s.active).toHaveLength(0)
-    expect(s.attemptsRemaining).toBe(3) // 납품은 카운터를 줄이지 않는다
-    expect(checkInvariant(s)).toBe(true)
+    expect(checkInvariant(s2)).toBe(true)
   })
 
   it('없는 id 는 무변화', () => {

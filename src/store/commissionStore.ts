@@ -32,9 +32,9 @@ function settingsOf(bucket: GoldBucket): BucketSettings {
 // 출제한다. 골드가 바뀌어 버킷이 달라지면 다음 갱신부터 반영된다(이미 발급된 제안은 freeze 유지).
 //
 // 완료는 두 store 에 걸친 트랜잭션이다: PlayerState 변경(검 소모+골드)은 gameStore 가 소유하고,
-// 제안 생명주기(선택 시 그 카드 제거)는 여기가 소유한다 — gameStore 가 완료를 수락(true)할 때만 complete 를
-// 적용해 두 store 의 일관성을 보장한다. complete 는 고른 카드 하나만 제거하고 나머지·갱신 카운터는 그대로 둔다
-// (납품은 세션을 갱신하지 않는다 — 세션 전체는 강화 시도로 카운터가 0 이 될 때만 새로 뜬다).
+// 제안 생명주기(선택 시 세션 카드 제거)는 여기가 소유한다 — gameStore 가 완료를 수락(true)할 때만 complete 를
+// 적용해 두 store 의 일관성을 보장한다. complete 는 이번 세션의 카드를 전부 비우고(고른 것 + 나머지) 갱신
+// 카운터는 그대로 둔다 — 카드들은 사라지고 갱신 바만 남으며, 새 제안은 강화 시도로 카운터가 0 이 될 때 뜬다.
 
 type CommissionActions = {
   // 큐 시작(App 마운트 시 1회). 이미 시작했으면 무시. config 로 큐를 초기화한다(잠금 해제 상태면 첫 세션을 채운다).
