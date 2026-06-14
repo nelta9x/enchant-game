@@ -91,12 +91,18 @@ type Lick = {
 // ── @theme 토큰(hex) → rgb 1회 해석 + 캐시 ─────────────────────────────────────
 // 결과(성공=금/파괴=적)마다 화염색이 다르므로 색쌍(coreVar|edgeVar)별로 팔레트를 캐시한다 — 변종이 둘뿐이라
 // Map 으로 충분하다. 캐시는 정적이다(런타임 테마 전환 경로 없음 — hit 토큰은 index.css 의 정적 @theme 상수).
-// 다크모드/테마 토글을 도입하면 paletteCache·glowSprite 를 무효화(clear/null 리셋)해야 한다.
+// 다크모드/테마 토글을 도입하면 paletteCache·glowSprites 를 무효화(clear)해야 한다.
 type Palette = {
   cool: number[][]
-  arcCore: number[] // 화염 백열 중심색 — 화구·불혀 그라데이션의 가장 뜨거운 속
+  arcCore: number[] // 화염 백열 중심색 — 화구·불혀 그라데이션의 가장 뜨거운 속(아주 작은 핫스팟)
+  glow: number[] // 후광 블룸 색(= 결과 글로우색) — 불티·화구·불혀의 가산 후광이 결과색을 띠게 한다
 }
 const paletteCache = new Map<string, Palette>()
+
+// rgb 를 인수만큼 어둡게(잿불·짙은 단계 도출). 결과색에서 식어가는 꼬리를 파생해 별도 토큰 없이 램프를 만든다.
+function darken(c: number[], f: number): number[] {
+  return [c[0] * f, c[1] * f, c[2] * f]
+}
 
 function hexToRgb(hex: string): number[] {
   const h = hex.replace('#', '').trim()
@@ -117,9 +123,11 @@ function resolveColorExpr(root: CSSStyleDeclaration, expr: string): string {
   return (m ? root.getPropertyValue(m[1]) : expr).trim()
 }
 
-// 결과 색쌍(coreVar=밝은 코어 / edgeVar=가장자리)으로 식어가는 4-stop 화염 램프를 만든다:
-//   머리(백열 화염 노랑, 공통) → 코어(결과색) → 가장자리(결과색) → 잿불(공통 어두운 적). 머리·꼬리는
-// 공통 hit 토큰이라 어떤 결과든 백열에서 시작해 잿불로 식고, 중간 두 stop 만 결과색(금/적)으로 물든다.
+// 결과 색쌍(coreVar=밝은 글로우 / edgeVar=베이스)으로 식어가는 4-stop 화염 램프를 만든다 — 결과색이
+// 불꽃 전체를 지배하도록(파괴가 또렷한 적색으로 읽히게):
+//   머리=글로우(밝은 결과색) → 베이스(결과색) → 짙은 결과색 → 잿불(베이스를 더 어둡게). 옛 공통 노랑
+//   머리(--color-hit-flash)와 공통 잿불은 빼고 전부 결과색에서 파생한다(꼬리는 darken). 가장 뜨거운
+//   핀포인트(arcCore)만 백열 흰색 공통이라 폭발 중심은 백열이고 본체·후광은 결과색으로 탄다.
 function resolvePalette(coreVar: string, edgeVar: string): Palette {
   const key = coreVar + '|' + edgeVar
   const cached = paletteCache.get(key)
@@ -127,9 +135,12 @@ function resolvePalette(coreVar: string, edgeVar: string): Palette {
   const root = getComputedStyle(document.documentElement)
   const tok = (name: string) => hexToRgb(root.getPropertyValue(name).trim())
   const expr = (e: string) => hexToRgb(resolveColorExpr(root, e))
+  const glow = expr(coreVar)
+  const base = expr(edgeVar)
   const pal: Palette = {
-    cool: [tok('--color-hit-flash'), expr(coreVar), expr(edgeVar), tok('--color-hit-ember')],
+    cool: [glow, base, darken(base, 0.5), darken(base, 0.2)],
     arcCore: tok('--color-hit-arc-core'),
+    glow,
   }
   paletteCache.set(key, pal)
   return pal
@@ -159,18 +170,15 @@ function coolInto(cool: number[][], t: number, out: number[]): void {
 const rgba = (c: number[], a: number) =>
   `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`
 
-// 부드러운 글로우 스프라이트(오프스크린, 1회 구움) — 가산 합성으로 불티마다 blit 해 발광 후광을 낸다.
-// shadowBlur(매 draw 가우시안 블러)는 임팩트 때 프레임을 떨어뜨려, 캐시한 텍스처 복사(drawImage)로 대체한다.
-// 색은 머리 노랑(--color-hit-flash)으로 고정 — 캐시는 정적(런타임 테마 전환 경로 없음; 도입 시 무효화 필요).
-let glowSprite: HTMLCanvasElement | null = null
-function getGlowSprite(): HTMLCanvasElement {
-  if (glowSprite) return glowSprite
-  // 후광 색은 백열 머리(--color-hit-flash)로 고정 — 결과(금/적)와 무관한 공통 뜨거운 심지라 한 장만 굽는다.
-  const color = hexToRgb(
-    getComputedStyle(document.documentElement)
-      .getPropertyValue('--color-hit-flash')
-      .trim(),
-  )
+// 부드러운 글로우 스프라이트(오프스크린, 결과 글로우색마다 1회 구움) — 가산 합성으로 불티마다 blit 해
+// 발광 후광을 낸다. shadowBlur(매 draw 가우시안 블러)는 임팩트 때 프레임을 떨어뜨려, 캐시한 텍스처
+// 복사(drawImage)로 대체한다. 후광 색을 결과 글로우색으로 굽기에 파괴=적 후광·성공=금 후광이 된다
+// (옛 공통 노랑 후광이 전체를 노랗게 물들이던 문제 해소). 색쌍이 둘뿐이라 Map 캐시로 충분하다.
+const glowSprites = new Map<string, HTMLCanvasElement>()
+function getGlowSprite(color: number[]): HTMLCanvasElement {
+  const key = (color[0] | 0) + ',' + (color[1] | 0) + ',' + (color[2] | 0)
+  const cached = glowSprites.get(key)
+  if (cached) return cached
   const S = 48
   const off = document.createElement('canvas')
   off.width = S
@@ -183,8 +191,8 @@ function getGlowSprite(): HTMLCanvasElement {
   grad.addColorStop(1, rgba(color, 0))
   g.fillStyle = grad
   g.fillRect(0, 0, S, S)
-  glowSprite = off
-  return glowSprite
+  glowSprites.set(key, off)
+  return off
 }
 
 // ── 캔버스 스파크 시스템 ────────────────────────────────────────────────────────
@@ -416,7 +424,7 @@ export class HitSparkSystem {
         const gr = r * 1.7
         ctx.globalAlpha = fa * S.fireGlow
         ctx.drawImage(
-          getGlowSprite(),
+          getGlowSprite(pal.glow),
           this.cx - gr,
           this.cy - gr,
           gr * 2,
@@ -480,7 +488,7 @@ export class HitSparkSystem {
           if (S.lickGlow > 0) {
             const gr = r2 * 1.9
             ctx.globalAlpha = sa * S.lickGlow
-            ctx.drawImage(getGlowSprite(), -gr, -gr, gr * 2, gr * 2)
+            ctx.drawImage(getGlowSprite(pal.glow), -gr, -gr, gr * 2, gr * 2)
           }
           ctx.restore()
         }
@@ -549,7 +557,7 @@ export class HitSparkSystem {
     // 패스 1 — additive 후광 블룸: 미리 구운 글로우 스프라이트를 가산 합성으로 불티마다 blit 한다. 겹치는
     // 불티의 빛이 누적돼 발광체처럼 보인다. shadowBlur 와 달리 캐시 텍스처 복사라 임팩트 때 프레임을 안 떨군다.
     if (S.glow > 0) {
-      const sprite = getGlowSprite()
+      const sprite = getGlowSprite(pal.glow)
       ctx.globalCompositeOperation = 'lighter'
       for (let i = 0; i < this.sparkCount; i++) {
         const p = this.sparks[i]
@@ -584,7 +592,9 @@ export class HitSparkSystem {
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
     this.syncBackingStore(rect)
-    getGlowSprite()
+    // 두 결과(성공=금/파괴=적) 글로우 후광 스프라이트를 미리 구워 첫 버스트가 프레임을 떨구지 않게 한다.
+    getGlowSprite(resolvePalette('var(--color-gold-glow)', 'var(--color-gold)').glow)
+    getGlowSprite(resolvePalette('var(--color-danger-glow)', 'var(--color-danger)').glow)
   }
 
   dispose() {
