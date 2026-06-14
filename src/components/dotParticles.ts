@@ -319,11 +319,20 @@ export class DotParticleSystem {
     }
   }
 
-  // 첫 버스트의 일회성 비용(backing store 할당)을 마운트로 옮긴다. 레이아웃 전(rect 0)이면 첫 emit 에서 잡는다(무해).
-  warmup() {
+  // 첫 버스트의 일회성 비용(backing store 할당 + 풀 슬롯 확보)을 마운트로 옮긴다. reserve 개의 Dot 슬롯을
+  // 미리 만들어 첫 버스트(특히 고레벨 대형 버스트)도 객체를 새로 할당하지 않게 한다(연사 GC 압박 0). 풀 확보는
+  // rect 무관(레이아웃 전이어도 가능), backing store 는 레이아웃이 잡힌 뒤에만(rect 0 이면 첫 emit 에서 잡는다 — 무해).
+  warmup(reserve = 0) {
+    // 슬롯 tex 는 자리표시 — emit 가 첫 사용 시 실제 텍스처로 덮어쓴다(그 전엔 dotCount=0 이라 그려지지 않는다).
+    if (reserve > this.dots.length) {
+      const placeholder = document.createElement('canvas')
+      for (let i = this.dots.length; i < reserve; i++) {
+        this.dots[i] = { tx: 0, ty: 0, size: 0, delay: 0, t: 0, tex: placeholder }
+      }
+    }
+    if (!this.decors[0]) this.decors[0] = { t: 0, core: [0, 0, 0], edge: [0, 0, 0] }
     const rect = this.canvas.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return
-    this.syncBackingStore(rect)
+    if (rect.width > 0 && rect.height > 0) this.syncBackingStore(rect)
   }
 
   dispose() {

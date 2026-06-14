@@ -552,9 +552,12 @@ export class HitSparkSystem {
     }
   }
 
-  // 첫 타격의 일회성 비용(캔버스 버퍼 할당·팔레트 해석·글로우 스프라이트 굽기)을 마운트로 옮겨 첫 burst 가
-  // 프레임을 떨구지 않게 한다. 레이아웃 전(rect 0)이면 건너뛰고 첫 burst 에서 잡는다(무해).
-  warmup() {
+  // 첫 타격의 일회성 비용(캔버스 버퍼 할당·팔레트 해석·글로우 스프라이트 굽기 + 풀 슬롯 확보)을 마운트로 옮겨
+  // 첫 burst 가 프레임을 떨구지 않게 한다. 풀 사전 확보(spark()/lick() 가 슬롯 생성)는 rect 무관, backing
+  // store·글로우는 레이아웃이 잡힌 뒤에만(rect 0 이면 건너뛰고 첫 burst 에서 잡는다 — 무해).
+  warmup(sparkReserve = 0, lickReserve = 0) {
+    for (let i = 0; i < sparkReserve; i++) this.spark(i)
+    for (let i = 0; i < lickReserve; i++) this.lick(i)
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
     this.syncBackingStore(rect)
