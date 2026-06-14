@@ -19,7 +19,7 @@ const GOLD_OUTLINE =
 // 낮춘 "톤다운 골드"를 쓴다. hex 하드코딩 금지 규약대로 토큰에서 color-mix 로 파생(글로벌 gold
 // 토큰은 그대로 — 판매가·+N·재화는 영향 없음).
 const BANNER_BG =
-  'linear-gradient(to right, color-mix(in srgb, var(--color-gold-glow) 82%, var(--color-gold-ink)), color-mix(in srgb, var(--color-gold-glow) 82%, var(--color-gold-ink)) 45%, color-mix(in srgb, var(--color-gold) 84%, var(--color-gold-ink)))'
+  'linear-gradient(to right, color-mix(in srgb, var(--color-gold-glow) 89%, var(--color-gold-ink)), color-mix(in srgb, var(--color-gold-glow) 89%, var(--color-gold-ink)) 45%, color-mix(in srgb, var(--color-gold) 90%, var(--color-gold-ink)))'
 
 // 쿨다운 "리차지" 오버레이 — 평소엔 가득 밝은 배너. 쿨다운 시작에 어둡게 "소진"됐다가 밝은 골드가
 // 좌→우로 다시 차오른다. 이 오버레이는 아직 안 찬(오른쪽) 영역을 어둡게 덮고, 채움 비율(--cooldown-fill)
