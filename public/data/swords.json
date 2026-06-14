@@ -438,11 +438,6 @@
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
     ],
     "sprite": "evilswordapophis.png"
