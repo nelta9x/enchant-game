@@ -102,7 +102,7 @@
     "protectionTickets": 0,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 1, "chance": 1 }],
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 1, "chance": 0.7 }],
     "sprite": "wangfu.png"
   },
   {
@@ -118,7 +118,7 @@
     "protectionTickets": 0,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 1, "chance": 1 }],
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 1, "chance": 0.7 }],
     "sprite": "cutlass.png"
   },
   {
@@ -134,7 +134,7 @@
     "protectionTickets": 0,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 1, "chance": 1 }],
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 1, "chance": 0.7 }],
     "sprite": "ssaurabillongsword.png"
   },
   {
@@ -150,7 +150,10 @@
     "protectionTickets": 1,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 2, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 }
+    ],
     "sprite": "zard.png"
   },
   {
@@ -166,7 +169,11 @@
     "protectionTickets": 1,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 3, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 }
+    ],
     "sprite": "alibaba.png"
   },
   {
@@ -182,7 +189,7 @@
     "protectionTickets": 1,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 5, "chance": 1 }],
+    "dropOnFail": [{ "itemId": "iron_scrap", "count": 5, "chance": 0.7 }],
     "sprite": "witsend.png"
   },
   {
@@ -199,7 +206,10 @@
     "whiffWeight": 3,
     "destroyWeight": 7,
     "dropOnFail": [
-      { "itemId": "iron_scrap", "count": 8, "chance": 1 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
     ],
@@ -218,7 +228,13 @@
     "protectionTickets": 2,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "flame_sword_handle", "count": 1, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "flame_sword_handle", "count": 1, "chance": 0.8 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 1, "chance": 0.7 }
+    ],
     "sprite": "redlotus.png"
   },
   {
@@ -234,7 +250,10 @@
     "protectionTickets": 3,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 10, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "sachsen.png"
   },
   {
@@ -250,7 +269,11 @@
     "protectionTickets": 4,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 15, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "maxcalibur.png"
   },
   {
@@ -266,7 +289,12 @@
     "protectionTickets": 7,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 20, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "frostfang.png"
   },
   {
@@ -282,7 +310,13 @@
     "protectionTickets": 9,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 25, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "doombringer.png"
   },
   {
@@ -298,7 +332,14 @@
     "protectionTickets": 10,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 30, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "diffusalblade.png"
   },
   {
@@ -314,7 +355,16 @@
     "protectionTickets": 12,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 40, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "flameblade.png"
   },
   {
@@ -330,7 +380,18 @@
     "protectionTickets": 15,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 50, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "bloodthirster.png"
   },
   {
@@ -348,7 +409,14 @@
     "whiffWeight": 3,
     "destroyWeight": 7,
     "dropOnFail": [
-      { "itemId": "iron_scrap", "count": 40, "chance": 1 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
@@ -372,7 +440,16 @@
     "whiffWeight": 3,
     "destroyWeight": 7,
     "dropOnFail": [
-      { "itemId": "iron_scrap", "count": 50, "chance": 1 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
@@ -395,7 +472,16 @@
     "protectionTickets": 22,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 40, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "infinityedge.png"
   },
   {
@@ -413,32 +499,25 @@
     "whiffWeight": 3,
     "destroyWeight": 7,
     "dropOnFail": [
-      { "itemId": "iron_scrap", "count": 70, "chance": 1 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 5, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 5, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 5, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 5, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 5, "chance": 0.7 }
     ],
     "sprite": "evilswordapophis.png"
   },
@@ -456,7 +535,28 @@
     "protectionTickets": 23,
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 100, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "divinerapier.png"
   },
   {
@@ -473,12 +573,23 @@
     "whiffWeight": 3,
     "destroyWeight": 7,
     "dropOnFail": [
-      { "itemId": "iron_scrap", "count": 80, "chance": 1 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
-      { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "dark_matter", "count": 5, "chance": 0.7 }
     ],
     "sprite": "ashbringer.png"
   },
@@ -496,7 +607,12 @@
     "protectionTickets": "disabled",
     "whiffWeight": 3,
     "destroyWeight": 7,
-    "dropOnFail": [{ "itemId": "iron_scrap", "count": 20, "chance": 1 }],
+    "dropOnFail": [
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 },
+      { "itemId": "iron_scrap", "count": 5, "chance": 0.7 }
+    ],
     "sprite": "frostmourne.png"
   },
   {

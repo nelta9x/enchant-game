@@ -21,6 +21,14 @@ const seq = (...values: number[]): (() => number) => {
 // 헛방 강제 엔진: 1차 rng=1 → 실패, 2차 rng=0 → weightedIndex 가 헛방(idx0)을 고른다
 // (sword_7 은 whiffWeight·destroyWeight 둘 다 양수라 실패 시 2차 굴림이 일어난다).
 const WHIFF = () => new Enhancer(seq(1, 0))
+// 파괴+드랍을 강제하는 rng: 첫 2회(성공 판정 + 파괴 추첨)=실패·파괴, 이후 드랍 롤(chance<1)은 모두
+// 통과(rng=0)시킨다. 드랍 후보의 개수·수량에 묶이지 않는다(밸런스 값 비의존). enhance() 1회 기준 —
+// 표준 검은 whiff/destroy weight 가 둘 다 양수라 성공 판정 1회 + 파괴 추첨 1회 뒤 드랍이 돈다.
+const failThenDropRng = (): (() => number) => {
+  let i = 0
+  return () => (i++ < 2 ? 1 : 0)
+}
+const DESTROY_WITH_DROPS = () => new Enhancer(failThenDropRng())
 
 describe('gameStore — 강화 적용 (seam)', () => {
   it('성공: 골드 차감 + 단계 +1', () => {
@@ -164,15 +172,25 @@ describe('gameStore — 강화 적용 (seam)', () => {
 describe('gameStore — 드랍 수집(collectDrop / flushDrops)', () => {
   it('파괴 시 dropOnFail 이 대기 드랍(pendingDrops)으로 쌓이고 items 엔 안 들어간다', () => {
     const store = createGameStore({
-      enhancer: ALWAYS_FAIL(),
+      enhancer: DESTROY_WITH_DROPS(),
       gold: 1_000_000,
       currentSwordId: 'sword_15',
       items: [],
     })
     const r = store.getState().enhance(false)
-    expect((r?.drops ?? []).length).toBeGreaterThan(0) // 이 단계는 dropOnFail 을 가진다(전제)
-    expect(store.getState().pendingDrops).toEqual(r?.drops ?? [])
-    for (const d of r?.drops ?? [])
+    const drops = r?.drops ?? []
+    expect(drops.length).toBeGreaterThan(0) // 이 단계는 dropOnFail 을 가진다(전제)
+    // pendingDrops 는 drops 를 itemId 별로 합산해 담는다(동일 아이템 다수 후보도 한 stack 으로 머지).
+    // 총량·아이템 종류만 본다(드랍 후보 개수·수량 같은 밸런스 값엔 묶지 않는다).
+    const sum = (xs: readonly { count: number }[]) =>
+      xs.reduce((s, x) => s + x.count, 0)
+    const pending = store.getState().pendingDrops
+    expect(sum(pending)).toBe(sum(drops))
+    expect(new Set(pending.map((d) => d.itemId))).toEqual(
+      new Set(drops.map((d) => d.itemId)),
+    )
+    // 수집 전이라 items 엔 아직 들어가지 않는다.
+    for (const d of drops)
       expect(countOf(store.getState().items, d.itemId)).toBe(0)
   })
 
@@ -180,7 +198,7 @@ describe('gameStore — 드랍 수집(collectDrop / flushDrops)', () => {
   // 런타임으로 읽어 관계로만 검증한다(특정 밸런스 값에 묶지 않는다).
   const destroyedWithPending = () => {
     const store = createGameStore({
-      enhancer: ALWAYS_FAIL(),
+      enhancer: DESTROY_WITH_DROPS(),
       gold: 1_000_000,
       currentSwordId: 'sword_16',
       items: [],
@@ -225,8 +243,14 @@ describe('gameStore — 드랍 수집(collectDrop / flushDrops)', () => {
 
   it('연속 파괴: 드랍이 대기분에 누적된다(merge — 유실 없음)', () => {
     // sword_7 파괴 → 시작 검(+1)으로 재시작 → 가방의 sword_10 을 명시적으로 장착 → sword_10 재파괴.
+    // 파괴+드랍을 강제하는 rng: 각 enhance 호출마다 첫 2회(성공·파괴 추첨)=실패·파괴, 이후 드랍
+    // 롤=드랍. rng 스트림은 호출 경계를 모르므로 2차 호출 전 resetRoll() 로 되감는다.
+    let roll = 0
+    const resetRoll = () => {
+      roll = 0
+    }
     const store = createGameStore({
-      enhancer: ALWAYS_FAIL(),
+      enhancer: new Enhancer(() => (roll++ < 2 ? 1 : 0)),
       gold: 1_000_000,
       currentSwordId: 'sword_7',
       items: [{ itemId: 'sword_10', count: 1 }],
@@ -242,6 +266,7 @@ describe('gameStore — 드랍 수집(collectDrop / flushDrops)', () => {
     // 재파괴를 위해 보관 검을 명시적으로 장착한 뒤 강화한다.
     store.getState().equip('sword_10')
     expect(store.getState().currentSwordId).toBe('sword_10')
+    resetRoll() // 2차 enhance 전 rng 되감기(첫 2회 다시 실패·파괴)
     store.getState().enhance(false)
     // 2차 드랍이 기존 대기분에 누적된다(유실 없음). items 엔 아직 없다.
     const pendingAfter2 = totalOf(store.getState().pendingDrops)
