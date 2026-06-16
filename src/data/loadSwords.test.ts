@@ -364,12 +364,17 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     expect(cur?.nextId).toBeNull()
   })
 
-  it('이지버그 단계(+27~+29)는 파괴보호장치 사용 불가다', () => {
+  it('최종 강화 단계(+29→+30)만 파괴보호장치를 쓸 수 없다', () => {
     const swords = loadSwords()
-    for (const level of [27, 28, 29]) {
-      expect(swords.find((s) => s.level === level)?.protectionTickets).toBe(
-        'disabled',
-      )
+    // +29(엑스칼리버 직전)는 유일한 무보호 벽 — 보호 불가('disabled').
+    expect(swords.find((s) => s.level === 29)?.protectionTickets).toBe(
+      'disabled',
+    )
+    // +27·+28은 보호 가능(티켓 수는 디자이너 튜닝값이라 '양수'만 검증).
+    for (const level of [27, 28]) {
+      const pt = swords.find((s) => s.level === level)?.protectionTickets
+      expect(typeof pt).toBe('number')
+      expect(pt as number).toBeGreaterThan(0)
     }
   })
 
