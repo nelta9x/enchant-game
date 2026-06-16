@@ -180,6 +180,50 @@ describe('검 아이콘 ↔ 스프라이트 무결성', () => {
   })
 })
 
+// 강화 비용 점진성: 재료(item) 비용이 고단계 전용으로 "갑자기" 등장하지 않고 중반(10레벨대 이하)에도
+// 한 번은 도입돼 있어야 한다 — 플레이어가 본격 재료 비용(고단계) 전에 "재료도 비용이 된다"를 학습할
+// 자리를 보장하는 디자인 불변식. 도입 레벨·수량(count)은 디자이너 튜닝 영역이라 단언하지 않고(toBe 금지),
+// "10레벨대 이하에 item 비용 검이 1개 이상 존재"라는 구조/방향만 검증한다.
+describe('강화 비용 점진성', () => {
+  it('재료(item) 비용이 10레벨대 이하(level <= 19)에 1개 이상 도입돼 있다', () => {
+    dataManager.load()
+    const midGameItemCost = dataManager
+      .getSwords()
+      .filter((s) => s.level <= 19 && s.enchantCost?.kind === 'item')
+    expect(midGameItemCost.length).toBeGreaterThan(0)
+  })
+
+  // soft-lock 가드: 잡템(비-검) 재료를 비용으로 요구하는 검은, 그 재료를 도입 레벨 도달 전에 얻을 수단이
+  // 반드시 있어야 한다 — 더 낮은 레벨의 실패 드랍(dropOnFail)에 등장하거나, 상점에서 구매 가능하거나.
+  // 재료가 그 레벨 이상에서만 나오면 도착 즉시 막히는 데드락이 된다(검 itemId='재료검'은 드랍이 아니라
+  // 강화·보관으로 얻으므로 이 가드 대상에서 제외).
+  it('재료 비용으로 쓰는 잡템은 도입 레벨 이전에 드랍되거나 상점에서 살 수 있다', () => {
+    dataManager.load()
+    const swords = dataManager.getSwords()
+    const buyable = new Set(
+      dataManager
+        .getShopItems()
+        .map((s) => s.itemId)
+        .filter((id) => dataManager.getSwordById(id) === undefined),
+    )
+    for (const sword of swords) {
+      const cost = sword.enchantCost
+      if (cost?.kind !== 'item') continue
+      // 검 재료(재료검)는 드랍이 아니라 강화/보관으로 얻으므로 제외 — 잡템 재료만 검사.
+      if (dataManager.getSwordById(cost.itemId) !== undefined) continue
+      const dropsEarlier = swords.some(
+        (s) =>
+          s.level < sword.level &&
+          s.dropOnFail.some((d) => d.itemId === cost.itemId),
+      )
+      expect(
+        dropsEarlier || buyable.has(cost.itemId),
+        `'${sword.id}'(level ${sword.level})의 재료 비용 '${cost.itemId}'를 도달 전에 얻을 수단이 없다`,
+      ).toBe(true)
+    }
+  })
+})
+
 // 아이템 카탈로그(items.json)의 모든 nameKey 가 번역 리소스에 존재해야 한다(검 규약과 동일).
 describe('아이템 카탈로그 ↔ i18n 무결성', () => {
   it('모든 ItemData nameKey 가 번역 리소스에 존재한다', () => {

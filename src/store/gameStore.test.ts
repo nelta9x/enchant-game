@@ -150,15 +150,16 @@ describe('gameStore — 강화 적용 (seam)', () => {
 
   it('방지: 단계 유지 + 파괴보호장치 차감 + 드랍 없음', () => {
     const beforePt = 5
+    // 골드 비용 + 파괴보호 가능 단계를 고른다(재료 비용 단계는 fixture 가 그 재료를 따로 공급해야 함).
     const store = createGameStore({
       enhancer: ALWAYS_FAIL(),
       gold: 1_000_000,
-      currentSwordId: 'sword_15',
+      currentSwordId: 'sword_16',
       items: [{ itemId: PROTECTION_TICKET_ID, count: beforePt }],
     })
     const r = store.getState().enhance(true)
     expect(r?.outcome).toBe('protected')
-    expect(store.getState().currentSwordId).toBe('sword_15') // 단계 유지
+    expect(store.getState().currentSwordId).toBe('sword_16') // 단계 유지
     // 파괴보호장치가 차감된다(소모량은 밸런스 값이므로 차감 방향만 본다).
     expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBeLessThan(
       beforePt,
@@ -171,10 +172,11 @@ describe('gameStore — 강화 적용 (seam)', () => {
 
 describe('gameStore — 드랍 수집(collectDrop / flushDrops)', () => {
   it('파괴 시 dropOnFail 이 대기 드랍(pendingDrops)으로 쌓이고 items 엔 안 들어간다', () => {
+    // 골드 비용 + dropOnFail 단계를 고른다(재료 비용 단계면 fixture 가 그 재료를 공급해야 enhance 가능).
     const store = createGameStore({
       enhancer: DESTROY_WITH_DROPS(),
       gold: 1_000_000,
-      currentSwordId: 'sword_15',
+      currentSwordId: 'sword_16',
       items: [],
     })
     const r = store.getState().enhance(false)

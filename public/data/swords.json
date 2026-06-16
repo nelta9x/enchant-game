@@ -242,8 +242,9 @@
     "level": 15,
     "nextId": "sword_16",
     "enchantCost": {
-      "kind": "gold",
-      "amount": 100000
+      "kind": "item",
+      "itemId": "iron_scrap",
+      "count": 15
     },
     "successRate": 0.65,
     "sellPrice": 3000000,
