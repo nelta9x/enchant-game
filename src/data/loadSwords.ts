@@ -1,6 +1,6 @@
 import swordsRaw from '../../public/data/swords.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
-import type { Drop, Material, SwordData, SwordNote } from './types'
+import type { Drop, ItemCost, Material, SwordData, SwordNote } from './types'
 import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(swords.json)을 검증해 SwordData[]로 만드는 로더.
@@ -64,6 +64,25 @@ function parseWeight(
   return raw
 }
 
+// 강화 비용 추가 아이템 목록 검증. 누락/null = [](추가 요구 없음). 각 엔트리는 itemId(비어있지 않은
+// 문자열)·count(양의 정수)를 요구한다(드랍·Material item 과 같은 규약). itemId 실재 검증은 하지 않는다 —
+// 검/잡템이 itemId 네임스페이스를 공유해 패턴으로 구분 불가하므로(parseSwords 주석 참고).
+function parseEnchantCostItems(raw: unknown, ctx: string): ItemCost[] {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw)) fail(`${ctx} enchantCostItems must be an array or null`)
+  return raw.map((e, i): ItemCost => {
+    const ectx = `${ctx} enchantCostItems[${i}]`
+    if (!isRecord(e)) fail(`${ectx} must be an object`)
+    const itemId = e.itemId
+    if (typeof itemId !== 'string' || itemId.length === 0)
+      fail(`${ectx} itemId must be a non-empty string`)
+    const count = e.count
+    if (typeof count !== 'number' || !Number.isInteger(count) || count <= 0)
+      fail(`${ectx} count must be a positive integer (got ${String(count)})`)
+    return { itemId, count }
+  })
+}
+
 function parseNotes(raw: unknown, ctx: string): SwordNote[] {
   if (raw === undefined) return []
   if (!Array.isArray(raw)) fail(`${ctx} notes must be an array`)
@@ -104,6 +123,11 @@ function parseSword(raw: unknown): ParsedSword {
     )
 
   const enchantCost = costNull ? null : parseMaterial(raw.enchantCost, ctx)
+
+  // 추가 아이템 비용(enchantCost 와 함께 소모). 최종 단계(강화 불가)는 추가 비용을 가질 수 없다.
+  const enchantCostItems = parseEnchantCostItems(raw.enchantCostItems, ctx)
+  if (costNull && enchantCostItems.length > 0)
+    fail(`${ctx} terminal sword (enchantCost null) must not have enchantCostItems`)
 
   let successRate: number | null = null
   if (!rateNull) {
@@ -185,6 +209,7 @@ function parseSword(raw: unknown): ParsedSword {
     level,
     nameKey,
     enchantCost,
+    enchantCostItems,
     successRate,
     sellPrice,
     protectionTickets,

@@ -196,7 +196,7 @@ describe('강화 비용 점진성', () => {
   // soft-lock 가드: 잡템(비-검) 재료를 비용으로 요구하는 검은, 그 재료를 도입 레벨 도달 전에 얻을 수단이
   // 반드시 있어야 한다 — 더 낮은 레벨의 실패 드랍(dropOnFail)에 등장하거나, 상점에서 구매 가능하거나.
   // 재료가 그 레벨 이상에서만 나오면 도착 즉시 막히는 데드락이 된다(검 itemId='재료검'은 드랍이 아니라
-  // 강화·보관으로 얻으므로 이 가드 대상에서 제외).
+  // 강화·보관으로 얻으므로 이 가드 대상에서 제외). enchantCost(단일) + enchantCostItems(추가) 모두 검사.
   it('재료 비용으로 쓰는 잡템은 도입 레벨 이전에 드랍되거나 상점에서 살 수 있다', () => {
     dataManager.load()
     const swords = dataManager.getSwords()
@@ -207,19 +207,24 @@ describe('강화 비용 점진성', () => {
         .filter((id) => dataManager.getSwordById(id) === undefined),
     )
     for (const sword of swords) {
-      const cost = sword.enchantCost
-      if (cost?.kind !== 'item') continue
-      // 검 재료(재료검)는 드랍이 아니라 강화/보관으로 얻으므로 제외 — 잡템 재료만 검사.
-      if (dataManager.getSwordById(cost.itemId) !== undefined) continue
-      const dropsEarlier = swords.some(
-        (s) =>
-          s.level < sword.level &&
-          s.dropOnFail.some((d) => d.itemId === cost.itemId),
-      )
-      expect(
-        dropsEarlier || buyable.has(cost.itemId),
-        `'${sword.id}'(level ${sword.level})의 재료 비용 '${cost.itemId}'를 도달 전에 얻을 수단이 없다`,
-      ).toBe(true)
+      // 이 검의 모든 아이템 비용 itemId(단일 enchantCost item + 추가 enchantCostItems).
+      const costItemIds = [
+        ...(sword.enchantCost?.kind === 'item' ? [sword.enchantCost.itemId] : []),
+        ...sword.enchantCostItems.map((ec) => ec.itemId),
+      ]
+      for (const itemId of costItemIds) {
+        // 검 재료(재료검)는 드랍이 아니라 강화/보관으로 얻으므로 제외 — 잡템 재료만 검사.
+        if (dataManager.getSwordById(itemId) !== undefined) continue
+        const dropsEarlier = swords.some(
+          (s) =>
+            s.level < sword.level &&
+            s.dropOnFail.some((d) => d.itemId === itemId),
+        )
+        expect(
+          dropsEarlier || buyable.has(itemId),
+          `'${sword.id}'(level ${sword.level})의 재료 비용 '${itemId}'를 도달 전에 얻을 수단이 없다`,
+        ).toBe(true)
+      }
     }
   })
 })

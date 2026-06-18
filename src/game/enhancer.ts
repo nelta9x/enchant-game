@@ -41,6 +41,11 @@ export class Enhancer {
     if (cost.kind === 'item' && countOf(supply.items, cost.itemId) < cost.count)
       return `Insufficient material: need ${cost.count} x ${cost.itemId}, have ${countOf(supply.items, cost.itemId)}`
 
+    // 추가 아이템 비용(enchantCost 와 함께 소모) — 하나라도 부족하면 강화 불가.
+    for (const ec of sword.enchantCostItems)
+      if (countOf(supply.items, ec.itemId) < ec.count)
+        return `Insufficient material: need ${ec.count} x ${ec.itemId}, have ${countOf(supply.items, ec.itemId)}`
+
     if (useProtection) {
       const pt = sword.protectionTickets
       // 'disabled'거나 0('-' = 해당 단계 방지 불가)이면 방지 사용 불가.
@@ -70,8 +75,17 @@ export class Enhancer {
     const fromId = sword.id
 
     const costGold = cost.kind === 'gold' ? cost.amount : 0
-    const costItems: ItemStack[] =
-      cost.kind === 'item' ? [{ itemId: cost.itemId, count: cost.count }] : []
+    // 비용 아이템 = enchantCost 가 item 이면 그 아이템 + 추가 아이템 목록(enchantCostItems).
+    // 어느 결과(성공/헛방/방지/파괴)든 이 전부가 차감된다(방지는 여기에 파괴보호장치만 더 얹는다).
+    const costItems: ItemStack[] = [
+      ...(cost.kind === 'item'
+        ? [{ itemId: cost.itemId, count: cost.count }]
+        : []),
+      ...sword.enchantCostItems.map((ec) => ({
+        itemId: ec.itemId,
+        count: ec.count,
+      })),
+    ]
     const baseConsumed: ConsumedMaterials = { gold: costGold, items: costItems }
 
     // 확률 판정: 시도당 정확히 rng() 1회.

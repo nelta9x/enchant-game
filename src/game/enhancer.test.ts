@@ -37,6 +37,7 @@ function sword(over: Partial<SwordData> = {}): SwordData {
     // 엔진은 nameKey를 읽지 않지만, level override 시에도 id/nextId/level과 어긋나지 않도록 파생한다.
     nameKey: `sword.${level}.name` as SwordData['nameKey'],
     enchantCost: { kind: 'gold', amount: 100 },
+    enchantCostItems: [],
     successRate: 0.5,
     sellPrice: 1000,
     protectionTickets: 0,
@@ -110,6 +111,46 @@ describe('Enhancer — 재료 부족 (req 2)', () => {
       supply: { gold: 0, items: [{ itemId: 'sword_19', count: 1 }] },
     })
     expect(ok.outcome).toBe('success')
+  })
+
+  it('복합 비용(골드 + enchantCostItems 여러 종)은 전부 충족해야 진행하고, 모두 함께 소모된다', () => {
+    // 골드 + 검(재료검) + 잡템을 한 번에 요구하는 검(마검 아포피스류 복합 비용).
+    const s = sword({
+      enchantCost: { kind: 'gold', amount: 200 },
+      enchantCostItems: [
+        { itemId: 'sword_13', count: 1 },
+        { itemId: 'dark_matter', count: 5 },
+      ],
+    })
+    const enough = {
+      gold: 1000,
+      items: [
+        { itemId: 'sword_13', count: 1 },
+        { itemId: 'dark_matter', count: 5 },
+      ],
+    }
+    // 추가 아이템 중 하나라도 부족하면 강화 불가.
+    expect(
+      new Enhancer(alwaysSucceeds).canEnhance({
+        sword: s,
+        supply: { gold: 1000, items: [{ itemId: 'sword_13', count: 1 }] },
+      }),
+    ).toBe(false)
+    // 골드만 부족해도 불가.
+    expect(
+      new Enhancer(alwaysSucceeds).canEnhance({ sword: s, supply: { ...enough, gold: 100 } }),
+    ).toBe(false)
+    // 전부 충족 → 진행하며 골드와 모든 추가 아이템이 consumed 로 함께 산출된다.
+    const r = new Enhancer(alwaysSucceeds).enhance({ sword: s, supply: enough })
+    expect(r.outcome).toBe('success')
+    expect(r.consumed.gold).toBe(200)
+    // 비용 아이템 종류·수량이 모두 소모분에 담긴다(밸런스 값이 아니라 입력 픽스처의 파생이라 단언 가능).
+    expect(new Map(r.consumed.items.map((i) => [i.itemId, i.count]))).toEqual(
+      new Map([
+        ['sword_13', 1],
+        ['dark_matter', 5],
+      ]),
+    )
   })
 
   it('최종 단계(enchantCost null)는 강화할 수 없다 — throw', () => {

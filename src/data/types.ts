@@ -9,6 +9,13 @@ export type Material =
   | { kind: 'item'; itemId: string; count: number }
   | { kind: 'free' }
 
+// 강화 비용으로 추가 소모되는 아이템 1건(언어 중립). enchantCost(단일 Material)와 함께 소모된다 —
+// "골드 + 재료 여러 종" 같은 복합 비용을 표현하기 위한 보조 목록(SwordData.enchantCostItems).
+// Material 은 한 강화당 한 종류만 표현하므로(상점 price 와 공유), 그 union 을 건드리지 않고
+// 검 강화에 한정해 추가 아이템 요구를 둔다.
+//  - itemId / count: 추가로 소모할 아이템과 수량(count 는 양의 정수). 검(재료검)·잡템 모두 가능.
+export type ItemCost = { itemId: string; count: number }
+
 // 강화 실패(파괴) 시 드랍될 수 있는 아이템 후보 1건(언어 중립). 파괴 시 후보마다 chance 로 독립
 // 추첨해(가중 추첨 아님) 통과한 것들이 동시에 떨어진다 — 한 번에 0~N종이 산출될 수 있다.
 //  - itemId / count: 떨어질 아이템과 그 수량(count 는 양의 정수, 확률 통과 시 고정 수량)
@@ -200,6 +207,11 @@ export type SwordData = {
   level: number
   nameKey: TranslationKey
   enchantCost: Material | null // null = 최종 단계(강화 불가)
+  // 강화 시 enchantCost 와 함께 소모되는 추가 아이템 요구. 빈 배열 = 추가 요구 없음(기본).
+  // "골드 + 재료 여러 종"처럼 Material(단일 종류)로 표현 못 하는 복합 비용을 위해 둔다 —
+  // 엔진은 enchantCost(골드/아이템) + 이 목록을 모두 충족해야 강화 가능하고, 성공/헛방/방지/파괴
+  // 어느 결과든 (방지의 파괴보호장치처럼) 함께 차감한다. 최종 단계(enchantCost null)는 항상 [].
+  enchantCostItems: ItemCost[]
   successRate: number | null // 0~1, null = 최종 단계
   sellPrice: number | null // null = 판매 불가
   protectionTickets: number | 'disabled' // 'disabled' = 파괴보호장치 사용 불가

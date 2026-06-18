@@ -213,6 +213,7 @@
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 },
       { "itemId": "dark_matter", "count": 1, "chance": 0.7 }
     ],
+    "notes": ["storable"],
     "sprite": "blackwidow.png"
   },
   {
@@ -490,10 +491,13 @@
     "level": 25,
     "nextId": "sword_26",
     "enchantCost": {
-      "kind": "item",
-      "itemId": "sword_23",
-      "count": 1
+      "kind": "gold",
+      "amount": 1000000
     },
+    "enchantCostItems": [
+      { "itemId": "sword_13", "count": 1 },
+      { "itemId": "dark_matter", "count": 5 }
+    ],
     "successRate": 0.4,
     "sellPrice": 300000000,
     "protectionTickets": 23,

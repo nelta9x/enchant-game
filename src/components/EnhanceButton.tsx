@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
-import { useState } from 'react'
-import type { Material } from '../data/types'
+import { type ReactNode, useState } from 'react'
+import type { ItemCost, Material } from '../data/types'
 import { useHoldRepeat } from '../hooks/useHoldRepeat'
 import { useI18nStore, useT } from '../i18n'
 import { formatAmount, formatGold } from '../lib/format'
@@ -45,6 +45,7 @@ type EnhanceButtonProps = {
   chargeMs: number
   onEnhance: () => void
   enchantCost: Material | null
+  enchantCostItems: readonly ItemCost[]
 }
 
 export function EnhanceButton({
@@ -53,6 +54,7 @@ export function EnhanceButton({
   chargeMs,
   onEnhance,
   enchantCost,
+  enchantCostItems,
 }: EnhanceButtonProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
@@ -80,35 +82,48 @@ export function EnhanceButton({
     if (charging) setCooldownCycle((c) => c + 1)
   }
 
-  // 강화 조건 칩 — 골드/아이템만 표시(무료·최종 단계는 null). 아이콘+수량만 시각화하고 aria-label 로 설명.
+  // 강화 조건 칩 — 골드/아이템(enchantCost) + 추가 아이템(enchantCostItems)을 칩으로 나열한다.
+  // 무료·최종 단계(칩 0개)는 null. 아이콘+수량만 시각화하고 aria-label 로 전체 비용을 설명한다.
   const renderCost = () => {
-    if (enchantCost === null || enchantCost.kind === 'free') return null
-    const { icon, qty, label } =
-      enchantCost.kind === 'gold'
-        ? {
-            icon: <Coin className="h-5 w-5" />,
-            // 금화 아이콘이 통화를 대신하므로 단위 없이 금액만 표시. aria-label 엔 단위 포함(formatGold).
-            qty: formatAmount(enchantCost.amount),
-            label: formatGold(enchantCost.amount, lang),
-          }
-        : {
-            icon: <ItemIcon itemId={enchantCost.itemId} className="h-5 w-5" />,
-            qty: `×${enchantCost.count}`,
-            label: `${itemDisplayName(enchantCost.itemId, t)} ×${enchantCost.count}`,
-          }
+    type Chip = { key: string; icon: ReactNode; qty: string; label: string }
+    const chips: Chip[] = []
+    if (enchantCost !== null && enchantCost.kind === 'gold')
+      chips.push({
+        key: 'gold',
+        icon: <Coin className="h-5 w-5" />,
+        // 금화 아이콘이 통화를 대신하므로 단위 없이 금액만 표시. aria-label 엔 단위 포함(formatGold).
+        qty: formatAmount(enchantCost.amount),
+        label: formatGold(enchantCost.amount, lang),
+      })
+    else if (enchantCost !== null && enchantCost.kind === 'item')
+      chips.push({
+        key: enchantCost.itemId,
+        icon: <ItemIcon itemId={enchantCost.itemId} className="h-5 w-5" />,
+        qty: `×${enchantCost.count}`,
+        label: `${itemDisplayName(enchantCost.itemId, t)} ×${enchantCost.count}`,
+      })
+    for (const ec of enchantCostItems)
+      chips.push({
+        key: ec.itemId,
+        icon: <ItemIcon itemId={ec.itemId} className="h-5 w-5" />,
+        qty: `×${ec.count}`,
+        label: `${itemDisplayName(ec.itemId, t)} ×${ec.count}`,
+      })
+    if (chips.length === 0) return null // 무료·최종 단계
     return (
       <>
         <span className="relative h-px w-14 bg-gold-ink/30" aria-hidden />
         <span
-          className="relative flex items-center justify-center gap-1.5 text-sm font-bold tabular-nums text-white"
+          className="relative flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-bold tabular-nums text-white"
           style={{ textShadow: GOLD_OUTLINE }}
-          aria-label={`${t('cost.enhance')}: ${label}`}
+          aria-label={`${t('cost.enhance')}: ${chips.map((c) => c.label).join(', ')}`}
         >
-          {icon}
-          {/* 금액/수량 슬롯 고정(min-w) — 비용이 바뀌어도 칩 폭이 변하지 않게 자리를 미리 잡는다. */}
-          <span className="min-w-[4.5rem] whitespace-nowrap text-center">
-            {qty}
-          </span>
+          {chips.map((c) => (
+            <span key={c.key} className="flex items-center gap-1.5 whitespace-nowrap">
+              {c.icon}
+              {c.qty}
+            </span>
+          ))}
         </span>
       </>
     )
