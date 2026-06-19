@@ -327,8 +327,12 @@
     "nextId": "sword_20",
     "enchantCost": {
       "kind": "gold",
-      "amount": 500000
+      "amount": 200000
     },
+    "enchantCostItems": [
+      { "itemId": "flame_sword_handle", "count": 3 },
+      { "itemId": "sword_14", "count": 1 }
+    ],
     "successRate": 0.5,
     "sellPrice": 30000000,
     "protectionTickets": 10,
@@ -401,9 +405,8 @@
     "level": 22,
     "nextId": "sword_23",
     "enchantCost": {
-      "kind": "item",
-      "itemId": "sword_20",
-      "count": 1
+      "kind": "gold",
+      "amount": 2500000
     },
     "successRate": 0.4,
     "sellPrice": 101000000,
@@ -432,9 +435,8 @@
     "level": 23,
     "nextId": "sword_24",
     "enchantCost": {
-      "kind": "item",
-      "itemId": "sword_22",
-      "count": 2
+      "kind": "gold",
+      "amount": 3800000
     },
     "successRate": 0.4,
     "sellPrice": 160000000,
@@ -465,9 +467,8 @@
     "level": 24,
     "nextId": "sword_25",
     "enchantCost": {
-      "kind": "item",
-      "itemId": "iron_scrap",
-      "count": 80
+      "kind": "gold",
+      "amount": 5500000
     },
     "successRate": 0.4,
     "sellPrice": 230000000,

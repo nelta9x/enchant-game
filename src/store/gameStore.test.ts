@@ -47,20 +47,27 @@ describe('gameStore — 강화 적용 (seam)', () => {
     expect(store.getState().gold).toBeLessThan(before)
   })
 
-  it('성공: 재료검(sword_20)이 items에서 차감되고 단계가 오른다', () => {
-    // sword_22 는 재료(item) 비용 검 — 재료검이 items 에서 소모되는 seam 을 본다.
+  it('성공: 재료(item) 비용 검의 재료가 items에서 차감되고 단계가 오른다', () => {
+    // enchantCost.kind === 'item' 인 검(재료 비용 검)을 데이터에서 골라 seam 을 본다.
+    // 어느 검·어느 아이템이 재료 비용인지는 밸런스 값이므로 하드코딩하지 않는다.
+    const matSword = dataManager
+      .getSwords()
+      .find((s) => s.enchantCost?.kind === 'item')
+    expect(matSword).toBeDefined()
+    const cost = matSword!.enchantCost
+    if (cost?.kind !== 'item') throw new Error('expected an item-cost sword')
     const store = createGameStore({
       enhancer: ALWAYS_SUCCESS(),
       gold: 0,
-      currentSwordId: 'sword_22',
-      items: [{ itemId: 'sword_20', count: 2 }],
+      currentSwordId: matSword!.id,
+      items: [{ itemId: cost.itemId, count: cost.count + 1 }],
     })
-    const before = countOf(store.getState().items, 'sword_20')
+    const before = countOf(store.getState().items, cost.itemId)
     const r = store.getState().enhance(false)
     expect(r?.outcome).toBe('success')
     expect(store.getState().currentSwordId).toBe(r?.toId)
-    // 재료검이 items 에서 소모된다(소모 수량은 밸런스 값이므로 차감 방향만 본다).
-    expect(countOf(store.getState().items, 'sword_20')).toBeLessThan(before)
+    // 재료가 items 에서 소모된다(소모 수량은 밸런스 값이므로 차감 방향만 본다).
+    expect(countOf(store.getState().items, cost.itemId)).toBeLessThan(before)
   })
 
   it('파괴 후 인벤토리에 검이 없으면 시작 검(+1)으로 재시작 + dropOnFail 은 대기분(pendingDrops)으로', () => {
@@ -304,10 +311,14 @@ describe('gameStore — canEnhance 게이팅', () => {
     expect(store.getState().canEnhance(false)).toBe(false)
   })
 
-  it('재료검이 없으면 강화 불가', () => {
-    // level 22 비용 sword_20 ×1을 보유하지 않음(골드는 충분).
+  it('재료(item) 비용 검은 재료가 없으면 강화 불가', () => {
+    // enchantCost.kind === 'item' 인 검을 데이터에서 골라, 재료 미보유 시 게이팅을 본다(골드는 충분).
+    const matSword = dataManager
+      .getSwords()
+      .find((s) => s.enchantCost?.kind === 'item')
+    expect(matSword).toBeDefined()
     const store = createGameStore({
-      currentSwordId: 'sword_22',
+      currentSwordId: matSword!.id,
       gold: 999_999_999,
       items: [],
     })
