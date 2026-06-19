@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { type ReactNode, useState } from 'react'
+import { memo, type ReactNode, useState } from 'react'
 import type { ItemCost, Material } from '../data/types'
 import { useHoldRepeat } from '../hooks/useHoldRepeat'
 import { useI18nStore, useT } from '../i18n'
@@ -48,7 +48,7 @@ type EnhanceButtonProps = {
   enchantCostItems: readonly ItemCost[]
 }
 
-export function EnhanceButton({
+export const EnhanceButton = memo(function EnhanceButton({
   disabled,
   charging,
   chargeMs,
@@ -181,4 +181,4 @@ export function EnhanceButton({
       />
     </motion.button>
   )
-}
+})

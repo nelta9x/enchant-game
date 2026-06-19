@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 
 // 우측 액션 열의 보조 액션 버튼(현재 판매) — 단일 라벨 + 활성/비활성 스타일.
 // 라벨·핸들러만 갈아끼우면 다른 보조 액션에도 재사용 가능한 일반 버튼이다.
@@ -11,7 +11,7 @@ type ActionButtonProps = {
   className?: string
 }
 
-export function ActionButton({
+export const ActionButton = memo(function ActionButton({
   disabled,
   onClick,
   children,
@@ -31,4 +31,4 @@ export function ActionButton({
       {children}
     </button>
   )
-}
+})

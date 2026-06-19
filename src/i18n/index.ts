@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import { ko, type TranslationKey } from './locales/ko'
 import { en } from './locales/en'
@@ -25,7 +26,9 @@ export const useI18nStore = create<I18nState>((set) => ({
 // resources 가 모든 키를 보유하도록 타입 강제되므로 항상 string을 반환한다.
 export function useT() {
   const lang = useI18nStore((s) => s.lang)
-  return (key: TranslationKey) => resources[lang][key]
+  // lang 이 바뀔 때만 새 함수를 만든다 — t 식별자를 안정화해 t 를 prop/deps 로 받는 자식(React.memo)이
+  // 매 렌더 깨지지 않게 한다(값은 동일 — 같은 키엔 같은 문자열).
+  return useMemo(() => (key: TranslationKey) => resources[lang][key], [lang])
 }
 
 export { resources }

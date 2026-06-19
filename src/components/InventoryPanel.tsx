@@ -1,4 +1,4 @@
-import type { Ref } from 'react'
+import { memo, type Ref } from 'react'
 import { dataManager } from '../data/DataManager'
 import { useT, type TranslationKey } from '../i18n'
 import type { SwordData } from '../data/types'
@@ -34,7 +34,7 @@ type InventoryPanelProps = {
   goldRef: Ref<HTMLDivElement>
 }
 
-export function InventoryPanel({
+export const InventoryPanel = memo(function InventoryPanel({
   sword,
   level,
   items,
@@ -88,7 +88,7 @@ export function InventoryPanel({
       </ul>
     </div>
   )
-}
+})
 
 // 장착 중인 검 — 금색 하이라이트가 곧 "장착 중" 표시다(별도 배지·성공률 없음).
 // 보관 가능(storable)하면 행 전체가 버튼이 되어 클릭 시 보관한다(ItemRow 검 행의 장착 버튼과 동일

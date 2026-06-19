@@ -7,11 +7,14 @@ import {
   type RefObject,
 } from 'react'
 import { dataManager } from '../data/DataManager'
+import type { ItemCost } from '../data/types'
 import { useActionHotkeys } from '../hooks/useActionHotkeys'
 import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
+import { useStableCallback } from '../hooks/useStableCallback'
 import { useT, type TranslationKey } from '../i18n'
 import { countOf, PROTECTION_TICKET_ID } from '../lib/items'
 import { sound } from '../lib/sound'
+import { useShallow } from 'zustand/shallow'
 import { useEffectStore } from '../store/effectStore'
 import {
   latestRunning,
@@ -82,15 +85,27 @@ function projectBurst(e: Effect): ShakeBurstEvent | null {
     : null
 }
 
-// 실행 중 버스트 효과(성공·파괴)를 전부 이벤트로 투영한다 — 각 효과가 burstAt 에 파티클을 emit 해야 하므로
-// (runningEventsOf: 겹친 옛 버스트 유실 방지) 최신 1개가 아니라 해당 kind 를 전부 뽑는다. 잔상 비주얼은
+// 좁혀 구독한 버스트 효과 리스트(성공·파괴)를 전부 이벤트로 투영한다 — 각 효과가 burstAt 에 파티클을
+// emit 해야 하므로(겹친 옛 버스트 유실 방지) 최신 1개가 아니라 리스트 전체를 뽑는다. 잔상 비주얼은
 // 이와 달리 최신 1개만 그린다(latestBurstEvent) — 잔상/파티클의 다중성이 달라 분리한다.
-function toBurstEvents(running: Effect[], kind: string): ShakeBurstEvent[] {
-  return runningEventsOf(running, kind).flatMap((e) => {
+function projectBursts(list: Effect[]): ShakeBurstEvent[] {
+  return list.flatMap((e) => {
     const ev = projectBurst(e)
     return ev ? [ev] : []
   })
 }
+
+// ANNOUNCE_KEY 에 해당하는 running 효과 중 최신(id 최대) 1개 — 스크린리더 알림 문구의 출처(좁힌 구독용).
+function latestAnnounce(running: Effect[]): Effect | null {
+  let best: Effect | null = null
+  for (const e of running) {
+    if (e.kind in ANNOUNCE_KEY && (best === null || e.id > best.id)) best = e
+  }
+  return best
+}
+
+// enchantCostItems 의 기본 빈 배열 — 매 렌더 새 [](`?? []`)를 만들면 EnhanceButton 의 memo 가 깨진다.
+const EMPTY_ITEM_COSTS: readonly ItemCost[] = []
 
 // 클릭 순간 캡처한 카드 rect 를 고정해 두는 보이지 않는 비행 출발 anchor(영점 크기·클릭 통과).
 // 의뢰 완료의 코인·아이템 보상 연출이 공유한다 — 카드가 active 에서 빠져 사라진 뒤에도
@@ -139,10 +154,32 @@ export function GameScreen() {
   const protectionArmed = useUiStore((s) => s.protectionArmed)
   const toggleProtection = useUiStore((s) => s.toggleProtection)
 
-  // 연출(Effect) 시스템 — 강화 버튼 잠금은 lockCount(>0이면 잠금), 연출 트리거는 running 에서.
+  // 연출(Effect) 시스템 — 강화 버튼 잠금은 lockCount(>0이면 잠금). 연출 트리거는 running 전체를 구독하지
+  // 않고 kind 별로 좁혀 구독한다 — 효과 객체는 enqueue 시 1회 생성돼 finish 까지 참조가 불변이라
+  // (latestRunning=Object.is / runningEventsOf=useShallow) 해당 kind 가 바뀔 때만 값이 바뀐다. 덕분에
+  // 무관한 효과(enhanceLock 등)의 시작/종료가 검 스테이지·오버레이를 리렌더시키지 않고, 파생값이 참조
+  // 안정적이라 자식(React.memo)이 바뀐 트리거만 재조정한다 — 단일 running 구독이 매 전이마다 전체 트리를
+  // 재조정하던 "검 변경 리렌더 폭풍"을 끊는다.
   const enqueueEffect = useEffectStore((s) => s.enqueueEffect)
   const lockCount = useEffectStore((s) => s.lockCount)
-  const running = useEffectStore((s) => s.running)
+  const hammerStrikeFx = useEffectStore((s) => latestRunning(s.running, 'hammerStrike'))
+  const coinFlightFx = useEffectStore((s) => latestRunning(s.running, 'coinFlight'))
+  const itemFlightFx = useEffectStore((s) => latestRunning(s.running, 'itemFlight'))
+  const dropFx = useEffectStore((s) => latestRunning(s.running, 'drop'))
+  const entranceFx = useEffectStore((s) => latestRunning(s.running, 'entranceSuppress'))
+  const protectedFx = useEffectStore((s) => latestRunning(s.running, 'protectedShake'))
+  const whiffFx = useEffectStore((s) => latestRunning(s.running, 'whiffShake'))
+  const successLatestFx = useEffectStore((s) => latestRunning(s.running, 'successBurst'))
+  const destructionLatestFx = useEffectStore((s) =>
+    latestRunning(s.running, 'destruction'),
+  )
+  const successFxList = useEffectStore(
+    useShallow((s) => runningEventsOf(s.running, 'successBurst')),
+  )
+  const destructionFxList = useEffectStore(
+    useShallow((s) => runningEventsOf(s.running, 'destruction')),
+  )
+  const announceFx = useEffectStore((s) => latestAnnounce(s.running))
 
   const sword =
     currentSwordId !== null
@@ -170,10 +207,14 @@ export function GameScreen() {
   // 보호 결계 상태(보호불가/부족/대기/발동) — 흩어진 조건 대신 순수 코어 한 곳에서 계산한다.
   // 검이 없으면 'disabled'(이 단계 보호 불가)로 본다. 실제 강화 적용 여부는 armed 일 때만.
   const ownedTickets = countOf(items, PROTECTION_TICKET_ID)
-  const protection = protectionState(
-    sword ? sword.protectionTickets : 'disabled',
-    ownedTickets,
-    protectionArmed,
+  const protection = useMemo(
+    () =>
+      protectionState(
+        sword ? sword.protectionTickets : 'disabled',
+        ownedTickets,
+        protectionArmed,
+      ),
+    [sword, ownedTickets, protectionArmed],
   )
   const effectiveProtection = isProtectionActive(protection)
   const canEnhance = canEnhanceFn(effectiveProtection)
@@ -274,8 +315,7 @@ export function GameScreen() {
   // (보관·장착·판매·방지)는 heldSwordId 가 null 이라 currentSwordId 를 즉시 따른다(별도 처리 불필요).
   // 새 스프라이트 등장 지연(초)은 entranceSuppress 효과 payload(= 이번 강화의 burstAt)에서 읽는다 —
   // 잔상 소멸과 정확히 같은 burstAt 을 써 정확히 교대시킨다(강화 전/후 검 동시 노출 방지의 단일 출처).
-  const entranceDelaySec =
-    latestRunning(running, 'entranceSuppress')?.payload?.entranceDelaySec ?? 0
+  const entranceDelaySec = entranceFx?.payload?.entranceDelaySec ?? 0
   const [heldSwordId, setHeldSwordId] = useState<string | null>(null)
   const revealedSwordId = heldSwordId ?? currentSwordId
   const revealedSword =
@@ -294,10 +334,8 @@ export function GameScreen() {
 
   // originEl 은 코인 비행의 "출발점"(연출 전용·선택)이다 — 납품(검 소모·보상·생명주기)은 store 가 소유하며
   // 엘리먼트 유무와 무관하게 진행된다. 연출 엘리먼트에 게임 액션을 묶지 않는다(키보드 납품이 막히던 버그의 근본 차단).
-  const handleFulfill = (
-    commission: Commission,
-    originEl: HTMLElement | null,
-  ) => {
+  const handleFulfill = useStableCallback(
+    (commission: Commission, originEl: HTMLElement | null) => {
     // 생명주기·검 소모는 store 가 소유 — 수락(true)일 때만 연출을 띄운다.
     if (!useCommissionStore.getState().fulfill(commission.id)) return
     // 보상 획득 '짤랑' 효과음 — 판매와 동일(검·재료를 내주고 보상을 받는 순간).
@@ -327,9 +365,9 @@ export function GameScreen() {
         itemId: commission.reward.itemId,
       })
     }
-  }
+  })
 
-  const handleSell = () => {
+  const handleSell = useStableCallback(() => {
     const price = sell()
     if (price === null || price <= 0) return
     // 판매 성사 '차칭' 효과음 — 판매한 순간 1회(코인 착지음 coin_pickup 은 연출 중 코인마다 별도로 울린다).
@@ -344,7 +382,7 @@ export function GameScreen() {
     })
     setGoldPulse((p) => ({ key: p.key + 1, count: coinCount(price) }))
     showGoldGain(price)
-  }
+  })
 
   // 검이 검 박스에서 인벤토리로 빨려 들어가는 연출(보관·장착 공용·병렬·비잠금). 코인 비행과 동일하게
   // Effect 시스템으로 구동한다 — 어떤 검이 나는지는 itemId(= 나가는 검의 sword id)로 전한다.
@@ -358,22 +396,22 @@ export function GameScreen() {
     })
 
   // 보관 — 현재 검을 가방으로. 나가는 검(변이 전 currentSwordId)을 캡처해 비행 연출을 띄운다.
-  const handleStore = () => {
+  const handleStore = useStableCallback(() => {
     if (!canStore) return // store() 와 동일 게이트(시작 검·검 없음이면 보관할 게 없음)
     const outgoing = currentSwordId
     store()
     if (outgoing) enqueueItemFlight(outgoing)
-  }
+  })
 
   // 장착 — 가방의 검을 끼우면 현재 검이 가방으로 옮겨진다(equip → bankOutgoing). 그 나가는 검도
   // 인벤토리로 빨려 드는 연출을 띄운다. 단, 시작 검(sword_1)은 가방에 들어가지 않고 버려지므로 제외.
-  const handleEquip = (itemId: string) => {
+  const handleEquip = useStableCallback((itemId: string) => {
     const outgoing = canStore ? currentSwordId : null
     equip(itemId)
     if (outgoing) enqueueItemFlight(outgoing)
-  }
+  })
 
-  const handleEnhance = () => {
+  const handleEnhance = useStableCallback(() => {
     // 쿨다운(재강화 가드) 중 들어온 강화는 무시한다 — 버튼이 더 이상 disabled 가 아니라(클릭/Enter 가능)
     // 쿨다운 오버레이만 덮으므로, 이 가드로 '쿨다운 중 단발 입력'을 no-op 으로 만든다(요구사항: 재강화는
     // UI 가드만으로 막는다 — 게임 로직은 불변). hold 연사는 useHoldRepeat 가 동일 게이팅.
@@ -565,7 +603,7 @@ export function GameScreen() {
       // 재강화 가드는 성공·파괴·방지와 동일하게 건다.
       lockEnhance()
     }
-  }
+  })
 
   // 데스크탑에서 스페이스바 = 강화(상점이 닫혀 있을 때만, 강화 버튼과 동일한 게이트를 따른다).
   useEnhanceHotkey({
@@ -583,65 +621,65 @@ export function GameScreen() {
     onOpenShop: openShop,
   })
 
-  // 연출 트리거는 effectStore 의 running 에서 뽑는다(생명주기·타이밍은 Effect 시스템이 소유). 대부분은
-  // "가장 최근" 1개만(latestRunning — 겹친 새 효과 유실 방지)이지만, 성공·파괴 버스트는 running 의 해당
-  // 효과를 전부 렌더한다(toBurstEvents) — 각 버스트가 자기 burstAt(임팩트 + 무작위 떨림 뒤)에 한 번씩
-  // emit 되도록(유실 방지). 최신 1개만 두면 잠금 해제 직후 재강화 시 옛 버스트의 emit 이 발사 전에 잘려
-  // 안 나올 수 있다. 재강화 잠금(lockMs = 버스트 + 가드 ~100ms)은 버스트 효과 수명(burstLifetimeMs =
-  // 버스트 + 파티클 비행 ~660ms)보다 짧아 빠른 재강화 시 버스트 효과가 running 에 여러 개 겹칠 수 있지만,
-  // 파티클 풀은 새 emit 마다 이전 버스트를 교체(replace)하므로 화면엔 늘 최신 한 벌만 보인다(겹침 없음).
-  // 주의: flatMap 이 running 변경마다 새 이벤트 객체를 만들어 각 연출의 useOneShot 백스톱 타이머가 매번
-  // 리셋되지만 무해하다 — 실제 unmount 는 effectStore 의 _finish(durationMs)가 소유하고 백스톱은 보조다.
+  // 연출 트리거 투영 — 위에서 kind 별로 좁혀 구독한 효과를 뷰가 쓰는 이벤트로 옮긴다. 입력 효과 참조가
+  // 안정적이라 각 useMemo 는 해당 트리거가 바뀔 때만 새 값을 낸다(무관한 효과 전이엔 참조 유지 → 자식
+  // memo 가 바뀐 오버레이만 재조정). 성공·파괴 버스트는 겹친 옛 버스트가 유실되지 않도록 해당 kind 를
+  // 전부 투영한다(각 효과가 자기 burstAt 에 emit). 잔상(ShakeAfterimage)은 이와 달리 최신 1개만 그린다.
   const destructionEvents = useMemo<DestructionEvent[]>(
-    () => toBurstEvents(running, 'destruction'),
-    [running],
+    () => projectBursts(destructionFxList),
+    [destructionFxList],
   )
   const successEvents = useMemo<SuccessEvent[]>(
-    () => toBurstEvents(running, 'successBurst'),
-    [running],
+    () => projectBursts(successFxList),
+    [successFxList],
   )
-  // 잔상(떨림→팝업)은 영속 단일 노드(ShakeAfterimage)가 그린다 — 색 무관(파티클만 색이 다름)이라 성공·파괴를
-  // 합쳐 "가장 최근" 버스트 1개만 그린다(망치·HitSpark 와 같은 latest 패턴). 연사로 버스트가 겹쳐도 잔상은
-  // 최신으로 하드 컷되고, 옛 버스트의 파티클은 위 emitter(successEvents/destructionEvents .map)가 책임진다.
+  // 잔상(떨림→팝업)은 영속 단일 노드가 성공·파괴를 합쳐 "가장 최근" 버스트 1개만 그린다(id 큰 쪽이 최신).
   const latestBurstEvent = useMemo<ShakeBurstEvent | null>(() => {
-    const s = latestRunning(running, 'successBurst')
-    const d = latestRunning(running, 'destruction')
-    const fx = s && d ? (s.id > d.id ? s : d) : (s ?? d) // id 단조 증가 — 큰 쪽이 최신
+    const fx =
+      successLatestFx && destructionLatestFx
+        ? successLatestFx.id > destructionLatestFx.id
+          ? successLatestFx
+          : destructionLatestFx
+        : (successLatestFx ?? destructionLatestFx)
     return fx ? projectBurst(fx) : null
-  }, [running])
-  const coinFlightEvent = useMemo<CoinFlightEvent | null>(() => {
-    const fx = latestRunning(running, 'coinFlight')
-    return fx ? { id: fx.id, coinCount: fx.payload?.coinCount ?? 0 } : null
-  }, [running])
-  const itemFlightEvent = useMemo<ItemFlightEvent | null>(() => {
-    const fx = latestRunning(running, 'itemFlight')
-    return fx?.payload?.itemId ? { id: fx.id, itemId: fx.payload.itemId } : null
-  }, [running])
-  const hammerStrikeEvent = useMemo<HammerStrikeEvent | null>(() => {
-    const fx = latestRunning(running, 'hammerStrike')
-    return fx ? { id: fx.id } : null
-  }, [running])
-  const dropEvent = useMemo<DropEvent | null>(() => {
-    const fx = latestRunning(running, 'drop')
-    return fx?.payload?.drops?.length
-      ? {
-          id: fx.id,
-          drops: fx.payload.drops,
-          // 재료 등장 시각(버스트 후) — 이번 강화의 무작위 떨림 길이를 반영한 타임라인 값.
-          appearDelaySec: fx.payload.appearDelaySec ?? 0,
-        }
-      : null
-  }, [running])
-  // 드롭 연출이 끝나면(running 에서 'drop' 효과가 빠져 dropEvent 가 null 이 됨) 미수집 대기분을
-  // 인벤토리로 회수한다(연출 완료 콜백이 누락돼도 유실 0). flushDrops 는 멱등 — 빈 대기분이면 무변화.
+  }, [successLatestFx, destructionLatestFx])
+  const coinFlightEvent = useMemo<CoinFlightEvent | null>(
+    () =>
+      coinFlightFx
+        ? { id: coinFlightFx.id, coinCount: coinFlightFx.payload?.coinCount ?? 0 }
+        : null,
+    [coinFlightFx],
+  )
+  const itemFlightEvent = useMemo<ItemFlightEvent | null>(
+    () =>
+      itemFlightFx?.payload?.itemId
+        ? { id: itemFlightFx.id, itemId: itemFlightFx.payload.itemId }
+        : null,
+    [itemFlightFx],
+  )
+  const hammerStrikeEvent = useMemo<HammerStrikeEvent | null>(
+    () => (hammerStrikeFx ? { id: hammerStrikeFx.id } : null),
+    [hammerStrikeFx],
+  )
+  const dropEvent = useMemo<DropEvent | null>(
+    () =>
+      dropFx?.payload?.drops?.length
+        ? {
+            id: dropFx.id,
+            drops: dropFx.payload.drops,
+            // 재료 등장 시각(버스트 후) — 이번 강화의 무작위 떨림 길이를 반영한 타임라인 값.
+            appearDelaySec: dropFx.payload.appearDelaySec ?? 0,
+          }
+        : null,
+    [dropFx],
+  )
+  // 드롭 연출이 끝나면(dropFx 가 빠져 dropEvent 가 null) 미수집 대기분을 인벤토리로 회수한다(멱등 — 빈
+  // 대기분이면 무변화). 연출 완료 콜백이 누락돼도 유실 0.
   useEffect(() => {
     if (dropEvent === null) flushDrops()
   }, [dropEvent, flushDrops])
-  // 실제 검 떨림은 방지(protected)·헛방(whiff) 공통(둘 다 "떨림만" 안무) — 둘 중 최신 효과로 구동한다
-  // (id 단조 증가 → 큰 쪽이 최신, latestBurstEvent 합치기 패턴 재사용). 단, 결계(파괴보호) 플레어는
-  // 방지일 때만 번쩍여야 하므로 protectedFx 만 따로 둔다(blockKey).
-  const protectedFx = latestRunning(running, 'protectedShake')
-  const whiffFx = latestRunning(running, 'whiffShake')
+  // 실제 검 떨림은 방지(protected)·헛방(whiff) 공통 — 둘 중 최신 효과로 구동한다(id 큰 쪽이 최신). 단,
+  // 결계(파괴보호) 플레어는 방지일 때만 번쩍여야 하므로 protectedFx 만 따로 둔다(blockKey).
   const shakeFx =
     protectedFx && whiffFx
       ? protectedFx.id > whiffFx.id
@@ -650,21 +688,72 @@ export function GameScreen() {
       : (protectedFx ?? whiffFx)
   const shakeKey = shakeFx?.id ?? 0
   const shakeImpactSec = (shakeFx?.payload?.impactMs ?? 0) / 1000
-  // payload.shakeMs 가 실제 떨림 길이다(방지·헛방 효과가 돌 때만 의미). 폴백(효과 없음 → shakeKey 0 이라 안 흔듦)은
-  // 현재 검 레벨대의 최소 떨림이면 충분하다.
+  // payload.shakeMs 가 실제 떨림 길이(방지·헛방 효과가 돌 때만 의미). 폴백은 현재 검 레벨대 최소 떨림.
   const shakeDurationSec =
     (shakeFx?.payload?.shakeMs ??
       shakeRangeForLevel(anim.shakeBands, sword?.level ?? 1).minMs) / 1000
-  // 결계(파괴보호) 플레어는 방지(protected)일 때만 — 헛방은 결계를 번쩍이지 않는다.
   const blockKey = protectedFx?.id ?? 0
 
   // 결과를 스크린리더에 알린다(시각 연출은 aria-hidden). 가장 최근 알림 대상 효과의 문구.
-  let announceFx: { id: number; kind: string } | null = null
-  for (const e of running) {
-    if (e.kind in ANNOUNCE_KEY && (announceFx === null || e.id > announceFx.id))
-      announceFx = e
-  }
   const announcement = announceFx ? t(ANNOUNCE_KEY[announceFx.kind]) : ''
+
+  // 보호 결계 prop·스프라이트 오버레이를 메모화해 SwordStage(memo)가 무관한 전이에 재조정되지 않게 한다.
+  // protectionProp 은 protection 상태/blockKey 가, spriteOverlay 는 해당 오버레이 트리거가 바뀔 때만 새로
+  // 만들어진다 — 그 외(enhanceLock 전이 등)엔 참조가 유지돼 SwordStage 가 바로 bail 한다.
+  const protectionProp = useMemo(
+    () => ({
+      state: protection,
+      onToggle: toggleProtection,
+      onShop: openShop,
+      blockKey,
+      flareDelaySec: anim.hammerImpactMs / 1000,
+    }),
+    [protection, toggleProtection, openShop, blockKey, anim],
+  )
+  const spriteOverlay = useMemo(
+    () => (
+      <>
+        {/* 파티클 풀 — 성공/파괴 버스트 도트(데이터 플래그로 on/off). 풀이 없으면 emit 은 자동 no-op. */}
+        {anim.enhanceParticlesEnabled && <ParticlePool />}
+        {/* 버스트 emit — 재강화 시 옛 버스트 emitter 유지(id 키잉, 렌더 null·풀이 그림). */}
+        {destructionEvents.map((ev) => (
+          <DestructionEffect key={ev.id} event={ev} />
+        ))}
+        {successEvents.map((ev) => (
+          <SuccessEffect key={ev.id} event={ev} />
+        ))}
+        {/* 잔상(떨림→팝업·소멸) — 영속 단일 캔버스가 최신 버스트를 그린다(레이어 churn 0, burstAt 에 교대). */}
+        <ShakeAfterimage event={latestBurstEvent} />
+        {/* 망치 — 결과 연출 위. impactMs 로 닿는 시점을 데이터에서 받는다(플래그로 on/off). */}
+        {anim.hammerSwingEnabled && (
+          <HammerStrike
+            event={hammerStrikeEvent}
+            impactMs={anim.hammerImpactMs}
+            shape={hammerShape}
+            smearEnabled={anim.hammerSmearEnabled}
+          />
+        )}
+        {/* Hit 불꽃 — 임팩트에 1회 폭발. 망치보다 "위"(나중 형제)에 둬 화구·불혀가 가려지지 않게(플래그). */}
+        {anim.enhanceParticlesEnabled && (
+          <HitSparkCanvas
+            event={hammerStrikeEvent}
+            impactMs={anim.hammerImpactMs}
+          />
+        )}
+        {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면. */}
+        <FloatingTextEffect event={floatingText} />
+      </>
+    ),
+    [
+      anim,
+      destructionEvents,
+      successEvents,
+      latestBurstEvent,
+      hammerStrikeEvent,
+      hammerShape,
+      floatingText,
+    ],
+  )
 
   // lg+(데스크탑)에선 바깥 패딩을 없애 카드가 브라우저를 꽉 채우게 한다 — 베젤(검정) 여백 제거.
   // <lg(세로형)에선 베젤 프레임을 유지한다.
@@ -737,63 +826,8 @@ export function GameScreen() {
                 // blockKey 는 protectedShake(방지) 전용 트리거 — 막아낸 순간 결계가 번쩍인다. 헛방(whiffShake)은
                 // 검만 떨고(shakeKey 공유) 결계는 번쩍이지 않으므로 shakeKey 가 아니라 blockKey 를 쓴다.
                 // 플레어는 망치가 닿는 순간(impact)에 맞춰 늦춘다(막아냄은 임팩트에 일어난다).
-                protection={{
-                  state: protection,
-                  onToggle: toggleProtection,
-                  onShop: openShop,
-                  blockKey: blockKey,
-                  flareDelaySec: anim.hammerImpactMs / 1000,
-                }}
-                spriteOverlay={
-                  <>
-                    {/* 파티클 풀 — 성공/파괴 버스트 도트를 캔버스 한 장에 그린다(Hit 불꽃은 별개 HitSparkCanvas — 맨 뒤에 둬
-                        검·잔상 위에 파티클이 얹히도록). 풀은 항상 마운트, 소비자가 emit 으로 재생을 요청한다.
-                        데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 — 풀이 없으면 버스트 emit 은
-                        자동 no-op(particleEmit.ts). 잔상 떨림·교대(ShakeBurstEffect)는 영향 없음. */}
-                    {anim.enhanceParticlesEnabled && <ParticlePool />}
-                    {/* 버스트 파티클 emit — 재강화 시 옛 버스트 emitter 가 유지돼야 대기 중 emit 이 안 잘려서, 각
-                        효과를 id 로 키잉해 독립적으로 burstAt 에 emit 한다. 렌더 null(파티클은 풀이 그림)이라
-                        다중·교체에도 레이어 churn 이 없고, 풀은 새 emit 마다 이전 버스트를 교체(replace)하므로
-                        화면엔 최신 한 벌만 보인다. 잔상 비주얼은 아래 영속 노드가 따로 그린다. */}
-                    {destructionEvents.map((ev) => (
-                      <DestructionEffect key={ev.id} event={ev} />
-                    ))}
-                    {successEvents.map((ev) => (
-                      <SuccessEffect key={ev.id} event={ev} />
-                    ))}
-                    {/* 잔상(떨림→팝업·소멸) — 성공·파괴 공통의 영속 단일 캔버스 한 장이 가장 최근 버스트를
-                        그린다(강화마다 마운트/언마운트하지 않아 모바일 교체 프레임 레이어 churn 제거). 소멸
-                        순간 새 검(entranceDelay)과 같은 burstAt 으로 정확히 교대된다. */}
-                    <ShakeAfterimage event={latestBurstEvent} />
-                    {/* 망치는 결과 연출 위에 그린다. impactMs 로 닿는 시점을 데이터에서 받는다(떨림·불꽃·
-                        타격음과 동일 앵커). 데이터 플래그(hammerSwingEnabled)로 끌 수 있다 — 마운트 자체를
-                        차단하며, 임팩트 앵커(떨림·Hit 불꽃·'캉')는 이 컴포넌트와 무관하게 타임라인이 구동한다. */}
-                    {anim.hammerSwingEnabled && (
-                      <HammerStrike
-                        event={hammerStrikeEvent}
-                        impactMs={anim.hammerImpactMs}
-                        shape={hammerShape}
-                        // 모션 블러 스미어 on/off — 데이터 플래그(animation.json). 망치 본체 스윙은 유지.
-                        smearEnabled={anim.hammerSmearEnabled}
-                      />
-                    )}
-                    {/* Hit 불꽃 — 망치 내려치기 이벤트를 받아 impact 순간 불티·잉걸불·화구·불혀를 캔버스에 1회 폭발.
-                        가는 불티 다수가 작은 스테이지에서 DOM 으론 묻혀 캔버스로 그린다(성공/실패는 별개 캔버스 ParticlePool).
-                        ⚠️ 망치보다 "뒤"(DOM 아래)가 아니라 위에 둔다 — 불꽃의 화구·불혀는 임팩트 중심에서
-                        피어나는데, 바로 그 자리에 망치 머리가 닿아 정지(holdAfter)하므로 망치 뒤에 깔면 핵심
-                        연출이 통째로 가려진다. 임팩트 섬광이 잠깐(≤0.2s) 망치 머리를 삼키는 것이 의도된 강렬함.
-                        paint order 의존을 의도적으로 고정(HitSparkCanvas 가 나중 형제라 망치 위에 그려진다).
-                        데이터 플래그(enhanceParticlesEnabled)로 끌 수 있다 — 마운트 자체를 차단. */}
-                    {anim.enhanceParticlesEnabled && (
-                      <HitSparkCanvas
-                        event={hammerStrikeEvent}
-                        impactMs={anim.hammerImpactMs}
-                      />
-                    )}
-                    {/* 결과 텍스트("아이구!...")는 망치·결과 연출 위 최전면에 띄운다. */}
-                    <FloatingTextEffect event={floatingText} />
-                  </>
-                }
+                protection={protectionProp}
+                spriteOverlay={spriteOverlay}
                 // 새 검 등장 지연 = 이번 강화의 burstAt(entranceSuppress payload). 잔상이 소멸하는 그 순간
                 // 드러나듯 등장한다(같은 burstAt 을 써 정확히 교대 → 강화 전/후 검 동시 노출 없음).
                 entranceDelay={entranceDelaySec}
@@ -837,7 +871,7 @@ export function GameScreen() {
                 chargeMs={lastLockMs}
                 onEnhance={handleEnhance}
                 enchantCost={sword?.enchantCost ?? null}
-                enchantCostItems={sword?.enchantCostItems ?? []}
+                enchantCostItems={sword?.enchantCostItems ?? EMPTY_ITEM_COSTS}
               />
               {/* 세로형(<lg)에선 판매 버튼 높이를 ~30% 키운다(min-h ≈ 2.92rem×1.3). 데스크탑은
                   고정 높이 2fr:1fr 그리드가 높이를 정하므로 lg:min-h-0 으로 리셋(영향 없음). */}

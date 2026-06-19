@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { memo, useCallback, useRef } from 'react'
 import { motion } from 'motion/react'
 import { dataManager } from '../data/DataManager'
 import { useT } from '../i18n'
@@ -23,7 +23,7 @@ type CommissionBarProps = {
   hotkeysEnabled: boolean
 }
 
-export function CommissionBar({
+export const CommissionBar = memo(function CommissionBar({
   onFulfill,
   hotkeysEnabled,
 }: CommissionBarProps) {
@@ -116,7 +116,7 @@ export function CommissionBar({
       </div>
     </div>
   )
-}
+})
 
 function CommissionCard({
   slotIndex,

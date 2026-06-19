@@ -1,10 +1,13 @@
+import { memo } from 'react'
 import { LANGS, useI18nStore, useT } from '../i18n'
 import { RecordGauge } from './RecordGauge'
 
 // 상단 컨트롤. 좌: 언어 토글, 가운데: 역대 최고 강화 게이지, 우: 상점(클릭 시 상점 팝업 열기).
 type TopControlsProps = { onOpenShop: () => void }
 
-export function TopControls({ onOpenShop }: TopControlsProps) {
+export const TopControls = memo(function TopControls({
+  onOpenShop,
+}: TopControlsProps) {
   const t = useT()
   return (
     <div className="flex items-center gap-2">
@@ -27,7 +30,7 @@ export function TopControls({ onOpenShop }: TopControlsProps) {
       </button>
     </div>
   )
-}
+})
 
 function Segmented<T extends string>({
   options,

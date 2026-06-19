@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -57,7 +58,7 @@ type SwordStageProps = {
 const HEX =
   'polygon(0% 50%, 16px 0%, calc(100% - 16px) 0%, 100% 50%, calc(100% - 16px) 100%, 16px 100%)'
 
-export function SwordStage({
+export const SwordStage = memo(function SwordStage({
   sword,
   level,
   displaySword = sword,
@@ -333,4 +334,4 @@ export function SwordStage({
       </div>
     </div>
   )
-}
+})
