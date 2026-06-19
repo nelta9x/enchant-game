@@ -330,7 +330,7 @@
       "amount": 200000
     },
     "enchantCostItems": [
-      { "itemId": "flame_sword_handle", "count": 3 },
+      { "itemId": "flame_sword_handle", "count": 1 },
       { "itemId": "sword_14", "count": 1 }
     ],
     "successRate": 0.5,
