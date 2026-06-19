@@ -628,7 +628,7 @@
     "enchantCost": {
       "kind": "free"
     },
-    "successRate": 0.15,
+    "successRate": 0.5,
     "sellPrice": null,
     "protectionTickets": "disabled",
     "whiffWeight": 3,
