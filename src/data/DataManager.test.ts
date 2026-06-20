@@ -180,16 +180,22 @@ describe('검 아이콘 ↔ 스프라이트 무결성', () => {
   })
 })
 
-// 강화 비용 점진성: 재료(item) 비용이 고단계 전용으로 "갑자기" 등장하지 않고 중반(10레벨대 이하)에도
+// 강화 비용 점진성: 재료 비용이 고단계 전용으로 "갑자기" 등장하지 않고 중반(10레벨대 이하)에도
 // 한 번은 도입돼 있어야 한다 — 플레이어가 본격 재료 비용(고단계) 전에 "재료도 비용이 된다"를 학습할
 // 자리를 보장하는 디자인 불변식. 도입 레벨·수량(count)은 디자이너 튜닝 영역이라 단언하지 않고(toBe 금지),
-// "10레벨대 이하에 item 비용 검이 1개 이상 존재"라는 구조/방향만 검증한다.
+// "10레벨대 이하에 재료 비용 검이 1개 이상 존재"라는 구조/방향만 검증한다. 재료 비용은 두 형태 모두
+// 인정한다 — enchantCost(kind 'item') 또는 복합 비용 enchantCostItems(골드+재료). 후자만 봐도 도입되며,
+// 좁게 'item' 만 보면 골드+재료 복합으로 표현된 중반 재료 비용을 놓친다.
 describe('강화 비용 점진성', () => {
-  it('재료(item) 비용이 10레벨대 이하(level <= 19)에 1개 이상 도입돼 있다', () => {
+  it('재료 비용이 10레벨대 이하(level <= 19)에 1개 이상 도입돼 있다', () => {
     dataManager.load()
     const midGameItemCost = dataManager
       .getSwords()
-      .filter((s) => s.level <= 19 && s.enchantCost?.kind === 'item')
+      .filter(
+        (s) =>
+          s.level <= 19 &&
+          (s.enchantCost?.kind === 'item' || s.enchantCostItems.length > 0),
+      )
     expect(midGameItemCost.length).toBeGreaterThan(0)
   })
 
