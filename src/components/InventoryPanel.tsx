@@ -26,8 +26,8 @@ type InventoryPanelProps = {
   // 장착 중인 검 행을 클릭하면 보관한다(보관 가능할 때만 클릭 가능 — canStoreEquipped 로 게이트).
   onStoreEquipped: () => void
   canStoreEquipped: boolean
-  // 보유 골드 + 판매·의뢰 코인 연출 동기화(pulseKey/coinCount). GoldDisplay 로 그대로 넘긴다.
-  gold: number
+  // 판매·의뢰 코인 연출 동기화(pulseKey/coinCount)만 받는다 — 골드 값 자체는 GoldDisplay 가 store 에서
+  // 직접 구독한다(골드만 바뀔 때 이 패널이 재렌더돼 목록을 재조정하지 않도록).
   goldPulseKey: number
   goldCoinCount: number
   // 판매·의뢰 코인이 빨려드는 "도착점" 측정용 ref(헤더 우측 골드 배지를 가리킨다).
@@ -41,7 +41,6 @@ export const InventoryPanel = memo(function InventoryPanel({
   onEquip,
   onStoreEquipped,
   canStoreEquipped,
-  gold,
   goldPulseKey,
   goldCoinCount,
   goldRef,
@@ -59,11 +58,7 @@ export const InventoryPanel = memo(function InventoryPanel({
           {t('inventory.title')}
         </span>
         <div ref={goldRef} className="flex items-center">
-          <GoldDisplay
-            gold={gold}
-            pulseKey={goldPulseKey}
-            coinCount={goldCoinCount}
-          />
+          <GoldDisplay pulseKey={goldPulseKey} coinCount={goldCoinCount} />
         </div>
       </div>
 

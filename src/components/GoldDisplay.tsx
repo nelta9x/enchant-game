@@ -6,6 +6,7 @@ import {
   useTransform,
 } from 'motion/react'
 import { useI18nStore } from '../i18n'
+import { useGameStore } from '../store/gameStore'
 import { formatAmount, formatGold } from '../lib/format'
 import { Coin } from './Coin'
 import { COIN_ARRIVAL_SEC, coinArrivalTimes } from './coins'
@@ -15,14 +16,15 @@ import { COIN_ARRIVAL_SEC, coinArrivalTimes } from './coins'
 // 콜백 없이 같은 순수 스케줄로 동기화한다. 모든 타격·숫자 갱신은 명령형(setTimeout + controls/motionValue)이라
 // React 재렌더가 없다(가볍고 안전).
 export function GoldDisplay({
-  gold,
   pulseKey = 0,
   coinCount = 0,
 }: {
-  gold: number
   pulseKey?: number
   coinCount?: number
 }) {
+  // 골드 값은 store 에서 직접 구독한다(부모 InventoryPanel 의 prop 이 아니라) — 강화 비용 차감 등 골드만
+  // 바뀔 때 인벤토리 패널(목록 행)이 재조정되지 않게 한다. 표시는 아래에서 motionValue 로 명령형 갱신.
+  const gold = useGameStore((s) => s.gold)
   const lang = useI18nStore((s) => s.lang)
 
   // 표시 숫자(명령형으로만 갱신 — React 재렌더 없이 textContent 만 바뀐다).
