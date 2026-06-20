@@ -2,6 +2,12 @@
   {
     "id": "sword_1",
     "level": 1,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_2",
     "enchantCost": {
       "kind": "gold",
@@ -17,6 +23,12 @@
   {
     "id": "sword_2",
     "level": 2,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_3",
     "enchantCost": {
       "kind": "gold",
@@ -32,6 +44,12 @@
   {
     "id": "sword_3",
     "level": 3,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_4",
     "enchantCost": {
       "kind": "gold",
@@ -47,6 +65,12 @@
   {
     "id": "sword_4",
     "level": 4,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_5",
     "enchantCost": {
       "kind": "gold",
@@ -62,6 +86,12 @@
   {
     "id": "sword_5",
     "level": 5,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_6",
     "enchantCost": {
       "kind": "gold",
@@ -77,6 +107,12 @@
   {
     "id": "sword_6",
     "level": 6,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_7",
     "enchantCost": {
       "kind": "gold",
@@ -92,6 +128,12 @@
   {
     "id": "sword_7",
     "level": 7,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_8",
     "enchantCost": {
       "kind": "gold",
@@ -108,6 +150,12 @@
   {
     "id": "sword_8",
     "level": 8,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_9",
     "enchantCost": {
       "kind": "gold",
@@ -124,6 +172,12 @@
   {
     "id": "sword_9",
     "level": 9,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_10",
     "enchantCost": {
       "kind": "gold",
@@ -140,6 +194,12 @@
   {
     "id": "sword_10",
     "level": 10,
+    "shake": {
+      "success": 100,
+      "protected": 100,
+      "whiff": 100,
+      "destroyed": 100
+    },
     "nextId": "sword_11",
     "enchantCost": {
       "kind": "gold",
@@ -159,6 +219,12 @@
   {
     "id": "sword_11",
     "level": 11,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_12",
     "enchantCost": {
       "kind": "gold",
@@ -179,6 +245,12 @@
   {
     "id": "sword_12",
     "level": 12,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_13",
     "enchantCost": {
       "kind": "gold",
@@ -195,6 +267,12 @@
   {
     "id": "sword_13",
     "level": 13,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_14",
     "enchantCost": {
       "kind": "gold",
@@ -219,6 +297,12 @@
   {
     "id": "sword_14",
     "level": 14,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_15",
     "enchantCost": {
       "kind": "gold",
@@ -241,6 +325,12 @@
   {
     "id": "sword_15",
     "level": 15,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_16",
     "enchantCost": {
       "kind": "gold",
@@ -261,6 +351,12 @@
   {
     "id": "sword_16",
     "level": 16,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_17",
     "enchantCost": {
       "kind": "gold",
@@ -281,6 +377,12 @@
   {
     "id": "sword_17",
     "level": 17,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_18",
     "enchantCost": {
       "kind": "gold",
@@ -302,6 +404,12 @@
   {
     "id": "sword_18",
     "level": 18,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_19",
     "enchantCost": {
       "kind": "gold",
@@ -324,6 +432,12 @@
   {
     "id": "sword_19",
     "level": 19,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_20",
     "enchantCost": {
       "kind": "gold",
@@ -351,6 +465,12 @@
   {
     "id": "sword_20",
     "level": 20,
+    "shake": {
+      "success": 500,
+      "protected": 500,
+      "whiff": 500,
+      "destroyed": 500
+    },
     "nextId": "sword_21",
     "enchantCost": {
       "kind": "gold",
@@ -376,6 +496,12 @@
   {
     "id": "sword_21",
     "level": 21,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": "sword_22",
     "enchantCost": {
       "kind": "gold",
@@ -403,6 +529,12 @@
   {
     "id": "sword_22",
     "level": 22,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": "sword_23",
     "enchantCost": {
       "kind": "gold",
@@ -433,6 +565,12 @@
   {
     "id": "sword_23",
     "level": 23,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": "sword_24",
     "enchantCost": {
       "kind": "gold",
@@ -465,6 +603,12 @@
   {
     "id": "sword_24",
     "level": 24,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": "sword_25",
     "enchantCost": {
       "kind": "gold",
@@ -490,6 +634,12 @@
   {
     "id": "sword_25",
     "level": 25,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": "sword_26",
     "enchantCost": {
       "kind": "gold",
@@ -530,6 +680,12 @@
   {
     "id": "sword_26",
     "level": 26,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": "sword_27",
     "enchantCost": {
       "kind": "item",
@@ -568,6 +724,12 @@
   {
     "id": "sword_27",
     "level": 27,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": "sword_28",
     "enchantCost": {
       "kind": "gold",
@@ -602,6 +764,12 @@
   {
     "id": "sword_28",
     "level": 28,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": "sword_29",
     "enchantCost": {
       "kind": "item",
@@ -624,6 +792,12 @@
   {
     "id": "sword_29",
     "level": 29,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": "sword_30",
     "enchantCost": {
       "kind": "free"
@@ -638,6 +812,12 @@
   {
     "id": "sword_30",
     "level": 30,
+    "shake": {
+      "success": 700,
+      "protected": 700,
+      "whiff": 700,
+      "destroyed": 700
+    },
     "nextId": null,
     "enchantCost": null,
     "successRate": null,

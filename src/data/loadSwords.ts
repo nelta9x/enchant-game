@@ -1,6 +1,13 @@
 import swordsRaw from '../../public/data/swords.json'
 import { ko, type TranslationKey } from '../i18n/locales/ko'
-import type { Drop, ItemCost, Material, SwordData, SwordNote } from './types'
+import type {
+  Drop,
+  ItemCost,
+  Material,
+  SwordData,
+  SwordNote,
+  SwordShake,
+} from './types'
 import { isRecord, makeFail } from './validate'
 
 // 데이터 파일(swords.json)을 검증해 SwordData[]로 만드는 로더.
@@ -91,6 +98,27 @@ function parseNotes(raw: unknown, ctx: string): SwordNote[] {
       fail(`${ctx} unknown note: ${String(n)}`)
     return n as SwordNote
   })
+}
+
+// 강화 결과별 떨림 길이(ms) 검증 — 성공/파괴보호/헛방/파괴 4종 전부 정수를 요구한다. 폴백·기본값 없음:
+// shake 객체나 어느 한 키라도 빠지면 throw 한다(요구사항: 검 데이터에 shake 가 없으면 예외). 0 이하는
+// "그 결과에선 떨지 않음"을 뜻하므로 0·음수도 허용한다(부호 제약 없는 정수 — 떨림 없음을 데이터로 표현).
+// 반환을 명시적 4키 객체로 둔다 — SwordShake 에 키가 늘면 여기서 누락이 컴파일로 잡혀 로더 갱신까지 강제된다.
+function parseShake(raw: unknown, ctx: string): SwordShake {
+  if (!isRecord(raw))
+    fail(`${ctx} shake must be an object { success, protected, whiff, destroyed }`)
+  const fint = (key: keyof SwordShake): number => {
+    const v = raw[key]
+    if (typeof v !== 'number' || !Number.isInteger(v))
+      fail(`${ctx} shake.${key} must be an integer ms (got ${String(v)})`)
+    return v
+  }
+  return {
+    success: fint('success'),
+    protected: fint('protected'),
+    whiff: fint('whiff'),
+    destroyed: fint('destroyed'),
+  }
 }
 
 function parseSword(raw: unknown): ParsedSword {
@@ -191,6 +219,9 @@ function parseSword(raw: unknown): ParsedSword {
     })
   }
 
+  // 강화 결과별 떨림 길이(ms) — 필수. 데이터에 없으면 throw(폴백 없음 — 요구사항).
+  const shake = parseShake(raw.shake, ctx)
+
   // 전용 스프라이트 파일명(선택). 없으면 null — parseSwords 에서 폴백을 채운다.
   let sprite: string | null = null
   if (raw.sprite !== null && raw.sprite !== undefined) {
@@ -217,6 +248,7 @@ function parseSword(raw: unknown): ParsedSword {
     destroyWeight,
     dropOnFail,
     notes: parseNotes(raw.notes, ctx),
+    shake,
     sprite,
   }
 }

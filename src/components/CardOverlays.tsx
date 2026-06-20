@@ -49,7 +49,7 @@ export const CardOverlays = memo(function CardOverlays({
         ? {
             id: dropFx.id,
             drops: dropFx.payload.drops,
-            // 재료 등장 시각(버스트 후) — 이번 강화의 무작위 떨림 길이를 반영한 타임라인 값.
+            // 재료 등장 시각(버스트 후) — 이번 강화의 떨림 길이(검 데이터)를 반영한 타임라인 값.
             appearDelaySec: dropFx.payload.appearDelaySec ?? 0,
           }
         : null,

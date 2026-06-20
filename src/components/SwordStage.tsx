@@ -43,8 +43,9 @@ type SwordStageProps = {
   // 파괴보호장치로 살아남았을 때 "떨림만" 재생하는 트리거. 값이 바뀔 때마다 실제 검 스프라이트가
   // 한 번 덜덜 떤다(파괴 잔상과 같은 공유 SHAKE). 파괴 시에는 올리지 않는다(이중 떨림 방지).
   shakeKey?: number
-  // 방지 떨림의 시작 지연(망치 임팩트까지 대기)·길이(이번 강화의 무작위 떨림 시간), 초 단위. 망치가
+  // 방지 떨림의 시작 지연(망치 임팩트까지 대기)·길이(결과별 검 데이터 shake 시간), 초 단위. 망치가
   // 닿는 순간부터 떨도록 GameScreen 이 타임라인에서 도출해 넘긴다(성공/파괴 잔상 떨림과 같은 박자).
+  // shakeDurationSec 이 0 이하면 떨지 않는다(아래 effect 가 start 자체를 건너뛴다 — 떨림 없음).
   shakeImpactSec?: number
   shakeDurationSec?: number
   // 검 스프라이트 박스에 대한 ref — 판매 코인 연출이 "코인이 뿜어져 나올 출발점"을 측정하는 데 쓴다.
@@ -68,7 +69,7 @@ export const SwordStage = memo(function SwordStage({
   entranceDelay = 0,
   shakeKey = 0,
   shakeImpactSec = 0,
-  shakeDurationSec = 0.4,
+  shakeDurationSec = 0,
   swordBoxRef,
   pricePopKey = 0,
 }: SwordStageProps) {
@@ -84,9 +85,10 @@ export const SwordStage = memo(function SwordStage({
   // 재생돼 검이 "재생성"되는 인상을 준다. shakeKey 가 바뀔 때마다 한 번 떤다(초기 0 은 무시).
   const shakeControls = useAnimationControls()
   useEffect(() => {
-    if (shakeKey > 0) {
-      // 망치가 닿는 순간(shakeImpactSec)부터 무작위 길이(shakeDurationSec)만큼 떤다 — 성공/파괴 잔상의
-      // 떨림과 동일한 박자(makeShakeTransition). 윈드업 동안은 delay 로 가만히 있는다.
+    // shakeDurationSec 0 이하면 그 결과는 떨림 없음 → start 를 건너뛴다(검은 원점에 머문다).
+    if (shakeKey > 0 && shakeDurationSec > 0) {
+      // 망치가 닿는 순간(shakeImpactSec)부터 검 데이터의 떨림 시간(shakeDurationSec)만큼 떤다 — 성공/파괴
+      // 잔상의 떨림과 동일한 박자(makeShakeTransition). 윈드업 동안은 delay 로 가만히 있는다.
       shakeControls.start({
         ...SHAKE_KEYFRAMES,
         transition: makeShakeTransition(shakeDurationSec, shakeImpactSec),

@@ -12,7 +12,7 @@ import { useParticleEmit } from './particleEmit'
 //
 // 연출(t=0 = 강화 시점):
 //   [0, impact)        잔상(강화 전 검)이 가만히 있는다 — 망치는 아직 윈드업 중.
-//   [impact, burstAt)  망치가 닿은 순간부터 잔상이 덜덜 떤다(무작위 떨림 시간 shakeMs).
+//   [impact, burstAt)  망치가 닿은 순간부터 잔상이 덜덜 떤다(검 데이터 떨림 시간 shakeMs, 0 = 떨림 없음).
 //   burstAt            떨림 끝 → 잔상이 팝업·소멸하고, 파티클이 풀에서 사방으로 터진다(성공=금/파괴=적).
 //
 // ── 두 책임을 분리한다(BurstEmitter / ShakeAfterimage) ────────────────────────────────
@@ -31,7 +31,7 @@ export type ShakeBurstEvent = {
   sprite: string // 잔상으로 그릴 검 스프라이트 파일명(spriteStore 풀에 이미 적재됨 — get 으로 블릿)
   particleCount: number
   impactMs: number // 망치가 닿는 시각(떨림 시작) — 데이터 기반 고정값
-  shakeMs: number // 이번 강화의 떨림 길이(무작위) — burstAt = impact + shake
+  shakeMs: number // 이번 강화의 떨림 길이(검 데이터, 0 = 떨림 없음) — burstAt = impact + shake
 }
 
 // 버스트 파티클 emit 트리거(렌더 null) — burstAt 에 풀로 1회 emit 한다. 색(coreVar/edgeVar)만 달리해
@@ -92,12 +92,18 @@ export function ShakeAfterimage({ event }: { event: ShakeBurstEvent | null }) {
     if (evtId === null || !event) return
     const canvas = canvasRef.current
     if (canvas) drawSpriteContain(canvas, swordSpriteUrl(event.sprite))
-    // 떨림 — 망치가 닿는 순간(impact)부터 무작위 길이(shakeMs)만큼. delay 동안은 가만히 있는다(윈드업).
+    // 떨림 — 망치가 닿는 순간(impact)부터 검 데이터 떨림 시간(shakeMs)만큼. delay 동안은 가만히 있는다(윈드업).
+    // shakeMs 0 이하면 떨림 없음 → 원점만 두고 start 는 건너뛴다(잔상은 burstAt=impact 에 그대로 팝업·소멸).
     shakeControls.set({ x: 0, rotate: 0 })
-    shakeControls.start({
-      ...SHAKE_KEYFRAMES,
-      transition: makeShakeTransition(event.shakeMs / 1000, event.impactMs / 1000),
-    })
+    if (event.shakeMs > 0) {
+      shakeControls.start({
+        ...SHAKE_KEYFRAMES,
+        transition: makeShakeTransition(
+          event.shakeMs / 1000,
+          event.impactMs / 1000,
+        ),
+      })
+    }
     // 팝업·소멸 — 떨림 동안 opacity 1(강화 전 검 노출)로 가만히 있다가 burstAt 에 팝업 후 소멸(opacity 0).
     // 끝 상태가 opacity 0 이라 연출이 끝나면 알아서 숨는다(영속 노드 — 마운트/언마운트 없이 다음 재생 대기).
     popControls.set({ scale: 1, opacity: 1 })

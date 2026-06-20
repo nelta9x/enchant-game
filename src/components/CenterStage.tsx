@@ -15,7 +15,6 @@ import { HammerStrike, type HammerStrikeEvent } from './HammerStrike'
 import type { HammerShape } from './hammerTiming'
 import { HitSparkCanvas } from './HitSparkCanvas'
 import { ParticleEmitProvider, ParticlePool } from './ParticlePool'
-import { shakeRangeForLevel } from './enhanceTimeline'
 import { FloatingTextEffect } from './FloatingTextEffect'
 import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import type { ProtectionState } from './protection'
@@ -91,7 +90,7 @@ export const CenterStage = memo(function CenterStage({
   goldGain,
 }: CenterStageProps) {
   const t = useT()
-  // 연출 타이밍(망치 임팩트·모양·떨림 밴드·플레어) — animation.json 에서 1회 읽는다(load 이후라 안전).
+  // 연출 타이밍(망치 임팩트·모양·플레어) — animation.json 에서 1회 읽는다(load 이후라 안전).
   const anim = useMemo(() => dataManager.getAnimation(), [])
   const hammerShape: HammerShape = useMemo(
     () => ({
@@ -171,9 +170,9 @@ export const CenterStage = memo(function CenterStage({
       : (protectedFx ?? whiffFx)
   const shakeKey = shakeFx?.id ?? 0
   const shakeImpactSec = (shakeFx?.payload?.impactMs ?? 0) / 1000
-  const shakeDurationSec =
-    (shakeFx?.payload?.shakeMs ??
-      shakeRangeForLevel(anim.shakeBands, liveSword?.level ?? 1).minMs) / 1000
+  // 떨림 길이는 효과 payload(GameScreen 이 검 데이터 shake[outcome]에서 도출)에서 온다. 활성 떨림 효과가
+  // 없으면 shakeKey 가 0 이라 SwordStage 가 어차피 떨지 않으므로 길이값은 무의미(0).
+  const shakeDurationSec = (shakeFx?.payload?.shakeMs ?? 0) / 1000
   const blockKey = protectedFx?.id ?? 0
 
   // 결과를 스크린리더에 알린다(시각 연출은 aria-hidden). 가장 최근 알림 대상 효과의 문구.

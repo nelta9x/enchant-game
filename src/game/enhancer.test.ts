@@ -48,6 +48,8 @@ function sword(over: Partial<SwordData> = {}): SwordData {
     destroyWeight: 1,
     dropOnFail: [],
     notes: [],
+    // 엔진은 떨림(연출용)을 읽지 않지만 SwordData 필수 필드라 합성값을 채운다.
+    shake: { success: 100, protected: 100, whiff: 100, destroyed: 100 },
     sprite: 'placeholder.png',
     ...over,
   }

@@ -25,7 +25,7 @@ import { useRelativeCenter } from './useRelativeCenter'
 // 오버레이는 클릭을 막지 않도록 pointer-events-none, 개별 토큰만 호버를 받도록 pointer-events-auto.
 
 // appearDelaySec: 재료가 떨어지기 시작하는 시각(초) = 이번 강화의 버스트 시점 + 약간의 간격. 폭발이
-// 드러난 뒤 떨어지도록 GameScreen 이 타임라인에서 도출해 넘긴다(무작위 떨림 길이를 반영).
+// 드러난 뒤 떨어지도록 GameScreen 이 타임라인에서 도출해 넘긴다(검 데이터 떨림 길이를 반영).
 export type DropEvent = {
   id: number
   drops: { itemId: string; count: number }[]

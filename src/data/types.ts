@@ -60,24 +60,11 @@ export type FloatingTextEntry = { text: TranslationKey; weight: number }
 // 이벤트 타이밍 키(예: 'enhanceFail') → 후보 엔트리 목록. 빈 배열 = 아직 안 채운 슬롯(미표시).
 export type FloatingTextData = Record<string, FloatingTextEntry[]>
 
-// 망치 내려치기 떨림 시간의 레벨 밴드 1구간(언어 중립). 검 레벨대마다 떨림 길이를 다르게 둔다
-// (저단계는 짧고 경쾌하게, 고단계는 길고 묵직하게). GoldBucket 의 골드 구간 커버리지 패턴 미러 —
-// 밴드들은 검 레벨 [1, ∞) 를 빈틈·겹침 없이 덮어야 한다(로더가 강제). 셀렉터(shakeRangeForLevel)는
-// maxLevel 만으로 담당 밴드를 고른다: 레벨 이상인 첫 밴드(= maxLevel >= level, 마지막은 null=∞).
-//  - maxLevel: 이 밴드가 담당하는 검 레벨 상한(포함). null = ∞(마지막 밴드, 그 위 모든 레벨).
-//  - minMs / maxMs: 이 밴드에서 매 강화마다 떨림 시간을 뽑는 범위(min <= max, 둘 다 정수 >= 0).
-//    min==max 면 그 레벨대는 고정 떨림.
-export type ShakeBand = {
-  maxLevel: number | null
-  minMs: number
-  maxMs: number
-}
-
 // 강화 연출 시퀀스의 타이밍 설정(코드 상수가 아니라 별도 데이터 파일 animation.json 에서 적재).
-// "시퀀스 타이밍"(언제 망치가 닿고, 떨림이 얼마나 가고, 언제 다시 강화 가능한지)만 데이터로 둔다 —
-// 개별 파티클의 "모양" 상수(분출 반경·파티클 비행 시간 등)는 프레젠테이션 코드에 남긴다(경계는
-// loadAnimation 주석 참고). 강화 1회의 연출 타임라인은 enhanceTimeline.ts 가 이 값 + 매회 랜덤 떨림
-// 시간으로 도출한다(단일 출처).
+// "시퀀스 타이밍"(언제 망치가 닿고, 언제 다시 강화 가능한지)만 데이터로 둔다 — 개별 파티클의 "모양"
+// 상수(분출 반경·파티클 비행 시간 등)는 프레젠테이션 코드에 남긴다(경계는 loadAnimation 주석 참고).
+// 떨림 길이(ms)는 결과별로 검 데이터(SwordData.shake)에 두며, 강화 1회의 연출 타임라인은
+// enhanceTimeline.ts 가 이 animation 값 + 그 떨림 시간으로 도출한다(단일 출처).
 //  - hammerImpactMs: 강화 시작(t=0)부터 망치가 검에 닿기까지(정수 >= 0). 떨림 시작·Hit 불꽃·'캉' 타격음의
 //    공통 앵커. 망치 윈드업(대기)은 고정이라 이 값은 매회 동일(랜덤이 아님).
 //  - hammerSnapMs: 닿기 직전 빠르게 내리꽂는 스냅(내려치기) 길이(holdUntil→impact). 윈드업이 아니라
@@ -98,8 +85,6 @@ export type ShakeBand = {
 //      · hammerSwingEnabled: 망치 본체 내려치기 스윙(motion.img). false 면 망치 자체가 안 보이고 하위
 //        스미어도 함께 사라진다 — 임팩트 앵커(떨림·Hit 불꽃·'캉' 타격음)는 GameScreen 타임라인이 독립 구동.
 //      · hammerSmearEnabled: 망치 스윙 모션 블러 스미어(궤적 잔상 캔버스). hammerSwingEnabled 가 true 일 때만 의미.
-//  - shakeBands: 망치가 닿은 뒤 무기가 떠는 시간(ms)의 검 레벨대별 범위. 강화 대상 검의 레벨로 밴드를 골라
-//    그 [min, max] 구간에서 매회 무작위로 뽑는다(레벨 [1, ∞) 를 덮는 연속 밴드 — shakeBands[0] 이 최저 레벨대).
 //  - particlePoolReserve: 파티클 객체 풀을 시작(warmup) 시 미리 확보할 슬롯 수. 첫 버스트(특히 고레벨 대형
 //    도트 버스트)도 객체를 새로 만들지 않게 한다 — 연사 GC 압박을 0으로. 풀은 이보다 큰 버스트가 오면 lazily
 //    더 늘되 줄지는 않는다(상한이 아니라 사전 확보치). dots = 보통 최고 레벨 버스트 입자 수(particleCount(maxLevel)),
@@ -114,7 +99,6 @@ export type AnimationConfig = {
   enhanceParticlesEnabled: boolean
   hammerSwingEnabled: boolean
   hammerSmearEnabled: boolean
-  shakeBands: ShakeBand[]
   particlePoolReserve: { dots: number; hitSparks: number; hitLicks: number }
 }
 
@@ -195,6 +179,20 @@ export type CommissionConfig = {
 //  - storable(보관필요): 고단계 강화 재료로도 쓰일 수 있는 검
 export type SwordNote = 'storable'
 
+// 강화 결과별 검 "덜덜 떨림" 길이(ms). 키 4종은 EnhanceOutcome(game/types)과 손으로 맞춘 1:1 대응이다
+// (data→game 의존을 피해 Record 로 묶지 않는다). 소비처(GameScreen)가 result.outcome 으로 직접 인덱싱하므로,
+// EnhanceOutcome 에 결과가 늘면 그 인덱싱 지점(sword.shake[result.outcome])이 컴파일 에러로 드러낸다.
+// 망치가 닿는 순간(animation.hammerImpactMs)부터 이 길이만큼 떤 뒤 결과가 공개된다(enhanceTimeline).
+// 값이 0 이하면 그 결과에선 검이 떨지 않는다(떨림 없음 — 즉시 임팩트 시점에 공개/버스트).
+// 폴백·기본값 없음: 검 데이터에 shake 또는 어느 한 키라도 없으면 로더가 throw 한다(데이터 명시 강제).
+//  - success: 성공   - protected: 파괴보호 발동   - whiff: 헛방   - destroyed: 파괴
+export type SwordShake = {
+  success: number
+  protected: number
+  whiff: number
+  destroyed: number
+}
+
 // 검 정의 데이터(언어 중립).
 // 표시명은 코드에 박지 않고 nameKey(i18n 키)로 두어 표시 시점에 t()로 해석한다.
 // enchantCost / successRate 가 null 이면 더 이상 강화할 수 없는 최종 단계(terminal)다.
@@ -223,6 +221,8 @@ export type SwordData = {
   // 파괴 1회에 0~N종이 동시에 떨어질 수 있다(엔진이 통과분을 ItemStack[]로 산출).
   dropOnFail: Drop[]
   notes: SwordNote[]
+  // 강화 결과별 떨림 길이(ms) — 성공/파괴보호/헛방/파괴 각각 별도. 데이터에 없으면 로더가 throw(폴백 없음).
+  shake: SwordShake
   // 스프라이트 파일명(예: 'rusty_dagger.png'). 전용 스프라이트가 없는 단계는
   // 로더가 마지막(최고 단계) 보유 스프라이트로 채운다(임시). 디렉토리/URL은 뷰에서 해석.
   sprite: string

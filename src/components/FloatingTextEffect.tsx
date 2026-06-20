@@ -26,7 +26,7 @@ import { OneShotOverlay } from './OneShotOverlay'
 // 않는다(사용자 결정) — 필요해지면 style 에 textShadow 를 더해 양피지·폭발 위 대비를 높일 수 있다.
 
 // delaySec: 팝업 지연(= 이번 강화의 burstAt). 결과가 망치 임팩트 후 떨림이 끝나는 순간 뜨도록 GameScreen 이
-// 타임라인에서 도출해 넘긴다(매 강화마다 다른 무작위 떨림 시간을 반영).
+// 타임라인에서 도출해 넘긴다(강화 결과별 검 데이터 떨림 시간을 반영).
 export type FloatingTextEvent = {
   id: number
   textKey: TranslationKey

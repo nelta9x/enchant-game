@@ -8,7 +8,7 @@ import type { ShakeBurstEvent } from './ShakeBurstEffect'
 
 // 파괴 연출 이벤트 = 공유 "떨림 후 분출" 이벤트(성공 버스트와 동일 형태 — 스프라이트 URL + 재생
 // 식별자 + 파티클 수 + 떨림/임팩트 타이밍). 단계→스프라이트 URL·파티클 수 해석은 뷰 경계(GameScreen)
-// 에서 수행하고, impactMs(망치 임팩트)·shakeMs(이번 강화의 무작위 떨림 길이)는 GameScreen 이
+// 에서 수행하고, impactMs(망치 임팩트)·shakeMs(이번 강화의 떨림 길이, 검 데이터)는 GameScreen 이
 // 타임라인에서 도출해 넘긴다 — 필드를 복제 선언하지 않고 그 타입을 그대로 쓴다(어긋남 방지).
 export type DestructionEvent = ShakeBurstEvent
 

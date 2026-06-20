@@ -20,11 +20,7 @@ import { CoinFlight, COIN_FLIGHT_MS } from './CoinFlight'
 import { dropAppearSec, dropLifetimeMs } from './drops'
 import { ItemFlight, ITEM_FLIGHT_MS } from './ItemFlight'
 import { hammerStrikeMs, type HammerShape } from './hammerTiming'
-import {
-  computeEnhanceTimeline,
-  rollShakeMs,
-  shakeRangeForLevel,
-} from './enhanceTimeline'
+import { computeEnhanceTimeline } from './enhanceTimeline'
 import { EnhanceButton } from './EnhanceButton'
 import { pickFloatingText } from './floatingText'
 import type { GoldGainEvent } from './GoldGainText'
@@ -105,7 +101,7 @@ export function GameScreen() {
       ? dataManager.getSwordById(currentSwordId)
       : undefined
 
-  // 강화 연출 타이밍(망치 임팩트·모양·떨림 밴드·재강화 가드) — 데이터(animation.json)에서 1회 읽어 매 강화의
+  // 강화 연출 타이밍(망치 임팩트·모양·재강화 가드) — 데이터(animation.json)에서 1회 읽어 매 강화의
   // 타임라인과 임팩트 의존 props(망치·Hit 불꽃·보호 플레어)에 쓴다. load 이후라 안전(컴포넌트는 적재 후 렌더).
   // anim 과 hammerShape 를 여기 한 곳에서 만들어 모든 소비처(타임라인·플레어·불꽃·망치·잠금·방지 떨림)에
   // 흘려 crossover 불일치를 차단한다. hammerShape 는 데이터의 망치 모양 필드에서 파생한다.
@@ -204,14 +200,10 @@ export function GameScreen() {
   }, [])
 
   // 직전 강화의 재강화 잠금 길이(ms) — 매 강화마다 떨림 길이에 따라 다르므로 버튼 충전 오버레이가 같은
-  // 길이로 걷히도록 보관한다(handleEnhance 가 타임라인 lockMs 로 갱신). 첫 강화 전엔 현재 검 레벨대의
-  // 최소 떨림 기준 추정치(검이 없으면 최저 레벨 밴드).
+  // 길이로 걷히도록 보관한다(handleEnhance 가 타임라인 lockMs 로 갱신). 첫 강화 전엔 결과를 모르므로
+  // 현재 검의 성공 떨림으로 어림한다(검이 없으면 떨림 0). 첫 강화 직후 실제 결과의 lockMs 로 대체된다.
   const [lastLockMs, setLastLockMs] = useState(
-    () =>
-      computeEnhanceTimeline(
-        anim,
-        shakeRangeForLevel(anim.shakeBands, sword?.level ?? 1).minMs,
-      ).lockMs,
+    () => computeEnhanceTimeline(anim, sword ? sword.shake.success : 0).lockMs,
   )
 
   // 강화 결과 플로팅 텍스트("아이구!..." 등)의 id 카운터 — 핸들러가 강화 시점에 후보 한 줄을 뽑아 이벤트를
@@ -322,13 +314,16 @@ export function GameScreen() {
     useCommissionStore.getState().notifyAttempt()
 
     // ── 이번 강화의 연출 타임라인(단일 출처) ──────────────────────────────────────
-    // 떨림 시간(shakeMs)을 1회 무작위로 뽑고, 데이터 타이밍과 합쳐 모든 마일스톤·수명을 도출한다. 아래
-    // 모든 효과·사운드·공개 타이머·잠금이 이 한 객체의 슬라이스를 쓴다 — impact+shake 계산이 곳곳에서
+    // 떨림 시간(shakeMs)을 결과별 검 데이터에서 고르고, 데이터 타이밍과 합쳐 모든 마일스톤·수명을 도출한다.
+    // 아래 모든 효과·사운드·공개 타이머·잠금이 이 한 객체의 슬라이스를 쓴다 — impact+shake 계산이 곳곳에서
     // 어긋나(= 강화 전/후 검 동시 노출 버그) 발생하지 않도록 한곳에서만 계산한다.
-    // 떨림 범위는 강화 대상(강화 전) 검의 레벨대 밴드에서 고른다 — sword 는 이번 렌더의 currentSwordId
-    // 스냅샷이라 강화 전 검이다(검이 없으면 enhance() 가 이미 null 을 반환해 위에서 빠진다).
-    const shakeRange = shakeRangeForLevel(anim.shakeBands, sword?.level ?? 1)
-    const tl = computeEnhanceTimeline(anim, rollShakeMs(shakeRange))
+    // 떨림 길이는 강화 대상(강화 전) 검의 결과별 shake(SwordData.shake[outcome])에서 고른다 — sword 는 이번
+    // 렌더의 currentSwordId 스냅샷이라 강화 전 검이고, result 가 있으면 검이 있었다는 뜻이라 여기선 존재한다.
+    // 0 이하면 타임라인이 0 으로 클램프해 그 결과에선 떨림 없이 임팩트 시점에 바로 공개·버스트한다.
+    const tl = computeEnhanceTimeline(
+      anim,
+      sword ? sword.shake[result.outcome] : 0,
+    )
     const burstAtSec = tl.burstAtMs / 1000
 
     // 결과 공개 지연: 강화 전 검을 떨림 동안 이름·스탯에 유지했다가, 떨림이 끝나는 순간(burstAt = revealAt)
@@ -417,7 +412,7 @@ export function GameScreen() {
     }
 
     if (result.outcome === 'success') {
-      // 성공 = (실패와 동일 안무) 망치 임팩트 → 떨림(무작위) → 황금 파티클 분출 + 상위 검 등장 ∥ 재강화 가드.
+      // 성공 = (실패와 동일 안무) 망치 임팩트 → 떨림(검 데이터) → 황금 파티클 분출 + 상위 검 등장 ∥ 재강화 가드.
       // 잔상은 강화 전 검(fromId), 파티클 수는 도달 검(toId)의 단계에 비례 — 둘 다 이 뷰 경계에서 해석(원칙 2).
       // 잔상 소멸·새 검 등장이 같은 burstAt 을 써 정확히 교대한다(강화 전/후 검 동시 노출 없음 — enqueueShakeBurst).
       const from = dataManager.getSwordById(result.fromId)
@@ -452,7 +447,7 @@ export function GameScreen() {
         enqueueShakeBurst('destruction', destroyed.sprite, destroyed.level)
       }
       // 드롭이 있으면 재료가 검 아래로 흩어져 떨어지는 연출(잠금X·병렬). 폭발(burstAt)이 드러난 직후
-      // 떨어지도록 등장 시각을 타임라인에서 도출한다(무작위 떨림 길이만큼 함께 늦춰짐). 실제 인벤토리 수량은 store 반영됨.
+      // 떨어지도록 등장 시각을 타임라인에서 도출한다(검 데이터 떨림 길이만큼 함께 늦춰짐). 실제 인벤토리 수량은 store 반영됨.
       if (result.drops.length > 0) {
         const appearSec = dropAppearSec(burstAtSec)
         enqueueEffect({
@@ -472,7 +467,7 @@ export function GameScreen() {
       scheduleReveal(false, false)
     } else if (result.outcome === 'protected') {
       // 방지 = 떨림만(폭발 없음) → 파괴보호장치 덕분에 살아남았음을 인지시킨다. 떨림은 망치가 닿는
-      // 순간(impact)부터 무작위 길이(shake)만큼 — 성공/파괴 잔상 떨림과 동일 박자(SwordStage 가 실제 검을 흔든다).
+      // 순간(impact)부터 검 데이터 떨림 길이(shake)만큼 — 성공/파괴 잔상 떨림과 동일 박자(SwordStage 가 실제 검을 흔든다).
       enqueueEffect({
         kind: 'protectedShake',
         exclusive: false,

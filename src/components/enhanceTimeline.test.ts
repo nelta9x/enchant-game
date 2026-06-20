@@ -1,12 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import {
-  computeEnhanceTimeline,
-  rollShakeMs,
-  shakeRangeForLevel,
-} from './enhanceTimeline'
-import type { AnimationConfig, ShakeBand } from '../data/types'
+import { computeEnhanceTimeline } from './enhanceTimeline'
+import type { AnimationConfig } from '../data/types'
 
-// 합성 픽스처(실제 데이터 값이 아님) — 떨림은 레벨 밴드로 분리됐으므로 timeline 은 임팩트·가드만 본다.
+// 합성 픽스처(실제 데이터 값이 아님) — 떨림은 검 데이터로 분리됐으므로 timeline 은 임팩트·가드만 본다.
 const ANIM: AnimationConfig = {
   hammerImpactMs: 360,
   hammerSnapMs: 140,
@@ -17,63 +13,8 @@ const ANIM: AnimationConfig = {
   enhanceParticlesEnabled: true,
   hammerSwingEnabled: true,
   hammerSmearEnabled: true,
-  shakeBands: [{ maxLevel: null, minMs: 200, maxMs: 500 }],
   particlePoolReserve: { dots: 44, hitSparks: 13, hitLicks: 6 },
 }
-
-describe('rollShakeMs — 떨림 시간 무작위 추출', () => {
-  const range = { minMs: 200, maxMs: 500 }
-
-  it('항상 [min, max] 구간의 정수를 돌려준다', () => {
-    // rng 양 끝(0, 1 직전)과 중간을 넣어 경계를 확인한다(특정 ms 가 아니라 범위 관계만).
-    for (const r of [0, 0.25, 0.5, 0.999999]) {
-      const v = rollShakeMs(range, () => r)
-      expect(Number.isInteger(v)).toBe(true)
-      expect(v).toBeGreaterThanOrEqual(range.minMs)
-      expect(v).toBeLessThanOrEqual(range.maxMs)
-    }
-  })
-
-  it('rng=0 은 하한, rng→1 은 상한(양끝 도달)', () => {
-    expect(rollShakeMs(range, () => 0)).toBe(range.minMs)
-    expect(rollShakeMs(range, () => 0.999999)).toBe(range.maxMs)
-  })
-
-  it('min==max 면 항상 그 값(고정 떨림)', () => {
-    expect(rollShakeMs({ minMs: 300, maxMs: 300 }, () => 0.7)).toBe(300)
-  })
-})
-
-describe('shakeRangeForLevel — 레벨로 떨림 밴드 선택', () => {
-  // 합성 밴드(실제 값·임계가 아님) — "레벨 이상인 첫 밴드"를 고르고, 고레벨일수록 떨림이 줄지 않는지(단조)만 본다.
-  const bands: ShakeBand[] = [
-    { maxLevel: 5, minMs: 100, maxMs: 100 },
-    { maxLevel: 10, minMs: 300, maxMs: 400 },
-    { maxLevel: null, minMs: 700, maxMs: 700 },
-  ]
-
-  it('레벨이 속한 밴드를 고른다(경계 포함은 그 밴드, 초과는 다음)', () => {
-    expect(shakeRangeForLevel(bands, 1)).toEqual({ minMs: 100, maxMs: 100 })
-    expect(shakeRangeForLevel(bands, 5)).toEqual({ minMs: 100, maxMs: 100 })
-    expect(shakeRangeForLevel(bands, 6)).toEqual({ minMs: 300, maxMs: 400 })
-    expect(shakeRangeForLevel(bands, 10)).toEqual({ minMs: 300, maxMs: 400 })
-    expect(shakeRangeForLevel(bands, 11)).toEqual({ minMs: 700, maxMs: 700 })
-  })
-
-  it('마지막 밴드(maxLevel null)는 그 위 모든 레벨을 담당한다', () => {
-    expect(shakeRangeForLevel(bands, 30)).toEqual({ minMs: 700, maxMs: 700 })
-    expect(shakeRangeForLevel(bands, 999)).toEqual({ minMs: 700, maxMs: 700 })
-  })
-
-  it('레벨이 오를수록 떨림 하한이 줄지 않는다(단조 — 고단계가 더 묵직)', () => {
-    let prev = -1
-    for (const level of [1, 5, 6, 10, 11, 50]) {
-      const { minMs } = shakeRangeForLevel(bands, level)
-      expect(minMs).toBeGreaterThanOrEqual(prev)
-      prev = minMs
-    }
-  })
-})
 
 describe('computeEnhanceTimeline — 마일스톤 관계 불변식', () => {
   // 특정 ms 값을 박지 않고 "서로 맞물려야 하는" 관계만 단언한다(튜닝값 단언 금지 원칙).
@@ -114,5 +55,15 @@ describe('computeEnhanceTimeline — 마일스톤 관계 불변식', () => {
     const noGuard: AnimationConfig = { ...ANIM, reEnhanceGuardMs: 0 }
     const t = computeEnhanceTimeline(noGuard, shakeMs)
     expect(t.lockMs).toBe(t.burstAtMs)
+  })
+
+  it('떨림 0 이하는 0 으로 클램프 — 떨림 없음, 버스트는 임팩트 시점(음수 burstAt 방지)', () => {
+    // 검 데이터 shake 가 0 이하면 그 결과는 떨림 없이 임팩트에 바로 공개/버스트해야 한다.
+    for (const noShake of [0, -1, -500]) {
+      const t = computeEnhanceTimeline(ANIM, noShake)
+      expect(t.shakeMs).toBe(0)
+      expect(t.burstAtMs).toBe(t.impactMs)
+      expect(t.revealAtMs).toBe(t.impactMs)
+    }
   })
 })

@@ -13,6 +13,8 @@ function row(over: Record<string, unknown> = {}): Record<string, unknown> {
     successRate: 1,
     sellPrice: null,
     protectionTickets: 0,
+    // 결과별 떨림은 필수 필드라 최소 행에도 둔다(값은 합성 — 키마다 달리해 매핑 정확성도 겸사 확인).
+    shake: { success: 100, protected: 80, whiff: 60, destroyed: 40 },
     ...over,
   }
 }
@@ -224,6 +226,58 @@ describe('parseSwords — 헛방/파괴 weight 검증', () => {
   })
 })
 
+describe('parseSwords — 결과별 떨림(shake) 검증', () => {
+  it('성공/파괴보호/헛방/파괴 4종을 키별로 그대로 파싱한다', () => {
+    const s = parseSwords([
+      row({ shake: { success: 100, protected: 80, whiff: 60, destroyed: 40 } }),
+    ])[0]
+    expect(s.shake).toEqual({
+      success: 100,
+      protected: 80,
+      whiff: 60,
+      destroyed: 40,
+    })
+  })
+
+  it('shake 객체가 없으면 throw (폴백·기본값 없음)', () => {
+    expect(() => parseSwords([row({ shake: undefined })])).toThrow()
+    expect(() => parseSwords([row({ shake: null })])).toThrow()
+    expect(() => parseSwords([row({ shake: 100 })])).toThrow()
+  })
+
+  it('4종 중 하나라도 키가 빠지면 throw', () => {
+    for (const partial of [
+      { protected: 80, whiff: 60, destroyed: 40 }, // success 누락
+      { success: 100, whiff: 60, destroyed: 40 }, // protected 누락
+      { success: 100, protected: 80, destroyed: 40 }, // whiff 누락
+      { success: 100, protected: 80, whiff: 60 }, // destroyed 누락
+    ]) {
+      expect(() => parseSwords([row({ shake: partial })])).toThrow()
+    }
+  })
+
+  it('값이 정수가 아니면 throw (소수·비숫자·NaN)', () => {
+    const base = { success: 100, protected: 80, whiff: 60, destroyed: 40 }
+    for (const bad of [1.5, '60', Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() =>
+        parseSwords([row({ shake: { ...base, whiff: bad } })]),
+      ).toThrow()
+    }
+  })
+
+  it('0·음수는 허용한다(그 결과에선 떨림 없음을 데이터로 표현)', () => {
+    const s = parseSwords([
+      row({ shake: { success: 0, protected: -1, whiff: 0, destroyed: -500 } }),
+    ])[0]
+    expect(s.shake).toEqual({
+      success: 0,
+      protected: -1,
+      whiff: 0,
+      destroyed: -500,
+    })
+  })
+})
+
 describe('parseSwords — 진행 체인(nextId) · id 무결성', () => {
   it('nextId가 null(최종 단계)이거나 실재하는 검 id면 통과', () => {
     const swords = parseSwords([
@@ -386,5 +440,19 @@ describe('loadSwords — 실제 번들 데이터(swords.json)', () => {
     const sprites = loadSwords().map((s) => s.sprite)
     expect(sprites.every((s) => s.length > 0)).toBe(true)
     expect(new Set(sprites).size).toBe(30)
+  })
+
+  it('모든 단계가 결과별 떨림(shake) 4종을 정수로 가진다(폴백 없음)', () => {
+    // 튜닝값(구체 ms)은 박지 않고 구조/타입만 본다 — 4종이 전부 있고 정수인지.
+    for (const s of loadSwords()) {
+      for (const key of [
+        'success',
+        'protected',
+        'whiff',
+        'destroyed',
+      ] as const) {
+        expect(Number.isInteger(s.shake[key])).toBe(true)
+      }
+    }
   })
 })

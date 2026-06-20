@@ -17,7 +17,7 @@ export type EffectPayload = {
   itemId?: string // 인벤토리로 빨려드는 아이템(보관·장착 비행)
   // 강화 연출 타임라인(매회 다름) — 뷰가 떨림 시작·버스트·등장 지연을 맞추는 데 쓴다(enhanceTimeline 도출).
   impactMs?: number // 망치가 닿는 시각(떨림 시작) — 버스트·방지 떨림
-  shakeMs?: number // 이번 강화의 무작위 떨림 길이 — 버스트·방지 떨림
+  shakeMs?: number // 이번 강화의 떨림 길이(검 데이터, 결과별) — 버스트·방지 떨림
   appearDelaySec?: number // 드롭 재료가 떨어지기 시작하는 시각(초, 버스트 후) — drop
   entranceDelaySec?: number // 새 검 스프라이트 등장 지연(초, = burstAt) — entranceSuppress
 }
