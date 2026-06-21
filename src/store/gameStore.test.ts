@@ -383,6 +383,33 @@ describe('gameStore — 판매', () => {
   })
 })
 
+describe('gameStore — 골드 차감(spendGold)', () => {
+  it('보유 골드 이상이면 차감하고 true', () => {
+    const store = createGameStore({ gold: 1000 })
+    expect(store.getState().spendGold(300)).toBe(true)
+    expect(store.getState().gold).toBe(700)
+  })
+
+  it('정확히 보유분이면 0 으로 차감(true)', () => {
+    const store = createGameStore({ gold: 300 })
+    expect(store.getState().spendGold(300)).toBe(true)
+    expect(store.getState().gold).toBe(0)
+  })
+
+  it('보유 골드 미만이면 무변화 false', () => {
+    const store = createGameStore({ gold: 200 })
+    expect(store.getState().spendGold(300)).toBe(false)
+    expect(store.getState().gold).toBe(200)
+  })
+
+  it('음수·비유한 금액은 거부(false, 무변화)', () => {
+    const store = createGameStore({ gold: 500 })
+    expect(store.getState().spendGold(-100)).toBe(false)
+    expect(store.getState().spendGold(Infinity)).toBe(false)
+    expect(store.getState().gold).toBe(500)
+  })
+})
+
 describe('gameStore — 보관 / 장착', () => {
   it('canStore: 시작 검(+1)·검 없음은 보관 불가, 그 외 검은 가능', () => {
     expect(

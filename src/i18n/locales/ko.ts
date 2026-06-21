@@ -43,6 +43,8 @@ export const ko = {
   'commission.title': '거래 제안',
   'commission.fulfill': '거래 수락',
   'commission.arrived': '새 거래 제안!',
+  // 제안 강제 갱신 버튼(상단바) — 골드를 내고 제안 세션을 즉시 새로 받는다(비용은 아이콘으로 표시).
+  'commission.refresh': '거래 제안 갱신',
 
   // 강화 결과 토스트
   'toast.success': '강화 성공',

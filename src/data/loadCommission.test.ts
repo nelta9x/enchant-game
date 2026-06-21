@@ -47,6 +47,7 @@ function cfg(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     maxCommissions: 3,
     unlockAtLevel: 10,
+    refreshCost: 100000,
     buckets: [bucket()],
     ...over,
   }
@@ -75,6 +76,7 @@ describe('parseCommissionConfig — 구조 검증', () => {
     expect(parse()).toEqual({
       maxCommissions: 3,
       unlockAtLevel: 10,
+      refreshCost: 100000,
       buckets: [
         {
           minGold: 0,
@@ -113,6 +115,13 @@ describe('parseCommissionConfig — 구조 검증', () => {
     expect(() => parse({ unlockAtLevel: Infinity })).toThrow()
     expect(() => parse({ unlockAtLevel: 1.5 })).toThrow()
   })
+
+  it('refreshCost 는 필수다 — 누락/비숫자/비유한/소수면 throw', () => {
+    expect(() => parse({ refreshCost: undefined })).toThrow()
+    expect(() => parse({ refreshCost: 'x' })).toThrow()
+    expect(() => parse({ refreshCost: Infinity })).toThrow()
+    expect(() => parse({ refreshCost: 1.5 })).toThrow()
+  })
 })
 
 describe('parseCommissionConfig — 글로벌 의미 검증', () => {
@@ -124,6 +133,12 @@ describe('parseCommissionConfig — 글로벌 의미 검증', () => {
     expect(() => parse({ unlockAtLevel: -1 })).toThrow()
     expect(parse({ unlockAtLevel: 0 }).unlockAtLevel).toBe(0)
     expect(parse({ unlockAtLevel: 10 }).unlockAtLevel).toBe(10)
+  })
+
+  it('refreshCost < 0 이면 throw, 0 은 허용(무료 갱신)', () => {
+    expect(() => parse({ refreshCost: -1 })).toThrow()
+    expect(parse({ refreshCost: 0 }).refreshCost).toBe(0)
+    expect(parse({ refreshCost: 250_000 }).refreshCost).toBe(250_000)
   })
 })
 
@@ -424,6 +439,7 @@ describe('loadCommission — 번들 데이터 진입점', () => {
     const known = realKnownIds()
     const config = loadCommission(known)
     expect(config.maxCommissions).toBeGreaterThanOrEqual(1)
+    expect(config.refreshCost).toBeGreaterThanOrEqual(0)
     expect(config.buckets.length).toBeGreaterThanOrEqual(1)
     expect(config.buckets.flatMap((b) => b.items).length).toBeGreaterThan(0)
     // 골드 버킷 커버리지: 첫 버킷 minGold 0, 마지막 maxGold null, 연속.

@@ -168,10 +168,13 @@ export type GoldBucket = {
 //    플레이어가 이 레벨에 한 번이라도 도달하기 전에는 제안이 전혀 출제되지 않는다(초반엔 재화가 없어 활용 불가 — 의도된 잠금).
 //    maxLevelReached 는 파괴·판매로 내려가지 않으므로(달성=영구) 한 번 해제되면 다시 잠기지 않는다. 0 = 처음부터 활성.
 //    데이터 파일(commission.json)에서 조절한다(코드 상수 아님).
+//  - refreshCost: 제안 세션을 강제로 갱신(상단 갱신 버튼)할 때 1회 차감되는 골드. 정수 >= 0(0 = 무료).
+//    잠금 해제 후에만 갱신할 수 있고, 보유 골드가 이 값 이상일 때만 동작한다(commissionStore.refreshNow).
 //  - buckets: 보유 골드 구간별 정의([0,∞) 를 덮는 연속 버킷 — buckets[0] 이 골드 0 구간).
 export type CommissionConfig = {
   maxCommissions: number
   unlockAtLevel: number
+  refreshCost: number
   buckets: GoldBucket[]
 }
 

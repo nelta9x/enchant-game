@@ -1,6 +1,7 @@
 {
   "maxCommissions": 3,
   "unlockAtLevel": 10,
+  "refreshCost": 100000,
   "buckets": [
     {
       "minGold": 0,

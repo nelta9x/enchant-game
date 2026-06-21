@@ -533,7 +533,7 @@ export function GameScreen() {
             정렬되게 한다. bg-stage(베이지)는 바깥 div 가 계속 full-width 로 깐다. 61rem 은 위 그리드 컬럼
             합과 동기화할 것 — 컬럼/갭을 바꾸면 이 값도 함께 고친다. <lg(세로형)은 그대로 full-width. */}
         <div className="lg:mx-auto lg:w-full lg:max-w-[61rem]">
-          <TopControls onOpenShop={openShop} />
+          <TopControls />
         </div>
 
         {/* 상단 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}

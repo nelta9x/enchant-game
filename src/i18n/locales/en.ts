@@ -44,6 +44,8 @@ export const en: Record<TranslationKey, string> = {
   'commission.title': 'Trade Offers',
   'commission.fulfill': 'Accept',
   'commission.arrived': 'New trade offers!',
+  // 제안 강제 갱신 버튼(상단바)
+  'commission.refresh': 'Refresh Offers',
 
   // 강화 결과 토스트
   'toast.success': 'Enchanted',

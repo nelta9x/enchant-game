@@ -6,6 +6,7 @@ import {
   commissionPool,
   complete,
   attempt,
+  refresh,
   type CommissionQueueState,
   type BucketSettings,
   type PoolEntry,
@@ -43,6 +44,9 @@ type CommissionActions = {
   stop: () => void
   // 강화 시도 1회 알림 — GameScreen 이 enhance() 직후 호출. 잠금/부트스트랩/카운터 차감·갱신을 처리한다.
   notifyAttempt: () => void
+  // 제안 강제 갱신: refreshCost 골드를 지불하고 현재 세션을 즉시 새로 출제한다(상단 갱신 버튼). 정지/잠금이거나
+  // 골드가 부족하면 무변화로 false(골드는 지불 성공 시에만 빠진다). 성공이면 true.
+  refreshNow: () => boolean
   // 의뢰 완료 시도: gameStore 가 검 소모+보상을 수락하면 complete 적용 후 true. 미보유면 false(무변화).
   fulfill: (id: number) => boolean
 }
@@ -151,6 +155,30 @@ export function createCommissionStore(opts: CreateOpts = {}) {
           config.maxCommissions,
         ),
       )
+    },
+
+    refreshNow: () => {
+      if (!started) return false
+      const config = getConfig()
+      // 잠금 중이면 갱신할 세션이 없다 — 강제 갱신도 불가(잠금 게이트를 골드로 우회하지 못하게). 무변화 false.
+      if (!isUnlocked(config)) return false
+      // 골드 지불은 gameStore 소유(fulfill 과 동일한 두 store 트랜잭션 규율) — 차감 성공일 때만 갱신한다.
+      // (지불 후 줄어든 골드로 currentBucket 을 읽어 출제 풀을 고른다 — 갱신은 항상 현재 골드를 반영한다.)
+      if (!useGameStore.getState().spendGold(config.refreshCost)) return false
+      const bucket = currentBucket(config)
+      set(
+        refresh(
+          rng,
+          buildPool(bucket),
+          settingsOf(bucket),
+          config.maxCommissions,
+          get().nextId,
+        ),
+      )
+      // 강제 갱신은 잠금 해제 후에만 도달하므로 부트스트랩 래치를 세워 둔다 — 만약 자연 부트스트랩 전에
+      // 갱신했다면, 다음 notifyAttempt 가 다시 부트스트랩해 방금 산 세션을 덮어쓰지 않도록(방어).
+      bootstrapped = true
+      return true
     },
 
     fulfill: (id) => {

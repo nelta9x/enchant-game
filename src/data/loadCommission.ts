@@ -226,6 +226,9 @@ export function parseCommissionConfig(
   // 제안 활성화 도달 레벨(maxLevelReached 기준). 정수 >= 0(0 = 처음부터 활성). 다른 글로벌 필드와 같이
   // 필수+검증으로 둔다 — 누락/오타가 조용히 0(항상 활성)으로 새지 않고 로드 시점에 즉시 실패하게.
   const unlockAtLevel = intAtLeast(raw, 'unlockAtLevel', 0)
+  // 제안 강제 갱신 1회 비용(골드). 정수 >= 0(0 = 무료). unlockAtLevel 과 동일하게 필수+검증으로 둬
+  // 누락/오타가 조용히 새지 않고 로드 시점에 즉시 실패하게 한다.
+  const refreshCost = intAtLeast(raw, 'refreshCost', 0)
 
   // buckets: 비어있지 않은 배열. 각 버킷은 parseBucket 으로 검증.
   const rawBuckets = raw.buckets
@@ -252,7 +255,7 @@ export function parseCommissionConfig(
   if (buckets[buckets.length - 1].maxGold !== null)
     fail('the last bucket maxGold must be null (spans to infinity)')
 
-  return { maxCommissions, unlockAtLevel, buckets }
+  return { maxCommissions, unlockAtLevel, refreshCost, buckets }
 }
 
 // 게임 시작 시 호출되는 로드 진입점. 번들된 데이터 파일을 검증해 CommissionConfig 로 만든다.
