@@ -5,7 +5,7 @@
 
 // 결계가 표현해야 할 네 가지 상태(요청 핵심: 상태 legibility).
 //   unavailable  — 이 단계는 파괴보호장치를 쓸 수 없다(데이터상 'disabled' 또는 0).
-//   insufficient — 쓸 수 있으나 보유가 필요 수량에 못 미친다(상점 유도 대상 — 기존 UI 사각지대).
+//   insufficient — 쓸 수 있으나 보유가 필요 수량에 못 미친다(정적 표시 — 파괴보호장치는 거래 제안으로 얻는다).
 //   ready        — 충분히 보유했지만 아직 발동(armed)하지 않음(클릭하면 켜짐).
 //   armed        — 충분히 보유 + 발동 → 실제 강화 실패를 막는다.
 export type ProtectionState =

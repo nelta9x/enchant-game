@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { dataManager } from '../data/DataManager'
-import type { Material, ShopItem } from '../data/types'
+import type { Material } from '../data/types'
 import { Enhancer, type EnhanceInput } from '../game/enhancer'
 import type { EnhanceResult, ItemStack, PlayerState } from '../game/types'
 import { countOf } from '../lib/items'
@@ -21,12 +21,6 @@ type GameActions = {
   // 현재 검 판매: 판매가만큼 골드를 받고 검을 비운다(currentSwordId = null).
   // 판매 불가(검 없음 / sellPrice null)면 null 반환(변화 없음). 반환값 = 받은 골드.
   sell: () => number | null
-  // 상점 구매 가능 여부(항목 존재 + 가격 충족). UI 버튼 게이팅용. shopId = 상점 항목 SKU.
-  canBuy: (shopId: string, qty?: number) => boolean
-  // 상점 구매(shopId = 상점 항목 SKU): 가격(골드/아이템) × qty 만큼 차감하고 지급 아이템을
-  // qty개 인벤토리에 적재한다. 불가(항목 없음 / 가격 부족 / qty 비정상)면 null(변화 없음).
-  // 반환값 = 구매한 상점 항목(ShopItem).
-  buy: (shopId: string, qty?: number) => ShopItem | null
   // 골드 차감(범용 지불 primitive). amount 만큼 보유 골드에서 빼되, 보유분 이상일 때만 — 부족하거나
   // amount 가 비정상(음수·비유한)이면 무변화로 false. 성공이면 true. 제안 강제 갱신 등 "골드만 무는" 동작이 쓴다.
   spendGold: (amount: number) => boolean
@@ -95,36 +89,6 @@ function addItems(
     else next.push({ ...a })
   }
   return next
-}
-
-// 가격(골드/아이템/무료) 충족 여부 — canBuy 게이트와 buy 게이트가 공유하는 단일 정의.
-function canAfford(
-  price: Material,
-  qty: number,
-  gold: number,
-  items: readonly ItemStack[],
-): boolean {
-  if (price.kind === 'free') return true
-  if (price.kind === 'gold') return gold >= price.amount * qty
-  return countOf(items, price.itemId) >= price.count * qty
-}
-
-// 가격 차감 후의 골드·인벤토리(구매 아이템 적재 전). buy 의 적용부가 공유한다.
-function chargeFor(
-  price: Material,
-  qty: number,
-  gold: number,
-  items: readonly ItemStack[],
-): { gold: number; items: readonly ItemStack[] } {
-  if (price.kind === 'gold') return { gold: gold - price.amount * qty, items }
-  if (price.kind === 'item')
-    return {
-      gold,
-      items: subtractItems(items, [
-        { itemId: price.itemId, count: price.count * qty },
-      ]),
-    }
-  return { gold, items } // free
 }
 
 // 빈 강화 슬롯은 항상 시작 검(INITIAL_SWORD_ID = 검 +1)으로 재시작한다(파괴·판매·의뢰완료 공통 규칙).
@@ -264,32 +228,6 @@ export function createGameStore(opts: CreateOpts = {}) {
           }
         })
         return price
-      },
-
-      canBuy: (shopId, qty = 1) => {
-        if (!Number.isInteger(qty) || qty <= 0) return false
-        const entry = dataManager.getShopItem(shopId)
-        if (!entry) return false
-        return canAfford(entry.price, qty, get().gold, get().items)
-      },
-
-      buy: (shopId, qty = 1) => {
-        if (!Number.isInteger(qty) || qty <= 0) return null
-        const entry = dataManager.getShopItem(shopId)
-        if (!entry) return null
-        // 게이트는 canBuy 와 동일한 canAfford 로 단일화한다(이중 작성 → 어긋남 방지).
-        if (!canAfford(entry.price, qty, get().gold, get().items)) return null
-
-        set((state) => {
-          const paid = chargeFor(entry.price, qty, state.gold, state.items)
-          // 구매한 아이템(지급 itemId)을 qty개 인벤토리에 적재(스택 합산).
-          // (검 itemId를 파는 경우의 '장착' 처리는 검 상점 도입 시 별도로 다룬다.)
-          return {
-            gold: paid.gold,
-            items: addItems(paid.items, [{ itemId: entry.itemId, count: qty }]),
-          }
-        })
-        return entry
       },
 
       spendGold: (amount) => {

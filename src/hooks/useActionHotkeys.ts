@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import {
   isDesktopPointer,
   isEditableTarget,
-  isShopHotkeyEvent,
   modifierActionForKey,
 } from '../lib/hotkeys'
 
@@ -10,28 +9,25 @@ import {
 //   · Ctrl '탭' = 판매, Alt '탭' = 보관 — 단독으로 눌렀다 뗀(중간에 다른 키 없음) 경우에만 발동한다.
 //     조합키(Ctrl+R, Ctrl+S, Alt+Tab …)에서 수정자 keydown 으로 오발하지 않도록 keyup-탭으로 판정한다:
 //     수정자가 눌린 뒤 다른 키가 끼면 그 홀드를 무효화하고, 깨끗한 단독 탭의 keyup 에서만 액션을 낸다.
-//   · S = 상점 열기 — 비파괴·가역이라 단순 keydown.
 // 데스크탑(정밀 포인터+호버) 환경에서만 부착한다 — 터치 전용 기기 제외.
-// enabled=false(예: 상점 열림)면 부착하지 않아 모달 내부 입력을 보존한다.
+// enabled=false 면 부착하지 않는다(모달 등에서 입력 보존).
 // 가능 여부(판매/보관 게이트)는 호출 측 핸들러가 소유한다 — sell()·store() 는 무효 상태면 no-op(버튼과 동일).
 type UseActionHotkeysOptions = {
   enabled: boolean
   onSell: () => void
   onStore: () => void
-  onOpenShop: () => void
 }
 
 export function useActionHotkeys({
   enabled,
   onSell,
   onStore,
-  onOpenShop,
 }: UseActionHotkeysOptions) {
   // 콜백을 ref 로 고정해 콜백 변경 시 리스너(와 탭 상태 머신)를 재부착하지 않는다.
   // 리스너는 이벤트 발생 시점에 cbRef.current 를 읽으므로 렌더 후 effect 에서 갱신해도 안전하다.
-  const cbRef = useRef({ onSell, onStore, onOpenShop })
+  const cbRef = useRef({ onSell, onStore })
   useEffect(() => {
-    cbRef.current = { onSell, onStore, onOpenShop }
+    cbRef.current = { onSell, onStore }
   })
 
   useEffect(() => {
@@ -41,12 +37,6 @@ export function useActionHotkeys({
     let armed: string | null = null
 
     const onKeyDown = (e: KeyboardEvent) => {
-      // S = 상점 열기(단순 keydown).
-      if (isShopHotkeyEvent(e)) {
-        e.preventDefault()
-        cbRef.current.onOpenShop()
-        return
-      }
       if (e.repeat) return // 꾹 누름 반복은 탭 판정에 영향 없음(무시).
       if (modifierActionForKey(e.key) !== null) {
         // 단독 수정자 keydown: 아직 다른 키가 안 끼었을 때만(armed===null) 탭 후보로 무장.

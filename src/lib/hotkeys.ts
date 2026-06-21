@@ -60,19 +60,6 @@ export function commissionHotkeySlot(e: KeyboardEvent): number | null {
   return slot === undefined ? null : slot
 }
 
-// S = 상점 열기 단축키로 쓰는 KeyboardEvent.code — 키보드 레이아웃과 무관한 물리 키 식별자.
-export const SHOP_HOTKEY_CODE = 'KeyS'
-
-// 이 keydown 을 "S = 상점 열기" 단축키로 처리해야 하는가.
-// S 키 · 수정자 없음 · 반복(꾹 누름) 아님 · 편집 입력 포커스 아님일 때만 true(스페이스 강화와 동일 정책).
-// 상점 열기는 비파괴·가역(닫으면 됨)이라 단순 keydown 으로 처리한다(판매·보관의 keyup-탭과 대비).
-export function isShopHotkeyEvent(e: KeyboardEvent): boolean {
-  if (e.code !== SHOP_HOTKEY_CODE) return false
-  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return false
-  if (e.repeat) return false
-  return !isEditableTarget(e.target)
-}
-
 // 단독-수정자 '탭'(눌렀다 뗌) 액션: Ctrl = 판매, Alt = 보관(요청: "Ctrl 누르면 판매, Alt 누르면 보관").
 // 판매·보관은 비가역(검 소모)이라 keydown 으로 발동하면 모든 조합키(Ctrl+R, Alt+Tab …)의 수정자
 // keydown 에서 오발한다 — 그래서 "중간에 다른 키가 끼지 않은 단독 탭"을 keyup 에서 판정한다(useActionHotkeys).

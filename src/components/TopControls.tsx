@@ -1,7 +1,7 @@
 import { memo, useCallback } from 'react'
 import { dataManager } from '../data/DataManager'
 import { LANGS, useI18nStore, useT } from '../i18n'
-import { formatAmount } from '../lib/format'
+import { formatAmount, formatGold } from '../lib/format'
 import { useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
 import { Coin } from './Coin'
@@ -30,14 +30,15 @@ export const TopControls = memo(function TopControls() {
 // 를 직접 읽는다(CommissionBar 와 동일). 위(Refresh 아이콘) / 아래(골드 코인 + 비용)로 세로 배치한다.
 function RefreshOffersButton() {
   const t = useT()
-  const gold = useGameStore((s) => s.gold)
-  const maxLevelReached = useGameStore((s) => s.maxLevelReached)
+  const lang = useI18nStore((s) => s.lang)
   const config = dataManager.getCommissionConfig()
   const refreshCost = config.refreshCost
-  // 잠금 해제(도달 레벨) + 비용 충당 가능할 때만 활성. refreshNow 가 같은 조건을 self-guard 하지만,
-  // 비활성(흐림)으로 미리 알려 헛클릭(골드 부족·잠금)을 막는다.
-  const canRefresh =
-    maxLevelReached >= config.unlockAtLevel && gold >= refreshCost
+  // 잠금 해제(도달 레벨) + 비용 충당 가능할 때만 활성. 골드/도달레벨 '값'이 아니라 그 게이트 불리언을
+  // 구독해, 임계를 넘나들 때만 리렌더한다(매 강화·판매·보상마다 도는 골드 변화에 버튼이 헛리렌더되지 않게).
+  // refreshNow 가 같은 조건을 self-guard 하지만, 비활성(흐림)으로 미리 알려 헛클릭을 막는다.
+  const canRefresh = useGameStore(
+    (s) => s.maxLevelReached >= config.unlockAtLevel && s.gold >= refreshCost,
+  )
   const onRefresh = useCallback(() => {
     useCommissionStore.getState().refreshNow()
   }, [])
@@ -46,8 +47,9 @@ function RefreshOffersButton() {
       type="button"
       onClick={onRefresh}
       disabled={!canRefresh}
-      // 비용은 아이콘으로 보이지만 스크린리더엔 동작+금액을 합성해 알린다(CommissionBar 의 aria-label 관례).
-      aria-label={`${t('commission.refresh')}: ${formatAmount(refreshCost)} gold`}
+      // 비용은 아이콘으로 보이지만 스크린리더엔 동작+금액(통화 단위 포함)을 합성해 알린다(GoldDisplay 의
+      // formatGold aria 관례 재사용 — 로케일별 단위 '원'/'G' 가 붙는다).
+      aria-label={`${t('commission.refresh')}: ${formatGold(refreshCost, lang)}`}
       className="flex cursor-pointer flex-col items-center gap-0.5 rounded-lg border border-frame/50 bg-panel px-3 py-1.5 text-on-dark transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
     >
       <RefreshIcon />

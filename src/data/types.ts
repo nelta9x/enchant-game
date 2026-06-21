@@ -23,19 +23,6 @@ export type ItemCost = { itemId: string; count: number }
 // 구조의 itemId/count 부분은 인벤토리 한 칸(ItemStack)과 같지만 데이터 레이어 독립을 위해 별도로 둔다.
 export type Drop = { itemId: string; count: number; chance: number }
 
-// 상점 판매 항목(언어 중립). 항목 식별자(id)는 지급 itemId와 분리한다 —
-// 같은 itemId를 서로 다른 가격(골드 / 아이템)으로 여러 항목에서 팔 수 있기 때문이다.
-// 표시명은 데이터에 박지 않고 itemId → lib/items의 itemDisplayName으로 해석한다.
-// 새 항목은 이 카탈로그 + (검이 아니면) lib/items 표시명 매핑·번역을 갖춰야 한다(무결성은 시드 테스트가 강제).
-//  - id: 상점 항목 식별자(SKU, 구매 대상 — dedup/조회 키)
-//  - itemId: 구매 시 인벤토리(items)에 지급되는 아이템 id
-//  - price: 1개당 가격 — Material(gold / item / free) 재사용
-export type ShopItem = {
-  id: string
-  itemId: string
-  price: Material
-}
-
 // 아이템 카탈로그 1건(언어 중립). 검이 아닌 아이템(철조각 등 재료)의 메타데이터를 데이터 파일(items.json)에 둔다.
 // 표시명은 데이터에 박지 않고 id → i18n 키(item.<id>)로 파생한다(검의 nameKey 파생 패턴 미러).
 //  - id: 인벤토리 itemId(= 카탈로그 키)

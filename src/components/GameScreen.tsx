@@ -28,7 +28,6 @@ import { InventoryPanel } from './InventoryPanel'
 import { particleCount } from './particles'
 import { protectionState, isProtectionActive } from './protection'
 import { ActionButton } from './ActionButton'
-import { ShopModal } from './ShopModal'
 import { GameClearModal } from './GameClearModal'
 import { TopControls } from './TopControls'
 import { CenterStage } from './CenterStage'
@@ -63,7 +62,7 @@ function FlightAnchor({
 }
 
 // 메인 강화 화면. 레퍼런스 레이아웃을 따른 가로 스테이지:
-//   상단(언어·난이도 / 상점·닫기) · 좌(비용카드·인벤토리) · 중앙(검 스테이지) · 우(강화·골드).
+//   상단(언어 토글 / 최고 기록 / 거래 제안 갱신) · 좌(인벤토리) · 중앙(검 스테이지) · 우(강화·판매).
 // 강화 1회 결과는 연출(성공=떨림 후 황금 파티클 / 파괴=떨림 후 폭발 / 방지=떨림)로 보여 주고,
 // 결과 문구는 화면에 보이지 않는 sr-only 라이브 리전으로 음성 전달한다.
 export function GameScreen() {
@@ -144,11 +143,6 @@ export function GameScreen() {
   // 버튼은 잠금 동안 '비활성(흐림)'이 아니라 쿨다운 오버레이로 표현하므로, 아래에서 disabled={!canEnhance} 로
   // 따로 게이팅한다(클릭은 handleEnhance 의 잠금 가드가 막는다).
   const enhanceDisabled = !canEnhance || enhanceLocked
-
-  // 상점 팝업 열림 상태.
-  const [shopOpen, setShopOpen] = useState(false)
-  const openShop = useCallback(() => setShopOpen(true), [])
-  const closeShop = useCallback(() => setShopOpen(false), [])
 
   // 게임 클리어(승리) — 최종 검(다음 단계 없음)에 도달하면 축하 모달을 띄운다. reveal 시점에 resultStore
   // 가 켠다(가격강조·이름공개와 같은 박자) → 여기선 좁혀 구독해 모달만 띄운다.
@@ -494,20 +488,19 @@ export function GameScreen() {
     }
   })
 
-  // 데스크탑에서 스페이스바 = 강화(상점이 닫혀 있을 때만, 강화 버튼과 동일한 게이트를 따른다).
+  // 데스크탑에서 스페이스바 = 강화(강화 버튼과 동일한 게이트를 따른다).
   useEnhanceHotkey({
-    enabled: !shopOpen,
+    enabled: true,
     disabled: enhanceDisabled,
     onEnhance: handleEnhance,
   })
 
-  // 데스크탑 액션 단축키: Ctrl 탭 = 판매, Alt 탭 = 보관(단독 탭만 — 조합키 오발 방지), S = 상점 열기.
-  // 상점이 닫혀 있을 때만 부착한다(모달 내부 입력 보존). 판매·보관 가능 여부는 핸들러가 self-gate.
+  // 데스크탑 액션 단축키: Ctrl 탭 = 판매, Alt 탭 = 보관(단독 탭만 — 조합키 오발 방지).
+  // 판매·보관 가능 여부는 핸들러가 self-gate.
   useActionHotkeys({
-    enabled: !shopOpen,
+    enabled: true,
     onSell: handleSell,
     onStore: handleStore,
-    onOpenShop: openShop,
   })
 
   // (연출 트리거 투영·스프라이트 오버레이·결계 plonk·결과 알림은 CenterStage 로, 비행 오버레이는
@@ -537,7 +530,7 @@ export function GameScreen() {
         </div>
 
         {/* 상단 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
-        <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={!shopOpen} />
+        <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={true} />
 
         {/* 좁은 화면(<lg)은 단일 컬럼 세로 스택, lg+ 는 3열 그리드 — 3열은 고정폭 검 스테이지(검 박스 240·
             이름 배너 320)가 들어갈 만큼 넓을 때만 쓴다. sm(640) 기준이면 640~1024 구간에서 가운데 트랙이
@@ -576,7 +569,6 @@ export function GameScreen() {
             liveSword={sword}
             protection={protection}
             onToggleProtection={toggleProtection}
-            onOpenShop={openShop}
             swordBoxRef={swordBoxRef}
             goldGain={goldGain}
           />
@@ -658,8 +650,6 @@ export function GameScreen() {
         />
       </div>
 
-      {/* 상점 팝업 (전체 화면 오버레이 — 열렸을 때만 렌더) */}
-      <ShopModal open={shopOpen} onClose={closeShop} />
       <GameClearModal
         open={cleared}
         onClose={() => useResultStore.getState().dismissCleared()}

@@ -546,49 +546,6 @@ describe('gameStore — 보관 / 장착', () => {
   })
 })
 
-describe('gameStore — 상점 구매', () => {
-  // 파괴방지권은 골드로만 판다(철조각 교환 경로 제거됨). 가격 액수는 밸런스 값이라 단언하지 않는다.
-  it('골드 구매: 골드 차감 + 파괴보호장치 적재', () => {
-    const before = 2_500_000
-    const store = createGameStore({ gold: before })
-    expect(store.getState().canBuy('protection_ticket_gold')).toBe(true)
-    expect(store.getState().buy('protection_ticket_gold')).not.toBeNull()
-    expect(store.getState().gold).toBeLessThan(before) // 가격(amount)은 밸런스 값 — 차감 방향만
-    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(1)
-  })
-
-  it('수량 구매: 골드 가격 × qty 차감 + qty개 지급', () => {
-    const before = 3_000_000
-    const store = createGameStore({ gold: before })
-    expect(store.getState().buy('protection_ticket_gold', 3)).not.toBeNull()
-    expect(store.getState().gold).toBeLessThan(before)
-    expect(countOf(store.getState().items, PROTECTION_TICKET_ID)).toBe(3)
-  })
-
-  it('골드가 부족하면 구매 불가 + buy는 null(상태 불변)', () => {
-    const store = createGameStore({ gold: 999_999 })
-    expect(store.getState().canBuy('protection_ticket_gold')).toBe(false)
-    expect(store.getState().buy('protection_ticket_gold')).toBeNull()
-    expect(store.getState().gold).toBe(999_999)
-  })
-
-  it('존재하지 않는 상점 항목 id는 구매 불가', () => {
-    const store = createGameStore({ gold: 10_000_000 })
-    expect(store.getState().canBuy('nonexistent')).toBe(false)
-    expect(store.getState().buy('nonexistent')).toBeNull()
-    expect(store.getState().gold).toBe(10_000_000)
-  })
-
-  it('비정상 수량(0 · 음수 · 소수)은 구매 불가', () => {
-    const store = createGameStore({ gold: 10_000_000 })
-    expect(store.getState().canBuy('protection_ticket_gold', 0)).toBe(false)
-    expect(store.getState().canBuy('protection_ticket_gold', -1)).toBe(false)
-    expect(store.getState().canBuy('protection_ticket_gold', 1.5)).toBe(false)
-    expect(store.getState().buy('protection_ticket_gold', 0)).toBeNull()
-    expect(store.getState().gold).toBe(10_000_000)
-  })
-})
-
 describe('gameStore — 의뢰 완료(fulfillCommission)', () => {
   it('가방 보유 검: 가방에서 차감, 장착 슬롯 불변, gold += reward', () => {
     const store = createGameStore({

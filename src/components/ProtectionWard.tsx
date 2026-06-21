@@ -12,14 +12,12 @@ import { SigilRunes } from './Sigil'
 //     (무기만 보고 있어도 "보호 중"임이 읽힌다).
 //   · 비발동/부족/보호불가: 서클이 disable 처럼 흐려지고, 가운데 파괴보호장치 아이템 +
 //     아래 충전 수치(예: 0/6 — 6 필요한데 0 보유)로 "무엇이 얼마나 필요한지"를 드러낸다.
-// 서클을 누르면 발동을 토글하고(충분할 때), 부족하면 상점으로 보낸다.
+// 서클을 누르면 발동을 토글한다(충분할 때). 부족·보호불가 상태는 정적 표시다(파괴보호장치는 거래 제안으로 얻는다).
 
 export type ProtectionWardProps = {
   state: ProtectionState
   // 발동 토글(ready·armed). 충분히 보유한 상태에서 결계를 켜고 끈다.
   onToggle: () => void
-  // 상점 열기(insufficient) — 부족분을 채우러.
-  onShop: () => void
   // 파괴보호장치로 살아남은 순간(protected) 결계가 폭발을 튕겨내는 흰빛 플레어 트리거(0 무시).
   blockKey: number
   // 플레어 시작 지연(초) — 막아냄은 망치가 닿는 순간(impact) 일어나므로 그만큼 늦춰 떨림과 박자를 맞춘다.
@@ -29,7 +27,6 @@ export type ProtectionWardProps = {
 export function ProtectionWard({
   state,
   onToggle,
-  onShop,
   blockKey,
   flareDelaySec = 0,
 }: ProtectionWardProps) {
@@ -64,12 +61,7 @@ export function ProtectionWard({
           민다. 세로형(<lg)에서도 같은 바깥 오프셋을 유지한다 — 검 박스(마법진)를 결계 그룹이 컬럼 폭을
           넘지 않을 만큼만 키워(SwordStage max-w) 결계가 마법진과 안 겹치고 화면에도 모두 보인다. */}
       <div className="absolute" style={{ left: '-25%', top: '-2%' }}>
-        <ProtectionSigil
-          state={state}
-          onToggle={onToggle}
-          onShop={onShop}
-          t={t}
-        />
+        <ProtectionSigil state={state} onToggle={onToggle} t={t} />
       </div>
     </div>
   )
@@ -78,12 +70,10 @@ export function ProtectionWard({
 function ProtectionSigil({
   state,
   onToggle,
-  onShop,
   t,
 }: {
   state: ProtectionState
   onToggle: () => void
-  onShop: () => void
   t: ReturnType<typeof useT>
 }) {
   const armed = state.kind === 'armed'
@@ -140,17 +130,13 @@ function ProtectionSigil({
         {body}
       </div>
     )
-  // insufficient: 탭 = 상점(부족분 채우기).
+  // insufficient: 파괴보호장치가 부족 — 정적 표시(상점 제거됨; 보호장치는 거래 제안으로 얻는다).
+  // 가운데 아이템 + 아래 충전 수치(예: 0/6)로 "무엇이 얼마나 필요한지"를 그대로 드러낸다.
   if (insufficient)
     return (
-      <button
-        type="button"
-        onClick={onShop}
-        aria-label={t('shop.open')}
-        className={cls}
-      >
+      <div className={cls} aria-label={t('protection.insufficient')}>
         {body}
-      </button>
+      </div>
     )
   // ready·armed: 탭 = 발동 토글.
   return (

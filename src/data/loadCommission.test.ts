@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { parseCommissionConfig, loadCommission } from './loadCommission'
 import { loadSwords } from './loadSwords'
 import { loadItems } from './loadItems'
-import { loadShop } from './loadShop'
+import { PROTECTION_TICKET_ID } from '../game/enhancer'
 
 // 출제 가능 itemId 집합(판매 가능 검 ∪ 카탈로그) — 테스트용 최소셋.
 const KNOWN = new Set([
@@ -430,8 +430,8 @@ describe('loadCommission — 번들 데이터 진입점', () => {
     const known = new Set<string>()
     for (const s of loadSwords()) if (s.sellPrice !== null) known.add(s.id)
     for (const it of loadItems()) known.add(it.id)
-    // 상점이 지급하는 itemId(파괴방지권 등)도 출제 집합에 포함한다(DataManager.load 와 동일 규칙).
-    for (const sku of loadShop()) known.add(sku.itemId)
+    // 파괴보호장치(카탈로그에 없는 특수 소비재)도 출제 집합에 포함한다(DataManager.load 와 동일 규칙).
+    known.add(PROTECTION_TICKET_ID)
     return known
   }
 

@@ -1,9 +1,9 @@
 import { memo, useCallback, useRef } from 'react'
 import { motion } from 'motion/react'
 import { dataManager } from '../data/DataManager'
-import { useT } from '../i18n'
+import { useI18nStore, useT } from '../i18n'
 import { itemDisplayName } from '../lib/items'
-import { formatAmount } from '../lib/format'
+import { formatAmount, formatGold } from '../lib/format'
 import { useCommissionHotkey } from '../hooks/useCommissionHotkey'
 import { useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
@@ -19,7 +19,7 @@ import { ItemIcon } from './ItemIcon'
 // 생명주기(active 에서 제거)는 commissionStore.fulfill 이 소유.
 type CommissionBarProps = {
   onFulfill: (commission: Commission, originEl: HTMLElement | null) => void
-  // 숫자 1·2·3 납품 단축키 활성 여부(상점 열림 등에서 끈다).
+  // 숫자 1·2·3 납품 단축키 활성 여부(모달 열림 등에서 끈다).
   hotkeysEnabled: boolean
 }
 
@@ -130,6 +130,7 @@ function CommissionCard({
   onFulfill: (commission: Commission, cardEl: HTMLElement) => void
 }) {
   const t = useT()
+  const lang = useI18nStore((s) => s.lang)
   const key = slotIndex + 1 // 납품 단축키(1·2·3)
   // 거래는 "지불(cost) → 보상(reward)". 둘 다 골드 또는 아이템(Material)이다.
   // 헤드라인 = 지불할 것(큰 아이콘), 보조줄 = 받는 것(→ 표기). 골드 비용 거래는 코인이 헤드라인이 된다.
@@ -146,14 +147,14 @@ function CommissionCard({
     reward.kind === 'item'
       ? (dataManager.getSwordById(reward.itemId)?.level ?? null)
       : null
-  // 스크린리더용 "지불 → 보상" 문구.
+  // 스크린리더용 "지불 → 보상" 문구. 골드 단위는 formatGold(로케일별 '원'/'G')로 — 하드코딩 'gold' 회피.
   const costLabel =
     cost.kind === 'gold'
-      ? `${formatAmount(cost.amount)} gold`
+      ? formatGold(cost.amount, lang)
       : `${costName}${cost.count > 1 ? ` ×${cost.count}` : ''}`
   const rewardLabel =
     reward.kind === 'gold'
-      ? `${formatAmount(reward.amount)} gold`
+      ? formatGold(reward.amount, lang)
       : reward.kind === 'item'
         ? `${rewardName}${reward.count > 1 ? ` ×${reward.count}` : ''}`
         : rewardName

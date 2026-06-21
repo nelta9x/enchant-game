@@ -4,11 +4,10 @@ import type {
   FloatingTextData,
   FloatingTextEntry,
   ItemData,
-  ShopItem,
   SwordData,
 } from './types'
+import { PROTECTION_TICKET_ID } from '../game/enhancer'
 import { loadSwords } from './loadSwords'
-import { loadShop } from './loadShop'
 import { loadItems } from './loadItems'
 import { loadCommission } from './loadCommission'
 import { loadFloatingText } from './loadFloatingText'
@@ -19,7 +18,6 @@ import { loadAnimation } from './loadAnimation'
 // 이 매니저를 통해서만 접근한다(데이터의 단일 출처).
 export class DataManager {
   private swords: readonly SwordData[] = []
-  private shop: readonly ShopItem[] = []
   private items: readonly ItemData[] = []
   private commission: CommissionConfig | null = null
   private floatingText: FloatingTextData = {}
@@ -27,7 +25,7 @@ export class DataManager {
   private loaded = false
 
   // 데이터 파일(public/data/*.json)을 검증·적재한다(동기).
-  // 데이터 소스는 코드 상수가 아니라 별도 데이터 파일이며, loadSwords()/loadShop()/loadItems()이
+  // 데이터 소스는 코드 상수가 아니라 별도 데이터 파일이며, loadSwords()/loadItems()이
   // 파일을 읽어 런타임 검증을 거친 도메인 타입으로 만든다.
   // 원격/비동기 로드가 필요해지면 이 메서드만 async로 전환하면 된다.
   //
@@ -36,15 +34,14 @@ export class DataManager {
   // 알려진 itemId 집합(knownItemIds)을 먼저 만들어 주입한다(sword_1 등 비판매 검 출제 차단).
   load(): void {
     this.swords = loadSwords()
-    this.shop = loadShop()
     this.items = loadItems()
     const knownItemIds = new Set<string>()
     for (const s of this.swords)
       if (s.sellPrice !== null) knownItemIds.add(s.id)
     for (const it of this.items) knownItemIds.add(it.id)
-    // 상점이 지급하는 itemId(파괴방지권 등)도 정당히 소유 가능한 아이템이므로 출제 집합에 포함한다 —
-    // 카탈로그(재료)에는 없지만 거래 제안 보상으로 지급할 수 있어야 한다(기준가는 없어도 됨, 고정 지급).
-    for (const sku of this.shop) knownItemIds.add(sku.itemId)
+    // 파괴보호장치(파괴방지권)는 재료 카탈로그(items.json)에 없는 특수 소비재지만(lib/items 의 carve-out),
+    // 거래 제안 보상으로 정당히 지급되므로 출제 집합에 명시적으로 등록한다(기준가 없는 고정 지급 아이템).
+    knownItemIds.add(PROTECTION_TICKET_ID)
     this.commission = loadCommission(knownItemIds)
     // 플로팅 텍스트 연출 데이터 — 검·아이템·의뢰와 무관(이벤트 키 → 문구만)이라 순서 제약 없음.
     this.floatingText = loadFloatingText()
@@ -85,18 +82,6 @@ export class DataManager {
   getSwordByLevel(level: number): SwordData | undefined {
     this.ensureLoaded()
     return this.swords.find((s) => s.level === level)
-  }
-
-  // 상점 판매 목록(데이터 순서 유지). 상점 UI가 그대로 순회해 렌더한다.
-  getShopItems(): readonly ShopItem[] {
-    this.ensureLoaded()
-    return this.shop
-  }
-
-  // 특정 항목 id(SKU)의 상점 항목(없으면 undefined). 구매 검증/가격 조회에 사용.
-  getShopItem(id: string): ShopItem | undefined {
-    this.ensureLoaded()
-    return this.shop.find((s) => s.id === id)
   }
 
   // 아이템 카탈로그(검이 아닌 재료 등). 표시명/스프라이트 해석(lib/items)이 검 다음으로 조회한다.

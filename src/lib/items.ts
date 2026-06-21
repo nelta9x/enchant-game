@@ -11,8 +11,8 @@ export { PROTECTION_TICKET_ID }
 // PROTECTION_TICKET_ID 와 같은 이유로 이 허브를 통해 재노출한다.
 export { countOf } from '../game/inventory'
 
-// 파괴보호장치 표시명 키 — carve-out. 상점 전용 아이템이라 의뢰 카탈로그(items.json)에 없고
-// basePrice 가 의미 없어 카탈로그에 넣지 않는다. 재료(철조각 등)는 items.json 카탈로그로 이관됐다.
+// 파괴보호장치 표시명 키 — carve-out. 거래 제안 보상으로만 얻는 특수 소비재라 basePrice 가 의미 없어
+// 카탈로그(items.json)에 넣지 않는다(출제 집합 등록은 DataManager 가 명시적으로 처리). 재료(철조각 등)는 카탈로그에 있다.
 // 동적 문자열로 t()를 호출하면 TranslationKey 타입을 벗어나므로 알려진 itemId만 리터럴 키로 매핑한다.
 const ITEM_NAME_KEYS: Record<string, TranslationKey> = {
   [PROTECTION_TICKET_ID]: 'item.protection_ticket',

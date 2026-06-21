@@ -6,14 +6,6 @@ export const en: Record<TranslationKey, string> = {
   // 앱 공통
   'app.title': 'Sword Enchant',
 
-  // 상점
-  'shop.open': 'Shop',
-  'shop.title': 'Shop',
-  'shop.buy': 'Buy',
-  'shop.close': 'Close',
-  'shop.owned': 'Owned',
-  'shop.insufficient': 'Not enough',
-
   // 비용 카드
   'cost.enhance': 'Enchant Cost',
   'cost.sell': 'Sell Price',
@@ -28,6 +20,7 @@ export const en: Record<TranslationKey, string> = {
   // 파괴보호장치 보호 결계(검 주변) — 토글·상태 라벨
   'protection.toggle': 'Toggle protection',
   'protection.unavailable': 'No Protection',
+  'protection.insufficient': 'Not enough protection',
 
   // 검 스테이지 스탯
   'stat.successRate': 'Enchant Success Rate',

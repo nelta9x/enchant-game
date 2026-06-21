@@ -71,7 +71,6 @@ type CenterStageProps = {
   // 보호 결계 순수 상태 — gold·items 의존이라 GameScreen 에서 계산해 내려준다(여기선 표시만).
   protection: ProtectionState
   onToggleProtection: () => void
-  onOpenShop: () => void
   // 판매 코인·드롭 비행의 출발점(검 박스) 측정용 — GameScreen 이 소유하고 카드 오버레이와 공유한다.
   swordBoxRef: RefObject<HTMLDivElement | null>
   // 판매·의뢰 보상 "+금액" 텍스트(검 박스 위) — 판매/의뢰 경로 로컬 상태라 prop 으로 받는다.
@@ -85,7 +84,6 @@ export const CenterStage = memo(function CenterStage({
   liveSword,
   protection,
   onToggleProtection,
-  onOpenShop,
   swordBoxRef,
   goldGain,
 }: CenterStageProps) {
@@ -182,11 +180,10 @@ export const CenterStage = memo(function CenterStage({
     () => ({
       state: protection,
       onToggle: onToggleProtection,
-      onShop: onOpenShop,
       blockKey,
       flareDelaySec: anim.hammerImpactMs / 1000,
     }),
-    [protection, onToggleProtection, onOpenShop, blockKey, anim],
+    [protection, onToggleProtection, blockKey, anim],
   )
 
   const spriteOverlay = useMemo(

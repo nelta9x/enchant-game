@@ -32,24 +32,6 @@ describe('DataManager', () => {
     expect(dm.getSwordById('protection_ticket')).toBeUndefined()
   })
 
-  it('load() 호출 전 상점 조회하면 에러를 던진다', () => {
-    const dm = new DataManager()
-    expect(() => dm.getShopItems()).toThrow()
-    expect(() => dm.getShopItem('protection_ticket')).toThrow()
-  })
-
-  it('load() 후 상점 항목을 항목 id(SKU)로 조회할 수 있다', () => {
-    const dm = new DataManager()
-    dm.load()
-    expect(dm.getShopItems().length).toBeGreaterThan(0)
-    expect(dm.getShopItem('protection_ticket_gold')?.itemId).toBe(
-      'protection_ticket',
-    )
-    // itemId는 항목 id가 아니므로 조회되지 않는다.
-    expect(dm.getShopItem('protection_ticket')).toBeUndefined()
-    expect(dm.getShopItem('nonexistent')).toBeUndefined()
-  })
-
   it('load() 후 아이템 카탈로그를 조회할 수 있다(검은 카탈로그가 아님)', () => {
     const dm = new DataManager()
     dm.load()
@@ -110,22 +92,7 @@ describe('검 데이터 ↔ i18n 무결성', () => {
   })
 })
 
-// 상점 itemId 도 표시명으로 해석 가능해야 한다(검 규약 또는 알려진 아이템 키).
-// loadShop 은 구조 검증만 하므로(데이터→뷰 결합 회피), 표시명 무결성은 이 시드 테스트가
-// 강제한다 — 미해석 itemId 는 런타임에 원문이 노출되어 원칙1(다국어)을 위반한다.
-describe('상점 데이터 ↔ i18n 무결성', () => {
-  it('모든 상점 itemId(지급 + 아이템 가격)가 표시명으로 해석 가능하다', () => {
-    // isDisplayableItemId 의 검 경로는 공유 DataManager 인스턴스를 참조하므로 적재한다.
-    dataManager.load()
-    for (const item of dataManager.getShopItems()) {
-      expect(isDisplayableItemId(item.itemId)).toBe(true)
-      if (item.price.kind === 'item')
-        expect(isDisplayableItemId(item.price.itemId)).toBe(true)
-    }
-  })
-})
-
-// 아이콘 무결성: 라이브 데이터에 등장하는 모든 비-검 아이템(강화 재료·실패 드랍·상점 지급/가격)은
+// 아이콘 무결성: 라이브 데이터에 등장하는 모든 비-검 아이템(강화 재료·실패 드랍·거래 제안 비용/보상)은
 // 전용 스프라이트로 표시돼야 한다(원칙1: 토큰 폴백이 아닌 실제 아이콘). itemSpriteName 매핑이 있는지
 // + 그 PNG 가 public/sprites/items/ 에 실제로 존재하는지까지 검증한다(파일명 오타·누락 → 깨진 이미지 방지).
 // 검 itemId 는 SwordData.sprite 로 표시되므로 제외한다.
@@ -136,10 +103,6 @@ describe('아이템 아이콘 ↔ 스프라이트 무결성', () => {
     for (const sword of dataManager.getSwords()) {
       if (sword.enchantCost?.kind === 'item') ids.add(sword.enchantCost.itemId)
       for (const d of sword.dropOnFail) ids.add(d.itemId)
-    }
-    for (const item of dataManager.getShopItems()) {
-      ids.add(item.itemId)
-      if (item.price.kind === 'item') ids.add(item.price.itemId)
     }
     // 거래에 등장하는 모든 아이템(아이템 비용의 납품 아이템 + 아이템 보상의 지급 아이템)도 아이콘으로 표시되므로 함께 검증한다.
     for (const bucket of dataManager.getCommissionConfig().buckets) {
@@ -200,18 +163,12 @@ describe('강화 비용 점진성', () => {
   })
 
   // soft-lock 가드: 잡템(비-검) 재료를 비용으로 요구하는 검은, 그 재료를 도입 레벨 도달 전에 얻을 수단이
-  // 반드시 있어야 한다 — 더 낮은 레벨의 실패 드랍(dropOnFail)에 등장하거나, 상점에서 구매 가능하거나.
+  // 반드시 있어야 한다 — 더 낮은 레벨의 실패 드랍(dropOnFail)에 등장해야 한다(상점 제거됨 → 골드 구매 경로 없음).
   // 재료가 그 레벨 이상에서만 나오면 도착 즉시 막히는 데드락이 된다(검 itemId='재료검'은 드랍이 아니라
   // 강화·보관으로 얻으므로 이 가드 대상에서 제외). enchantCost(단일) + enchantCostItems(추가) 모두 검사.
-  it('재료 비용으로 쓰는 잡템은 도입 레벨 이전에 드랍되거나 상점에서 살 수 있다', () => {
+  it('재료 비용으로 쓰는 잡템은 도입 레벨 이전에 드랍된다', () => {
     dataManager.load()
     const swords = dataManager.getSwords()
-    const buyable = new Set(
-      dataManager
-        .getShopItems()
-        .map((s) => s.itemId)
-        .filter((id) => dataManager.getSwordById(id) === undefined),
-    )
     for (const sword of swords) {
       // 이 검의 모든 아이템 비용 itemId(단일 enchantCost item + 추가 enchantCostItems).
       const costItemIds = [
@@ -227,7 +184,7 @@ describe('강화 비용 점진성', () => {
             s.dropOnFail.some((d) => d.itemId === itemId),
         )
         expect(
-          dropsEarlier || buyable.has(itemId),
+          dropsEarlier,
           `'${sword.id}'(level ${sword.level})의 재료 비용 '${itemId}'를 도달 전에 얻을 수단이 없다`,
         ).toBe(true)
       }

@@ -162,19 +162,22 @@ export function createCommissionStore(opts: CreateOpts = {}) {
       const config = getConfig()
       // 잠금 중이면 갱신할 세션이 없다 — 강제 갱신도 불가(잠금 게이트를 골드로 우회하지 못하게). 무변화 false.
       if (!isUnlocked(config)) return false
-      // 골드 지불은 gameStore 소유(fulfill 과 동일한 두 store 트랜잭션 규율) — 차감 성공일 때만 갱신한다.
-      // (지불 후 줄어든 골드로 currentBucket 을 읽어 출제 풀을 고른다 — 갱신은 항상 현재 골드를 반영한다.)
-      if (!useGameStore.getState().spendGold(config.refreshCost)) return false
+      // 비용을 낼 수 있는지만 먼저 확인(차감 전). 출제 풀은 "지불 전" 골드 기준 버킷에서 고른다 — 지불로
+      // 골드 티어가 내려가 더 낮은(불리한) 풀을 뽑는 경계 근처 강등을 막는다("내가 선 티어에서 갱신").
+      if (useGameStore.getState().gold < config.refreshCost) return false
       const bucket = currentBucket(config)
-      set(
-        refresh(
-          rng,
-          buildPool(bucket),
-          settingsOf(bucket),
-          config.maxCommissions,
-          get().nextId,
-        ),
+      const next = refresh(
+        rng,
+        buildPool(bucket),
+        settingsOf(bucket),
+        config.maxCommissions,
+        get().nextId,
       )
+      // 세션을 먼저 확정한 뒤에만 과금한다(fulfill 과 동일한 두 store 트랜잭션 규율) — 빈 세션(방어: 로더가
+      // 빈 풀을 막지만 코어 단독 안전성 유지)이면 헛돈을 물지 않고 무변화 false 로 빠진다.
+      if (next.active.length === 0) return false
+      if (!useGameStore.getState().spendGold(config.refreshCost)) return false
+      set(next)
       // 강제 갱신은 잠금 해제 후에만 도달하므로 부트스트랩 래치를 세워 둔다 — 만약 자연 부트스트랩 전에
       // 갱신했다면, 다음 notifyAttempt 가 다시 부트스트랩해 방금 산 세션을 덮어쓰지 않도록(방어).
       bootstrapped = true

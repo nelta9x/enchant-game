@@ -5,14 +5,6 @@ export const ko = {
   // 앱 공통
   'app.title': '검 강화하기',
 
-  // 상점
-  'shop.open': '상점',
-  'shop.title': '상점',
-  'shop.buy': '구매',
-  'shop.close': '닫기',
-  'shop.owned': '보유',
-  'shop.insufficient': '재화 부족',
-
   // 비용 카드
   'cost.enhance': '강화비용',
   'cost.sell': '판매가격',
@@ -27,6 +19,8 @@ export const ko = {
   // 파괴보호장치 보호 결계(검 주변) — 토글·상태 라벨
   'protection.toggle': '파괴보호장치 사용 전환',
   'protection.unavailable': '보호 불가',
+  // 파괴보호장치 부족(결계 비활성 표시) — 보호장치는 거래 제안으로 얻는다.
+  'protection.insufficient': '파괴보호장치 부족',
 
   // 검 스테이지 스탯
   'stat.successRate': '강화 성공률',
