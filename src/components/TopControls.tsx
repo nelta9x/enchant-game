@@ -2,6 +2,7 @@ import { memo, useCallback } from 'react'
 import { dataManager } from '../data/DataManager'
 import { LANGS, useI18nStore, useT } from '../i18n'
 import { formatAmount, formatGold } from '../lib/format'
+import { sound } from '../lib/sound'
 import { useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
 import { Coin } from './Coin'
@@ -40,7 +41,9 @@ function RefreshOffersButton() {
     (s) => s.maxLevelReached >= config.unlockAtLevel && s.gold >= refreshCost,
   )
   const onRefresh = useCallback(() => {
-    useCommissionStore.getState().refreshNow()
+    // 갱신 성공(골드 실제 차감) 시에만 '골드 빠지는' 효과음을 낸다 — 판매·의뢰 성사가 쓰는 item_sold 와 동일.
+    // 사운드는 뷰 부수효과라 컴포넌트에서 store 반환값(true)을 보고 재생한다(refreshNow 는 순수 유지).
+    if (useCommissionStore.getState().refreshNow()) sound.playSfx('item_sold')
   }, [])
   return (
     <button
