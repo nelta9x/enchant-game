@@ -1,5 +1,5 @@
 // 방사형 파티클 연출의 공유 코어(순수). 파괴(적)·성공(금)이 같은 분출 패턴을 쓰고,
-// "강화 단계가 높을수록 더 많이" 규칙을 한 곳에서 관리한다(ParticlePool 이 렌더).
+// "강화 단계가 높을수록 더 많이" 규칙을 한 곳에서 관리한다(EffectCanvas 가 렌더).
 
 // 파티클 비행 시간(초). 파괴/성공 연출의 길이 계산에도 쓰인다(단일 출처).
 export const PARTICLE_DUR = 0.6
@@ -18,6 +18,9 @@ export type Particle = { x: number; y: number; size: number; stagger: number }
 // 값을 키우면 파티클이 더 넓게 퍼진다.
 const BURST_DIST = 96 // 첫 링 반경
 const BURST_RING_GAP = 42 // 링 간 간격
+// 도트가 도달하는 최대 반경(px) — 바깥 링(96 + 2×42) + 최대 도트 글로우 반경(12/(2·0.5)) + 여유. 효과 캔버스(EffectCanvas)가
+// 이 값으로 최소 크기를 정해 세로 폰(rem 이 작아 30rem < 도달 반경)에서 바깥 링이 잘리지 않게 한다.
+export const PARTICLE_REACH_PX = BURST_DIST + 2 * BURST_RING_GAP + 12 + 8
 
 // 중심에서 사방으로 흩는 파티클 좌표를 결정적으로 생성한다(렌더 비의존).
 // 균등 분포 + 교번 지터, 거리·크기는 인덱스로 순환 → count 가 커지면 같은 링이 더 촘촘해진다.

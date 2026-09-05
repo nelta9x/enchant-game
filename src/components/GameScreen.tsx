@@ -326,7 +326,7 @@ export function GameScreen() {
     sound.playSfx('enhance', { delayMs: tl.impactMs })
 
     // 망치 내려치기 연출 — 결과와 무관하게 강화 시도마다 검 위로 호라드릭 망치가 내리꽂힌다(잠금X·병렬).
-    // 이 이벤트가 HitSparkCanvas 의 불꽃 트리거도 겸한다(임팩트 = 닿는 순간). 잠금은 아래 enhanceLock 전담.
+    // 이 이벤트가 HitSparkTrigger 의 불꽃 트리거도 겸한다(임팩트 = 닿는 순간). 잠금은 아래 enhanceLock 전담.
     enqueueEffect({
       kind: 'hammerStrike',
       exclusive: false,
@@ -548,7 +548,7 @@ export function GameScreen() {
 
           {/* 중앙: 검 스테이지 + 결과 연출(오버레이) — running(효과)·resultStore(공개 상태)를 자기 자신이
               구독하는 memo 자식. GameScreen 의 gold·lockCount·items 커밋과 분리돼, 무거운 검 스테이지·오버레이
-              트리는 연출 트리거가 바뀔 때만 재조정된다(검 변경 리렌더 폭풍 차단의 핵심). 내부에 ParticleEmitProvider·
+              트리는 연출 트리거가 바뀔 때만 재조정된다(검 변경 리렌더 폭풍 차단의 핵심). 내부에 EffectCanvasProvider·
               SwordStage·스프라이트 오버레이·골드획득 텍스트·결과 알림을 모두 품는다. */}
           <CenterStage
             liveSword={sword}

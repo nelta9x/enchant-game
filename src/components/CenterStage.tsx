@@ -8,8 +8,8 @@ import { useResultStore } from '../store/resultStore'
 import { DestructionEffect, type DestructionEvent } from './DestructionEffect'
 import { HammerStrike, type HammerStrikeEvent } from './HammerStrike'
 import type { HammerShape } from './hammerTiming'
-import { HitSparkCanvas } from './HitSparkCanvas'
-import { ParticleEmitProvider, ParticlePool } from './ParticlePool'
+import { HitSparkTrigger } from './HitSparkTrigger'
+import { EffectCanvas, EffectCanvasProvider } from './EffectCanvas'
 import { FloatingTextEffect } from './FloatingTextEffect'
 import { GoldGainText, type GoldGainEvent } from './GoldGainText'
 import type { ProtectionState } from './protection'
@@ -155,13 +155,14 @@ export const CenterStage = memo(function CenterStage({
   const spriteOverlay = useMemo(
     () => (
       <>
-        {/* 파티클 풀 — 성공/파괴 버스트 도트(데이터 플래그로 on/off). 풀이 없으면 emit 은 자동 no-op. */}
-        {anim.enhanceParticlesEnabled && <ParticlePool />}
-        {/* 버스트 emit — 영속 emitter 가 새 id 마다 burstAt 타이머를 건다(렌더 null·풀이 그림). */}
+                {/* 버스트 emit — 영속 emitter 가 새 id 마다 burstAt 타이머를 건다(렌더 null·풀이 그림). */}
         <DestructionEffect event={destructionEvent} />
         <SuccessEffect event={successEvent} />
         {/* 잔상(떨림→팝업·소멸) — 영속 단일 캔버스가 최신 버스트를 그린다(레이어 churn 0, burstAt 에 교대). */}
         <ShakeAfterimage event={latestBurstEvent} />
+        {/* 효과 캔버스(도트 버스트 + 임팩트 불꽃, 한 장) — 잔상 위에 둬 임팩트 불꽃이 검에 가려지지 않게(데이터 플래그).
+            풀이 없으면 emit/burst 는 자동 no-op. */}
+        {anim.enhanceParticlesEnabled && <EffectCanvas />}
         {/* 망치 — 결과 연출 위. impactMs 로 닿는 시점을 데이터에서 받는다(플래그로 on/off). */}
         {anim.hammerSwingEnabled && (
           <HammerStrike
@@ -173,7 +174,7 @@ export const CenterStage = memo(function CenterStage({
         )}
         {/* Hit 불꽃 — 임팩트에 1회 폭발. 망치보다 "위"(나중 형제)에 둬 화구·불혀가 가려지지 않게(플래그). */}
         {anim.enhanceParticlesEnabled && (
-          <HitSparkCanvas
+          <HitSparkTrigger
             event={hammerStrikeEvent}
             impactMs={anim.hammerImpactMs}
           />
@@ -194,7 +195,7 @@ export const CenterStage = memo(function CenterStage({
   )
 
   return (
-    <ParticleEmitProvider>
+    <EffectCanvasProvider>
       <div className="relative flex min-h-0 w-full flex-1 items-center justify-center lg:w-auto lg:flex-none">
         <SwordStage
           sword={liveSword}
@@ -218,6 +219,6 @@ export const CenterStage = memo(function CenterStage({
           {announcement}
         </div>
       </div>
-    </ParticleEmitProvider>
+    </EffectCanvasProvider>
   )
 })

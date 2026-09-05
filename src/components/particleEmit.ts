@@ -1,12 +1,11 @@
 import { createContext, useCallback, useContext, type RefObject } from 'react'
 import type { Particle } from './particles'
 
-// 파티클 풀의 emit 컨텍스트(비-컴포넌트 모듈) — 풀(ParticlePool)이 자신의 emit 을 ref 에 등록하고, 소비자
-// (성공/파괴 버스트 경로)는 useParticleEmit 으로 그 ref 를 통해 호출한다. 컨텍스트·훅·타입을 컴포넌트
-// 파일에서 분리해 둔다(react-refresh: 컴포넌트 파일은 컴포넌트만 export).
+// 효과 캔버스(EffectCanvas)의 방출 인터페이스 — 소비자(BurstEmitter·HitSparkTrigger)는 이 컨텍스트로 캔버스 시스템에
+// "터뜨려라"만 전한다. 컨텍스트 값은 ref 라 캔버스 마운트/언마운트가 소비자를 리렌더하지 않고, 캔버스가 없으면
+// (데이터 플래그 off) 호출은 자동 no-op 이다. 컴포넌트가 아닌 모듈(react-refresh 규칙).
 
-// 한 번에 그릴 파티클 1개 묶음 — particles.ts 의 순수 좌표(Particle)를 그대로 쓴다.
-// (성공/파괴 버스트 전용 — Hit 불꽃은 캔버스(HitSparkCanvas)로 분리돼 이 풀을 쓰지 않는다.)
+// 성공/파괴 도트 버스트 명세 — 좌표(makeParticles)와 색(CSS var 또는 색 문자열).
 export type ParticleEmitSpec = {
   particles: Particle[] // 중심에서 사방으로 튀는 좌표(makeParticles)
   coreVar: string // 밝은 코어 색(CSS var 또는 색 문자열)
@@ -14,17 +13,31 @@ export type ParticleEmitSpec = {
 }
 
 export type ParticleEmit = (spec: ParticleEmitSpec) => void
+// 망치 임팩트 불꽃 — 원점은 검 박스 중심 기준 px.
+export type HitSparkBurst = (origin: { x: number; y: number }) => void
 
-// 풀이 emit 을 등록하고 소비자가 읽는 ref. Provider 가 만들어 풀·소비자에게 같은 ref 를 내려 준다.
-export const ParticleEmitContext =
-  createContext<RefObject<ParticleEmit | null> | null>(null)
+export type EffectCanvasApi = { emit: ParticleEmit; burst: HitSparkBurst }
 
-// 연출 컴포넌트가 호출하는 emit 핸들. 풀이 아직 등록 전이면(이론상 없음 — 풀은 앱 시작에 마운트) no-op.
+export const EffectCanvasContext =
+  createContext<RefObject<EffectCanvasApi | null> | null>(null)
+
+// 도트 버스트 방출기(안정 참조) — 캔버스 미마운트면 no-op.
 export function useParticleEmit(): ParticleEmit {
-  const ref = useContext(ParticleEmitContext)
+  const ref = useContext(EffectCanvasContext)
   return useCallback(
     (spec: ParticleEmitSpec) => {
-      ref?.current?.(spec)
+      ref?.current?.emit(spec)
+    },
+    [ref],
+  )
+}
+
+// 임팩트 불꽃 방출기(안정 참조) — 캔버스 미마운트면 no-op.
+export function useHitSparkBurst(): HitSparkBurst {
+  const ref = useContext(EffectCanvasContext)
+  return useCallback(
+    (origin: { x: number; y: number }) => {
+      ref?.current?.burst(origin)
     },
     [ref],
   )

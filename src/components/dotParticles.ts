@@ -1,5 +1,6 @@
 import { PARTICLE_DUR, type Particle } from './particles'
 import type { ParticleEmitSpec } from './particleEmit'
+import type { EffectCanvasHost, EffectFrame, EffectLayer } from './effectCanvasHost'
 
 // 성공/파괴 버스트의 방사형 도트 파티클(프레젠테이션 전용·DOM 노드 없음) — 기존 DOM 풀(motion.span 132개를
 // 상시 마운트·재사용)을 캔버스 한 장으로 대체한다. 강화 1회마다 emit() 로 도트 N개 + decor(섬광·충격파 링)
@@ -7,7 +8,7 @@ import type { ParticleEmitSpec } from './particleEmit'
 // — HitSparkSystem 과 동일한 생명주기). 이로써 ① 상시 132 DOM 노드·motion 구독, ② 버스트당 ~44개 setState
 // 팬아웃, ③ 동시 수십~132개 motion JS 애니메이션(메인 스레드), ④ boxShadow 글로우 레이어 합성이 한꺼번에 사라진다.
 //
-// 좌표: 검 박스 정중앙 원점(캔버스 left-1/2 top-1/2 — HitSparkCanvas·옛 ParticlePool 과 같은 공간). makeParticles
+// 좌표: 검 박스 정중앙 원점(효과 캔버스 EffectCanvas 중심 — 불꽃과 같은 공간). makeParticles
 // 의 raw CSS px 를 그대로 쓴다(rem 스케일 무관 — 옛 motion transform 도 raw px 였다). dpr 만 backing store 로 보정.
 //
 // 색: emit spec 의 coreVar/edgeVar('var(--color-…)')를 probe 엘리먼트의 computed color 로 1회 해석·캐시한다
@@ -145,57 +146,28 @@ function getFlashTexture(coreCss: string): HTMLCanvasElement {
 
 // ── 도트 파티클 캔버스 시스템 ─────────────────────────────────────────────────────
 // emit() 로 도트·decor 로 교체하고(replace — 이전 버스트를 비움), 살아 있는 입자가 있는 동안에만 rAF 루프를 돈다(평소 0 비용). 캔버스당 하나.
-export class DotParticleSystem {
-  private canvas: HTMLCanvasElement
-  private ctx: CanvasRenderingContext2D
+export class DotParticleSystem implements EffectLayer {
+  private readonly host: EffectCanvasHost
   // 풀(증가만) — 0..dotCount / 0..decorCount 가 활성 슬롯. 버스트마다 객체를 새로 만들지 않고 슬롯의 필드만
   // 덮어써 재사용한다(GC 압박 제거). 활성 범위 밖의 슬롯은 다음 버스트에 다시 쓰인다(꼬리에 보존).
   private dots: Dot[] = []
   private dotCount = 0
   private decors: Decor[] = []
   private decorCount = 0
-  private cx = 0
-  private cy = 0
-  private w = 0
-  private h = 0
-  private bw = 0 // 현재 backing store 픽셀 폭(리사이즈 감지)
-  private bh = 0
-  private dpr = 1
-  private running = false
-  private prev = 0
-  private raf = 0
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('DotParticleSystem: 2d context unavailable')
-    this.ctx = ctx
+  // 캔버스·루프·크기는 호스트(EffectCanvasHost)가 소유한다 — 이 시스템은 입자 상태와 그리기만 맡는 레이어.
+  constructor(host: EffectCanvasHost) {
+    this.host = host
   }
 
-  // dpr 기준 backing store 픽셀 크기를 맞춘다(크기 변화 시에만 — 매번 하면 진행 중 프레임이 지워진다).
-  private syncBackingStore(rect: DOMRect) {
-    const dpr = Math.min(2, window.devicePixelRatio || 1)
-    const bw = Math.round(rect.width * dpr)
-    const bh = Math.round(rect.height * dpr)
-    if (bw !== this.bw || bh !== this.bh) {
-      this.canvas.width = bw
-      this.canvas.height = bh
-      this.bw = bw
-      this.bh = bh
-    }
-    this.dpr = dpr
-    this.w = rect.width
-    this.h = rect.height
-    this.cx = rect.width / 2
-    this.cy = rect.height / 2
+  isAlive(): boolean {
+    return this.dotCount > 0 || this.decorCount > 0
   }
 
-  // 버스트 1회 — 이전 버스트를 비우고(replace) 도트 N개 + decor 1세트로 교체한다. 옛 ParticlePool.emit 과
-  // 동일 시그니처(소비자 무변경).
+  // 버스트 1회 — 이전 버스트를 비우고(replace) 도트 N개 + decor 1세트로 교체한다. 옛 emit 과
+  // 동일 시그니처(소비자 무변경). 크기 읽기 없음 — 원점은 그릴 때 프레임(cx/cy)에서 받는다.
   emit(spec: ParticleEmitSpec) {
-    const rect = this.canvas.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return
-    this.syncBackingStore(rect)
+    if (this.host.geometry().w <= 0) return
     // 새 버스트가 이전 버스트를 대체한다(replace — 누적 금지). 단 객체를 버리고 새로 만들지 않고 풀 슬롯
     // (this.dots[i])의 필드만 덮어써 재사용한다 — 첫 대형 버스트 이후로는 Dot 할당이 0이라 연사 시 GC 압박이
     // 없다. dotCount 를 이번 입자 수로 맞춰 이전 버스트의 잔여 슬롯을 활성 범위 밖으로 버린다(잔상 latest 하드
@@ -228,31 +200,11 @@ export class DotParticleSystem {
     dec.edge = resolveColor(spec.edgeVar)
     dec.flashTex = getFlashTexture(spec.coreVar)
     this.decorCount = 1
-    if (!this.running) {
-      this.running = true
-      this.prev = 0
-      this.raf = requestAnimationFrame(this.loop)
-    }
+    this.host.wake()
   }
 
-  private loop = (ts: number) => {
-    if (!this.running) return
-    if (!this.prev) this.prev = ts
-    const dt = Math.min(0.05, (ts - this.prev) / 1000)
-    this.prev = ts
-    this.draw(dt)
-    if (this.dotCount === 0 && this.decorCount === 0) {
-      this.running = false
-      this.ctx.clearRect(0, 0, this.w, this.h)
-      return
-    }
-    this.raf = requestAnimationFrame(this.loop)
-  }
-
-  private draw(dt: number) {
-    const ctx = this.ctx
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
-    ctx.clearRect(0, 0, this.w, this.h)
+  draw(ctx: CanvasRenderingContext2D, f: EffectFrame) {
+    const { dt, cx, cy } = f
 
     // ── decor: 섬광(가산) + 충격파 링 ──
     if (this.decorCount > 0) {
@@ -270,7 +222,7 @@ export class DotParticleSystem {
           // 구운 섬광 텍스처를 반경 r 로 가산 합성(알파 op 는 globalAlpha) — 프레임마다 그라데이션을 만들지 않는다.
           ctx.globalCompositeOperation = 'lighter'
           ctx.globalAlpha = op
-          ctx.drawImage(d.flashTex, this.cx - r, this.cy - r, r * 2, r * 2)
+          ctx.drawImage(d.flashTex, cx - r, cy - r, r * 2, r * 2)
           ctx.globalAlpha = 1
           ctx.globalCompositeOperation = 'source-over'
           alive = true
@@ -284,7 +236,7 @@ export class DotParticleSystem {
           ctx.strokeStyle = rgba(d.edge, op)
           ctx.lineWidth = RING_W
           ctx.beginPath()
-          ctx.arc(this.cx, this.cy, r, 0, TAU)
+          ctx.arc(cx, cy, r, 0, TAU)
           ctx.stroke()
           alive = true
         }
@@ -313,8 +265,8 @@ export class DotParticleSystem {
         if (q >= 0) {
           // q<0 은 아직 시작 전(stagger 대기) — 살아 있으나 안 그림. q>=0 일 때만 블릿.
           const e = easeOut(q)
-          const x = this.cx + p.tx * e
-          const y = this.cy + p.ty * e
+          const x = cx + p.tx * e
+          const y = cy + p.ty * e
           const op = keyframe(q, DOT_TIMES, DOT_OPACITY)
           const scale = keyframe(q, DOT_TIMES, DOT_SCALE)
           // R = size/(2·ρ)·scale → 본체 지름이 정확히 size·scale, 글로우는 그 바깥으로 번진다.
@@ -334,9 +286,8 @@ export class DotParticleSystem {
     }
   }
 
-  // 첫 버스트의 일회성 비용(backing store 할당 + 풀 슬롯 확보)을 마운트로 옮긴다. reserve 개의 Dot 슬롯을
-  // 미리 만들어 첫 버스트(특히 고레벨 대형 버스트)도 객체를 새로 할당하지 않게 한다(연사 GC 압박 0). 풀 확보는
-  // rect 무관(레이아웃 전이어도 가능), backing store 는 레이아웃이 잡힌 뒤에만(rect 0 이면 첫 emit 에서 잡는다 — 무해).
+  // 첫 버스트의 일회성 비용(풀 슬롯 확보)을 마운트로 옮긴다. reserve 개의 Dot 슬롯을 미리 만들어 첫 버스트(특히
+  // 고레벨 대형 버스트)도 객체를 새로 할당하지 않게 한다(연사 GC 압박 0). backing store 는 호스트가 맞춘다.
   warmup(reserve = 0) {
     // 슬롯 tex 는 자리표시 — emit 가 첫 사용 시 실제 텍스처로 덮어쓴다(그 전엔 dotCount=0 이라 그려지지 않는다).
     const placeholder = document.createElement('canvas')
@@ -347,16 +298,5 @@ export class DotParticleSystem {
     }
     if (!this.decors[0])
       this.decors[0] = { t: 0, core: [0, 0, 0], edge: [0, 0, 0], flashTex: placeholder }
-    const rect = this.canvas.getBoundingClientRect()
-    if (rect.width > 0 && rect.height > 0) this.syncBackingStore(rect)
-  }
-
-  dispose() {
-    this.running = false
-    if (this.raf) cancelAnimationFrame(this.raf)
-    this.dots = []
-    this.dotCount = 0
-    this.decors = []
-    this.decorCount = 0
   }
 }

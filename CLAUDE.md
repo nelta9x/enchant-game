@@ -49,6 +49,7 @@
 - **GameScreen 은 탭 커밋 최소 구독**: 불리언 셀렉터(`canEnhance/canSell/canStore`)·현재 검·보호권 수만. 골드·가방·잠금·공개(heldSwordId)는 리프(GoldDisplay·InventoryPanel/EquippedSlot·EnhanceButton·CenterStage·CommissionCard)가 직접 구독한다. 새 상태를 GameScreen 에 구독으로 올리기 전에 리프에 둘 수 있는지 먼저 본다.
 - **연출은 합성 전용 속성(transform·opacity)만 움직인다.** `clip-path`·`filter`·`box-shadow`·`background-position`·등록 커스텀 프로퍼티 보간처럼 페인트 속성을 매 프레임 바꾸면 화면 전체가 프레임마다 다시 래스터된다(모바일 프레임 드랍의 실측 원인). 상시 반복은 CSS `@keyframes`, 1회성은 motion — 어느 쪽이든 움직이는 요소엔 `.fx-layer`(index.css)를 붙여 자기 합성 레이어를 준다(정적 장식엔 금지).
 - **커밋 중 레이아웃 읽기 금지.** 캔버스 스프라이트는 `SpriteCanvasBinding`(lib/spriteStore.ts) 경유 — 크기는 ResizeObserver 가 준다. 렌더/effect 안에서 `offsetWidth`·`getBoundingClientRect()`를 읽고 `canvas.width`를 쓰는 패턴을 새로 만들지 말 것(여러 캔버스가 한 커밋에서 이걸 번갈아 하면 강제 레이아웃이 캔버스 수만큼 반복된다).
+- 캔버스 연출은 `EffectCanvasHost`(components/effectCanvasHost.ts) 한 장·rAF 루프 하나에 레이어(`EffectLayer`)로 얹는다 — 새 캔버스·새 rAF 루프를 만들지 말 것. backing store 는 DPR 1(흐린 글로우 전용; 또렷해야 하면 SpriteCanvasBinding). 크기는 호스트의 ResizeObserver 에서 오고 레이어는 `geometry()`/frame 만 읽는다.
 - 캔버스 파티클은 프레임마다 그라데이션·객체를 만들지 않는다 — 단면 텍스처를 1회 구워(`hitSparks.ts`/`dotParticles.ts`의 `bake*`/`get*Texture`) `drawImage`+`globalAlpha`로 찍는다.
 
 ## 테스트
