@@ -5,8 +5,9 @@ import { Enhancer, type EnhanceInput } from '../game/enhancer'
 import type { EnhanceResult, ItemStack, PlayerState } from '../game/types'
 import { countOf } from '../lib/items'
 
-// 시작 자금 / 시작 검. 시작 자금은 사용자 지정값(10만) — 새 플레이어가 의뢰 첫 골드 버킷(보유 50만 미만)에서
-// 시작하도록 한다. 시작 검 획득 방식 등 나머지 '게임 시작 설정'은 디자인 미확정이며 조정될 수 있다.
+// 시작 자금 / 시작 검. 시작 자금은 사용자 지정값(10만). 거래 제안 풀은 골드가 아니라 상점 레벨(상점 업그레이드)이
+// 고르므로 시작 자금과 무관하게 시작 티어에서 출발한다. 시작 검 획득 방식 등 나머지 '게임 시작 설정'은
+// 디자인 미확정이며 조정될 수 있다.
 export const INITIAL_GOLD = 100_000
 export const INITIAL_SWORD_ID = 'sword_1'
 

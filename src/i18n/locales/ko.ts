@@ -39,6 +39,11 @@ export const ko = {
   'commission.arrived': '새 거래 제안!',
   // 제안 강제 갱신 버튼(상단바) — 골드를 내고 제안 세션을 즉시 새로 받는다(비용은 아이콘으로 표시).
   'commission.refresh': '거래 제안 갱신',
+  // 상점 카드(거래 제안 줄 맨 오른쪽) — 상점 레벨 표시 + 클릭 시 비용(골드/아이템)을 내고 업그레이드.
+  'commission.shop': '상점',
+  'commission.shopUpgrade': '상점 업그레이드',
+  'commission.shopLevel': 'Lv.',
+  'commission.shopMax': '최고 등급',
 
   // 강화 결과 토스트
   'toast.success': '강화 성공',

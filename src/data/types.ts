@@ -130,24 +130,29 @@ export type RefreshWeight = {
   weight: number // 추첨 가중치(> 0)
 }
 
-// 의뢰 골드 버킷 1구간(언어 중립). 플레이어의 보유 골드 구간마다 출제 아이템·갱신 분포를 독립 설정한다.
-// 버킷들은 [0, ∞) 를 빈틈·겹침 없이 덮어야 한다(로더가 강제): 첫 버킷 minGold=0, 연속, 마지막 maxGold=null.
-//  - minGold: 담당 골드 구간 하한(포함). 검증 전용 — 셀렉터는 maxGold 만 본다.
-//  - maxGold: 상한(미포함). null = ∞(마지막 버킷).
-//  - items: 이 버킷에서 출제될 아이템 목록(itemId + weight + 아이템별 incentive/additive). 비어있지 않음
+// 거래 비용(언어 중립) — 골드 또는 아이템. Material 에서 'free' 만 뺀 것으로, 거래 제안의 지불(cost)과
+// 상점 업그레이드 비용이 같은 체계를 쓴다(gameStore.canFulfill/fulfillCommission 이 둘 다 처리).
+export type TradeCost = Exclude<Material, { kind: 'free' }>
+
+// 상점 티어 1단계(언어 중립). 상점 레벨(tiers[] 인덱스, 0 부터)마다 출제 아이템·갱신 분포를 독립 설정한다.
+// 티어는 보유 골드가 아니라 "상점 업그레이드"로 오른다 — 레벨은 단조(내려가지 않음)이고, 세션 갱신 시
+// 현재 레벨의 티어 items[] 가 출제 풀이 된다(이미 발급된 제안은 freeze 유지).
+//  - upgradeCost: 이 티어로 올리는 데 드는 비용(골드 또는 아이템 — 거래 비용과 같은 체계). tiers[0] 은
+//    시작 티어라 null 이고, 그 외 티어는 반드시 비용이 있다(로더 강제). 상점 카드가 다음 티어의 이 값을
+//    표시하고, 지불하면 레벨이 1 오르며 세션이 새 티어 풀로 즉시 무료 갱신된다(commissionStore.upgradeShop).
+//  - items: 이 티어에서 출제될 아이템 목록(itemId + weight + 아이템별 incentive/additive). 비어있지 않음
 //  - refreshWeights: 세션이 갱신되기까지의 강화 시도 횟수 후보(가중 추첨). 세션 시작 시 여기서 하나를 뽑아
 //    세션 카운터로 삼고, 강화 시도마다 1씩 차감해 0 이 되면 세션 전체가 새로 갱신된다(시간이 아니라 시도 기반).
 //    비어있지 않음.
-export type GoldBucket = {
-  minGold: number
-  maxGold: number | null
+export type ShopTier = {
+  upgradeCost: TradeCost | null
   items: CommissionItemEntry[]
   refreshWeights: RefreshWeight[]
 }
 
 // 의뢰(Commission) 시스템 튜닝 설정(언어 중립). 코드 상수가 아니라 데이터 파일(commission.json)에 두고
 // DataManager 가 로드 시 검증한다. 순수 reducer(commissionQueue)는 이 값을 인자로 주입받아 쓴다.
-// 시스템 파라미터(아래 2개)는 버킷과 무관한 글로벌이고, 나머지 튜닝값은 전부 buckets[] 안에 골드 구간별로 둔다.
+// 시스템 파라미터(아래 3개)는 티어와 무관한 글로벌이고, 나머지 튜닝값은 전부 tiers[] 안에 상점 레벨별로 둔다.
 //  - maxCommissions: 한 "제안 세션"에 한 번에 출제되는 제안 수(=세션 크기). 세션 발생 시 서로 다른 제안을
 //    이만큼 한 번에 출제하고, 풀의 서로 다른 항목 수가 이보다 적으면 있는 만큼만 낸다(min). 플레이어가 그중
 //    하나를 선택(납품)하면 이번 세션의 카드가 전부 사라지고 갱신 바만 남는다 — 새 제안은 갱신 카운터가 0 이 될 때 뜬다.
@@ -157,12 +162,12 @@ export type GoldBucket = {
 //    데이터 파일(commission.json)에서 조절한다(코드 상수 아님).
 //  - refreshCost: 제안 세션을 강제로 갱신(상단 갱신 버튼)할 때 1회 차감되는 골드. 정수 >= 0(0 = 무료).
 //    잠금 해제 후에만 갱신할 수 있고, 보유 골드가 이 값 이상일 때만 동작한다(commissionStore.refreshNow).
-//  - buckets: 보유 골드 구간별 정의([0,∞) 를 덮는 연속 버킷 — buckets[0] 이 골드 0 구간).
+//  - tiers: 상점 레벨별 정의(tiers[0] = 시작 티어, 인덱스가 곧 레벨). 최고 레벨 = tiers.length - 1.
 export type CommissionConfig = {
   maxCommissions: number
   unlockAtLevel: number
   refreshCost: number
-  buckets: GoldBucket[]
+  tiers: ShopTier[]
 }
 
 // 검의 특수 플래그(언어 중립 태그). 표시가 필요하면 i18n에서 해석한다.

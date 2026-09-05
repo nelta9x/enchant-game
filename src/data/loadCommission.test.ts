@@ -28,11 +28,9 @@ function itemEntry(
   }
 }
 
-// 최소 유효 버킷 헬퍼([0,∞) 단일 버킷). override 로 개별 필드만 바꿔 검증 경로를 테스트한다.
-function bucket(over: Record<string, unknown> = {}): Record<string, unknown> {
+// 최소 유효 티어 헬퍼(시작 티어 — upgradeCost 없음). override 로 개별 필드만 바꿔 검증 경로를 테스트한다.
+function tier(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    minGold: 0,
-    maxGold: null,
     items: [itemEntry(), itemEntry({ itemId: 'iron_scrap', weight: 2 })],
     refreshWeights: [
       { value: 1, weight: 1 },
@@ -48,7 +46,7 @@ function cfg(over: Record<string, unknown> = {}): Record<string, unknown> {
     maxCommissions: 3,
     unlockAtLevel: 10,
     refreshCost: 100000,
-    buckets: [bucket()],
+    tiers: [tier()],
     ...over,
   }
 }
@@ -77,10 +75,9 @@ describe('parseCommissionConfig — 구조 검증', () => {
       maxCommissions: 3,
       unlockAtLevel: 10,
       refreshCost: 100000,
-      buckets: [
+      tiers: [
         {
-          minGold: 0,
-          maxGold: null,
+          upgradeCost: null,
           items: [
             { itemId: 'sword_3', weight: 3, ...itemFields },
             { itemId: 'iron_scrap', weight: 2, ...itemFields },
@@ -142,76 +139,76 @@ describe('parseCommissionConfig — 글로벌 의미 검증', () => {
   })
 })
 
-describe('parseCommissionConfig — buckets 구조 검증', () => {
-  it('buckets 가 비어있거나 배열이 아니면 throw', () => {
-    expect(() => parse({ buckets: [] })).toThrow()
-    expect(() => parse({ buckets: {} })).toThrow()
+describe('parseCommissionConfig — tiers 구조 검증', () => {
+  it('tiers 가 비어있거나 배열이 아니면 throw', () => {
+    expect(() => parse({ tiers: [] })).toThrow()
+    expect(() => parse({ tiers: {} })).toThrow()
   })
 
   it('items 가 비어있거나 배열이 아니면 throw', () => {
-    expect(() => parse({ buckets: [bucket({ items: [] })] })).toThrow()
-    expect(() => parse({ buckets: [bucket({ items: 'x' })] })).toThrow()
+    expect(() => parse({ tiers: [tier({ items: [] })] })).toThrow()
+    expect(() => parse({ tiers: [tier({ items: 'x' })] })).toThrow()
   })
 
   it('itemId 가 출제 가능 집합(판매 가능 검·카탈로그)에 없으면 throw (익스플로잇 가드)', () => {
     // sword_1(판매 불가 = 시작 검) 은 KNOWN 에 없다 → 거부(무한 골드 익스플로잇 차단).
     expect(() =>
       parse({
-        buckets: [bucket({ items: [{ itemId: 'sword_1', weight: 1 }] })],
+        tiers: [tier({ items: [{ itemId: 'sword_1', weight: 1 }] })],
       }),
     ).toThrow()
     // 오타/미지의 itemId 도 즉시 실패.
     expect(() =>
-      parse({ buckets: [bucket({ items: [{ itemId: 'nope', weight: 1 }] })] }),
+      parse({ tiers: [tier({ items: [{ itemId: 'nope', weight: 1 }] })] }),
     ).toThrow()
   })
 
   it('weight 가 0 이하거나 비숫자면 throw', () => {
     expect(() =>
       parse({
-        buckets: [bucket({ items: [{ itemId: 'sword_3', weight: 0 }] })],
+        tiers: [tier({ items: [{ itemId: 'sword_3', weight: 0 }] })],
       }),
     ).toThrow()
     expect(() =>
       parse({
-        buckets: [bucket({ items: [{ itemId: 'sword_3', weight: -1 }] })],
+        tiers: [tier({ items: [{ itemId: 'sword_3', weight: -1 }] })],
       }),
     ).toThrow()
     expect(() =>
       parse({
-        buckets: [bucket({ items: [{ itemId: 'sword_3', weight: 'x' }] })],
+        tiers: [tier({ items: [{ itemId: 'sword_3', weight: 'x' }] })],
       }),
     ).toThrow()
   })
 
   it('itemId 가 비어있으면 throw', () => {
     expect(() =>
-      parse({ buckets: [bucket({ items: [{ itemId: '', weight: 1 }] })] }),
+      parse({ tiers: [tier({ items: [{ itemId: '', weight: 1 }] })] }),
     ).toThrow()
   })
 
   it('아이템별 incentive/additive 범위·관계 위반은 throw', () => {
     expect(() =>
       parse({
-        buckets: [bucket({ items: [itemEntry({ incentiveMin: -0.1 })] })],
+        tiers: [tier({ items: [itemEntry({ incentiveMin: -0.1 })] })],
       }),
     ).toThrow()
     expect(() =>
       parse({
-        buckets: [
-          bucket({
+        tiers: [
+          tier({
             items: [itemEntry({ incentiveMin: 3.0, incentiveMax: 2.0 })],
           }),
         ],
       }),
     ).toThrow()
     expect(() =>
-      parse({ buckets: [bucket({ items: [itemEntry({ additiveMin: -1 })] })] }),
+      parse({ tiers: [tier({ items: [itemEntry({ additiveMin: -1 })] })] }),
     ).toThrow()
     expect(() =>
       parse({
-        buckets: [
-          bucket({
+        tiers: [
+          tier({
             items: [itemEntry({ additiveMin: 200, additiveMax: 100 })],
           }),
         ],
@@ -222,27 +219,27 @@ describe('parseCommissionConfig — buckets 구조 검증', () => {
   it('아이템별 incentive/additive 누락/비숫자는 throw', () => {
     expect(() =>
       parse({
-        buckets: [bucket({ items: [{ itemId: 'sword_3', weight: 1 }] })],
+        tiers: [tier({ items: [{ itemId: 'sword_3', weight: 1 }] })],
       }),
     ).toThrow() // incentiveMin 등 누락
   })
 
   it('refreshWeights 가 비어있거나 배열이 아니면 throw', () => {
-    expect(() => parse({ buckets: [bucket({ refreshWeights: [] })] })).toThrow()
+    expect(() => parse({ tiers: [tier({ refreshWeights: [] })] })).toThrow()
     expect(() =>
-      parse({ buckets: [bucket({ refreshWeights: 'x' })] }),
+      parse({ tiers: [tier({ refreshWeights: 'x' })] }),
     ).toThrow()
   })
 
   it('refreshWeights 의 value 가 1 미만/정수 아니면 throw', () => {
     expect(() =>
       parse({
-        buckets: [bucket({ refreshWeights: [{ value: 0, weight: 1 }] })],
+        tiers: [tier({ refreshWeights: [{ value: 0, weight: 1 }] })],
       }),
     ).toThrow()
     expect(() =>
       parse({
-        buckets: [bucket({ refreshWeights: [{ value: 2.5, weight: 1 }] })],
+        tiers: [tier({ refreshWeights: [{ value: 2.5, weight: 1 }] })],
       }),
     ).toThrow()
   })
@@ -250,79 +247,97 @@ describe('parseCommissionConfig — buckets 구조 검증', () => {
   it('refreshWeights 의 weight 가 0 이하/비숫자면 throw', () => {
     expect(() =>
       parse({
-        buckets: [bucket({ refreshWeights: [{ value: 1, weight: 0 }] })],
+        tiers: [tier({ refreshWeights: [{ value: 1, weight: 0 }] })],
       }),
     ).toThrow()
     expect(() =>
       parse({
-        buckets: [bucket({ refreshWeights: [{ value: 1, weight: 'x' }] })],
+        tiers: [tier({ refreshWeights: [{ value: 1, weight: 'x' }] })],
       }),
     ).toThrow()
   })
 })
 
-describe('parseCommissionConfig — 골드 버킷 커버리지 검증', () => {
-  // 유효한 2버킷 연속 구성([0,500000) + [500000,∞)) — 정상 파싱.
-  it('연속하는 2버킷([0,X)+[X,∞))을 그대로 파싱한다', () => {
+describe('parseCommissionConfig — 상점 티어·업그레이드 비용 검증', () => {
+  it('시작 티어(비용 없음) + 골드 비용 티어 + 아이템 비용 티어를 Material 로 파싱한다', () => {
     const config = parse({
-      buckets: [
-        bucket({ minGold: 0, maxGold: 500_000 }),
-        bucket({ minGold: 500_000, maxGold: null }),
+      tiers: [
+        tier(),
+        tier({ upgradeCost: { costKind: 'gold', costAmount: 500_000 } }),
+        tier({
+          upgradeCost: { costKind: 'item', itemId: 'iron_scrap', requiredCount: 5 },
+        }),
       ],
     })
-    expect(config.buckets).toHaveLength(2)
-    expect(config.buckets[0].maxGold).toBe(500_000)
-    expect(config.buckets[1].maxGold).toBeNull()
+    expect(config.tiers).toHaveLength(3)
+    expect(config.tiers[0].upgradeCost).toBeNull()
+    expect(config.tiers[1].upgradeCost).toEqual({ kind: 'gold', amount: 500_000 })
+    expect(config.tiers[2].upgradeCost).toEqual({
+      kind: 'item',
+      itemId: 'iron_scrap',
+      count: 5,
+    })
   })
 
-  it('첫 버킷 minGold 가 0 이 아니면 throw', () => {
-    expect(() =>
-      parse({ buckets: [bucket({ minGold: 100, maxGold: null })] }),
-    ).toThrow()
+  it('upgradeCost 의 costKind/requiredCount 누락은 거래 항목과 같은 규칙으로 item·1 로 정규화된다', () => {
+    const config = parse({
+      tiers: [tier(), tier({ upgradeCost: { itemId: 'sword_4' } })],
+    })
+    expect(config.tiers[1].upgradeCost).toEqual({
+      kind: 'item',
+      itemId: 'sword_4',
+      count: 1,
+    })
   })
 
-  it('마지막 버킷 maxGold 가 null 이 아니면 throw', () => {
-    expect(() =>
-      parse({ buckets: [bucket({ minGold: 0, maxGold: 500_000 })] }),
-    ).toThrow()
-  })
-
-  it('버킷 사이에 빈틈(gap)이 있으면 throw', () => {
+  it('시작 티어(tiers[0])에 upgradeCost 가 있으면 throw, null 은 허용', () => {
     expect(() =>
       parse({
-        buckets: [
-          bucket({ minGold: 0, maxGold: 500_000 }),
-          bucket({ minGold: 600_000, maxGold: null }), // 500000~600000 빈틈
-        ],
+        tiers: [tier({ upgradeCost: { costKind: 'gold', costAmount: 1 } })],
+      }),
+    ).toThrow()
+    expect(parse({ tiers: [tier({ upgradeCost: null })] }).tiers[0].upgradeCost).toBeNull()
+  })
+
+  it('시작 티어가 아닌 티어에 upgradeCost 가 없거나 객체가 아니면 throw', () => {
+    expect(() => parse({ tiers: [tier(), tier()] })).toThrow()
+    expect(() => parse({ tiers: [tier(), tier({ upgradeCost: null })] })).toThrow()
+    expect(() => parse({ tiers: [tier(), tier({ upgradeCost: 500 })] })).toThrow()
+  })
+
+  it('upgradeCost 아이템이 출제 집합에 없으면 throw (비판매 검·오타 차단)', () => {
+    expect(() =>
+      parse({
+        tiers: [tier(), tier({ upgradeCost: { itemId: 'sword_1' } })],
+      }),
+    ).toThrow()
+    expect(() =>
+      parse({
+        tiers: [tier(), tier({ upgradeCost: { itemId: 'nope' } })],
       }),
     ).toThrow()
   })
 
-  it('버킷 사이에 겹침(overlap)이 있으면 throw', () => {
+  it('upgradeCost 금액/수량이 1 미만·정수 아님·costKind 오타면 throw', () => {
     expect(() =>
       parse({
-        buckets: [
-          bucket({ minGold: 0, maxGold: 500_000 }),
-          bucket({ minGold: 400_000, maxGold: null }), // 400000~500000 겹침
-        ],
+        tiers: [tier(), tier({ upgradeCost: { costKind: 'gold', costAmount: 0 } })],
       }),
     ).toThrow()
-  })
-
-  it('마지막이 아닌 버킷의 maxGold 가 null 이면 throw(비말단 ∞)', () => {
     expect(() =>
       parse({
-        buckets: [
-          bucket({ minGold: 0, maxGold: null }),
-          bucket({ minGold: 500_000, maxGold: null }),
-        ],
+        tiers: [tier(), tier({ upgradeCost: { costKind: 'gold', costAmount: 1.5 } })],
       }),
     ).toThrow()
-  })
-
-  it('버킷 minGold >= maxGold 이면 throw', () => {
     expect(() =>
-      parse({ buckets: [bucket({ minGold: 0, maxGold: 0 })] }),
+      parse({
+        tiers: [tier(), tier({ upgradeCost: { itemId: 'iron_scrap', requiredCount: 0 } })],
+      }),
+    ).toThrow()
+    expect(() =>
+      parse({
+        tiers: [tier(), tier({ upgradeCost: { costKind: 'xp', costAmount: 1 } })],
+      }),
     ).toThrow()
   })
 })
@@ -342,8 +357,8 @@ describe('parseCommissionConfig — 물물교환(아이템 보상) 항목', () =
   })
 
   it('유효한 아이템 보상 항목을 그대로 파싱한다', () => {
-    const config = parse({ buckets: [bucket({ items: [itemRewardEntry()] })] })
-    expect(config.buckets[0].items[0]).toEqual({
+    const config = parse({ tiers: [tier({ items: [itemRewardEntry()] })] })
+    expect(config.tiers[0].items[0]).toEqual({
       costKind: 'item',
       itemId: 'iron_scrap',
       requiredCount: 2,
@@ -357,8 +372,8 @@ describe('parseCommissionConfig — 물물교환(아이템 보상) 항목', () =
   it('rewardItemId 가 출제 집합(판매 가능 검·카탈로그)에 없으면 throw', () => {
     expect(() =>
       parse({
-        buckets: [
-          bucket({ items: [itemRewardEntry({ rewardItemId: 'sword_1' })] }),
+        tiers: [
+          tier({ items: [itemRewardEntry({ rewardItemId: 'sword_1' })] }),
         ],
       }),
     ).toThrow()
@@ -367,13 +382,13 @@ describe('parseCommissionConfig — 물물교환(아이템 보상) 항목', () =
   it('rewardItemId 누락/빈 문자열이면 throw', () => {
     expect(() =>
       parse({
-        buckets: [bucket({ items: [itemRewardEntry({ rewardItemId: '' })] })],
+        tiers: [tier({ items: [itemRewardEntry({ rewardItemId: '' })] })],
       }),
     ).toThrow()
     expect(() =>
       parse({
-        buckets: [
-          bucket({ items: [itemRewardEntry({ rewardItemId: undefined })] }),
+        tiers: [
+          tier({ items: [itemRewardEntry({ rewardItemId: undefined })] }),
         ],
       }),
     ).toThrow()
@@ -382,13 +397,13 @@ describe('parseCommissionConfig — 물물교환(아이템 보상) 항목', () =
   it('rewardItemCount 가 1 미만/정수 아니면 throw', () => {
     expect(() =>
       parse({
-        buckets: [bucket({ items: [itemRewardEntry({ rewardItemCount: 0 })] })],
+        tiers: [tier({ items: [itemRewardEntry({ rewardItemCount: 0 })] })],
       }),
     ).toThrow()
     expect(() =>
       parse({
-        buckets: [
-          bucket({ items: [itemRewardEntry({ rewardItemCount: 1.5 })] }),
+        tiers: [
+          tier({ items: [itemRewardEntry({ rewardItemCount: 1.5 })] }),
         ],
       }),
     ).toThrow()
@@ -397,12 +412,12 @@ describe('parseCommissionConfig — 물물교환(아이템 보상) 항목', () =
   it('requiredCount 가 1 미만/정수 아니면 throw', () => {
     expect(() =>
       parse({
-        buckets: [bucket({ items: [itemRewardEntry({ requiredCount: 0 })] })],
+        tiers: [tier({ items: [itemRewardEntry({ requiredCount: 0 })] })],
       }),
     ).toThrow()
     expect(() =>
       parse({
-        buckets: [bucket({ items: [itemRewardEntry({ requiredCount: 2.5 })] })],
+        tiers: [tier({ items: [itemRewardEntry({ requiredCount: 2.5 })] })],
       }),
     ).toThrow()
   })
@@ -410,14 +425,14 @@ describe('parseCommissionConfig — 물물교환(아이템 보상) 항목', () =
   it("rewardKind 가 'gold'/'item' 이 아니면 throw", () => {
     expect(() =>
       parse({
-        buckets: [bucket({ items: [itemRewardEntry({ rewardKind: 'xp' })] })],
+        tiers: [tier({ items: [itemRewardEntry({ rewardKind: 'xp' })] })],
       }),
     ).toThrow()
   })
 
   it('costKind/requiredCount/rewardKind 누락 시 item·1·gold 로 정규화된다(기존 골드 의뢰 호환)', () => {
     const config = parse()
-    const e = config.buckets[0].items[0]
+    const e = config.tiers[0].items[0]
     expect(e.costKind).toBe('item')
     if (e.costKind === 'item') expect(e.requiredCount).toBe(1)
     expect(e.rewardKind).toBe('gold')
@@ -440,17 +455,22 @@ describe('loadCommission — 번들 데이터 진입점', () => {
     const config = loadCommission(known)
     expect(config.maxCommissions).toBeGreaterThanOrEqual(1)
     expect(config.refreshCost).toBeGreaterThanOrEqual(0)
-    expect(config.buckets.length).toBeGreaterThanOrEqual(1)
-    expect(config.buckets.flatMap((b) => b.items).length).toBeGreaterThan(0)
-    // 골드 버킷 커버리지: 첫 버킷 minGold 0, 마지막 maxGold null, 연속.
-    expect(config.buckets[0].minGold).toBe(0)
-    expect(config.buckets[config.buckets.length - 1].maxGold).toBeNull()
-    for (let i = 1; i < config.buckets.length; i += 1) {
-      expect(config.buckets[i].minGold).toBe(config.buckets[i - 1].maxGold)
+    expect(config.tiers.length).toBeGreaterThanOrEqual(1)
+    expect(config.tiers.flatMap((b) => b.items).length).toBeGreaterThan(0)
+    // 상점 티어: 시작 티어는 비용 없음, 그 외 티어는 골드(금액>=1) 또는 아이템(출제 집합·수량>=1) 비용.
+    expect(config.tiers[0].upgradeCost).toBeNull()
+    for (let i = 1; i < config.tiers.length; i += 1) {
+      const cost = config.tiers[i].upgradeCost
+      expect(cost).not.toBeNull()
+      if (cost?.kind === 'gold') expect(cost.amount).toBeGreaterThanOrEqual(1)
+      if (cost?.kind === 'item') {
+        expect(known.has(cost.itemId)).toBe(true)
+        expect(cost.count).toBeGreaterThanOrEqual(1)
+      }
     }
-    // 모든 버킷의 모든 항목 구조 검증: 비용은 아이템(납품 id 가 출제 집합·수량>=1) 또는 골드(금액>=1),
+    // 모든 티어의 모든 항목 구조 검증: 비용은 아이템(납품 id 가 출제 집합·수량>=1) 또는 골드(금액>=1),
     // 보상은 골드(incentive/additive min<=max) 또는 아이템(지급 id 가 출제 집합·수량>=1).
-    for (const b of config.buckets) {
+    for (const b of config.tiers) {
       expect(b.items.length).toBeGreaterThan(0)
       for (const e of b.items) {
         expect(e.weight).toBeGreaterThan(0)

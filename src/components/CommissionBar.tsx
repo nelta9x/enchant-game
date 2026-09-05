@@ -5,14 +5,22 @@ import { useI18nStore, useT } from '../i18n'
 import { itemDisplayName } from '../lib/items'
 import { formatAmount, formatGold } from '../lib/format'
 import { useCommissionHotkey } from '../hooks/useCommissionHotkey'
-import { useCommissionStore } from '../store/commissionStore'
+import { sound } from '../lib/sound'
+import { nextUpgradeCost, useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
 import type { Commission } from '../store/commissionQueue'
 import { ItemIcon } from './ItemIcon'
+import { SpriteCanvas } from './SpriteCanvas'
+import { uiSpriteUrl } from '../lib/sprites'
 
-// 상단 의뢰 바. 현재 떠 있는 의뢰(active)를 최대 MAX_COMMISSIONS 슬롯으로 보여 준다.
-// 각 의뢰서: 아이템 아이콘 + 이름 + 보상가(판매가에 인센티브가 붙은 금액). 요구 검을 보유했을 때만
-// 클릭(납품) 가능하다. 빈 슬롯은 재생성 대기('준비 중') placeholder 로 채워 바 높이를 안정시킨다.
+// 상점 카드 아이콘 — 검·아이템과 같은 32px 도트 스프라이트(public/sprites/ui/shop.png)를 SpriteCanvas 로 그린다.
+// URL 조립은 sprites.ts 경계(uiSpriteUrl — UI_SPRITES 등록 이름)에서만. 모듈 평가 시 1회 해석(BASE_URL 은 빌드 상수).
+const SHOP_SPRITE_URL = uiSpriteUrl('shop')
+
+// 상단 의뢰 바. 현재 떠 있는 의뢰(active)를 최대 MAX_COMMISSIONS 슬롯으로 보여 주고, 줄 맨 오른쪽에
+// 상점 카드(ShopCard — 상점 레벨 + 업그레이드)를 둔다. 각 의뢰서: 아이템 아이콘 + 이름 + 보상가(판매가에
+// 인센티브가 붙은 금액). 요구 검을 보유했을 때만 클릭(납품) 가능하다. 빈 슬롯은 보이지 않는 동일 크기
+// placeholder 로 채워 바 높이를 안정시킨다.
 //
 // 완료(검 소모+보상)는 부모(GameScreen)가 onFulfill 콜백으로 처리한다. 두 번째 인자는 코인 연출의
 // 출발점(클릭한/슬롯의 카드 엘리먼트)이며 연출 전용·선택이다 — null 이어도 납품은 진행된다(키보드 경로 대비).
@@ -98,6 +106,8 @@ export const CommissionBar = memo(function CommissionBar({
               <EmptySlot key={`empty-${i}`} />
             ),
           )}
+          {/* 상점 카드는 제안 카드 줄의 맨 오른쪽 고정 슬롯 — 세션이 비어도(잠금/납품 후) 항상 자리를 지킨다. */}
+          <ShopCard />
         </div>
         {/* 세그먼트 바 슬롯은 세션이 없어도(잠금/빈) 항상 자식으로 두어 부모 flex-col gap-1.5 의 간격과
             바 높이를 항상 확보한다 — 세션이 떴다 사라질 때 아래 UI 가 흔들리지 않게. 비활성 구간(total 0)은
@@ -230,6 +240,79 @@ function CommissionCard({
           ) : null}
         </span>
       </span>
+    </button>
+  )
+}
+
+// 상점 카드 — 제안 카드 줄의 맨 오른쪽 고정 슬롯. 상점 아이콘 + 현재 상점 레벨(표시는 1 부터 — 내부
+// shopLevel 0 = Lv.1) + 다음 업그레이드 비용을 보여 주고, 클릭하면 비용을 내고 상점을 업그레이드한다
+// (commissionStore.upgradeShop — 세션이 새 티어 풀로 즉시 갱신돼 카드들이 교체된다). 비용은 거래 비용과 같은
+// 체계(골드 또는 아이템)라 표시도 카드의 지불 라인과 같은 어휘(코인+금액 / 아이템 아이콘 ×N)를 쓴다.
+// 게이팅은 카드와 같은 idiom: 업그레이드 가능(잠금 해제 + 비용 충당) 불리언 셀렉터만 구독해, 골드·가방이
+// 임계를 넘나들 때만 리렌더한다. 최고 레벨이면 '최고 등급'으로 비활성. 세로 컴팩트 배치(아이콘 / 레벨 / 비용)로
+// 제안 카드 3장 옆에서 폭을 적게 차지하고, 줄의 stretch 로 카드와 같은 높이가 된다.
+function ShopCard() {
+  const t = useT()
+  const lang = useI18nStore((s) => s.lang)
+  const config = dataManager.getCommissionConfig()
+  const shopLevel = useCommissionStore((s) => s.shopLevel)
+  const cost = nextUpgradeCost(config, shopLevel)
+  const canUpgrade = useGameStore(
+    (s) =>
+      cost !== null &&
+      s.maxLevelReached >= config.unlockAtLevel &&
+      s.canFulfill(cost),
+  )
+  const onUpgrade = useCallback(() => {
+    // 업그레이드 성공(재화 실제 차감) 시에만 '재화 빠지는' 효과음 — 갱신 버튼·판매·거래 성사와 같은 item_sold.
+    if (useCommissionStore.getState().upgradeShop()) sound.playSfx('item_sold')
+  }, [])
+  const levelLabel = `${t('commission.shop')} ${t('commission.shopLevel')}${shopLevel + 1}`
+  // 비용 문구(스크린리더) — 골드는 formatGold(로케일 단위), 아이템은 표시명 ×N. 최고 레벨이면 '최고 등급'.
+  const costLabel =
+    cost === null
+      ? t('commission.shopMax')
+      : cost.kind === 'gold'
+        ? formatGold(cost.amount, lang)
+        : `${itemDisplayName(cost.itemId, t)}${cost.count > 1 ? ` ×${cost.count}` : ''}`
+
+  return (
+    <button
+      type="button"
+      onClick={onUpgrade}
+      disabled={!canUpgrade}
+      aria-label={`${t('commission.shopUpgrade')} (${levelLabel}): ${costLabel}`}
+      // 업그레이드 가능하면 황금색 강조(테두리 + 글로우 — 제안 카드의 초록과 구분되는 '상점' 어휘), 불가하면 흐리게.
+      className={`relative flex w-[5.5rem] shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border px-2 py-2 text-center transition-opacity ${
+        canUpgrade
+          ? 'cursor-pointer border-gold bg-panel ring-1 ring-gold/60 shadow-[0_0_12px_-2px_var(--color-gold)] hover:opacity-90'
+          : 'cursor-not-allowed border-frame/40 bg-panel-soft opacity-60'
+      }`}
+    >
+      <SpriteCanvas url={SHOP_SPRITE_URL} className="h-8 w-8" />
+      <span className="flex items-baseline gap-0.5 text-[0.65rem] font-semibold leading-none text-on-dark">
+        {t('commission.shop')}
+        <span className="font-bold tabular-nums text-gold">
+          {t('commission.shopLevel')}
+          {shopLevel + 1}
+        </span>
+      </span>
+      {/* 비용 라인 — 카드의 지불 라인과 같은 어휘. 최고 레벨이면 텍스트만. */}
+      {cost === null ? (
+        <span className="text-[0.65rem] font-semibold leading-none text-on-dark-soft">
+          {t('commission.shopMax')}
+        </span>
+      ) : cost.kind === 'gold' ? (
+        <span className="flex items-center gap-0.5 text-[0.65rem] font-bold leading-none text-gold tabular-nums">
+          <CoinIcon className="h-3 w-3" />
+          {formatAmount(cost.amount)}
+        </span>
+      ) : (
+        <span className="flex items-center gap-0.5 text-[0.65rem] font-bold leading-none text-gold tabular-nums">
+          <ItemIcon itemId={cost.itemId} className="h-4 w-4" />
+          {cost.count > 1 && <span>×{cost.count}</span>}
+        </span>
+      )}
     </button>
   )
 }

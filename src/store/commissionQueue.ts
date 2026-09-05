@@ -9,7 +9,7 @@
 // 모델 — "제안 세션(배치)"은 시간이 아니라 강화 시도 횟수로 굴러간다:
 //  - active: 현재 화면에 떠 있는 한 세션의 제안들. 세션이 시작되면 서로 다른 제안 sessionSize 개를 "한 번에"
 //    출제한다(풀의 서로 다른 항목 수가 그보다 적으면 있는 만큼만 — min). 세션 내 중복 제안은 없다(비복원 추출).
-//  - attemptsTotal / attemptsRemaining: 세션이 갱신되기까지의 강화 시도 카운터. 세션 시작 시 버킷의
+//  - attemptsTotal / attemptsRemaining: 세션이 갱신되기까지의 강화 시도 카운터. 세션 시작 시 티어의
 //    refreshWeights 에서 가중 추첨으로 한 번 뽑아(attemptsTotal) attemptsRemaining 을 같게 둔다. 강화 시도가
 //    한 번 일어날 때마다 attemptsRemaining 을 1 줄이고, 1 에서 0 으로 떨어지는 그 시도에 세션 전체를 새로
 //    갱신한다(쿨다운 없음 — 즉시 교체). 카운트다운 UI 는 세그먼트 바로 표현한다(총 칸 attemptsTotal, 켜진
@@ -23,14 +23,16 @@ import type {
   CommissionItemEntry,
   Material,
   RefreshWeight,
+  TradeCost,
 } from '../data/types'
 import { weightedIndex } from '../lib/weightedPick'
 
 // 거래 비용은 골드 또는 아이템뿐이다('free' 는 강화 비용 전용 — 거래엔 쓰지 않는다).
-export type CommissionCost = Exclude<Material, { kind: 'free' }>
+// 상점 업그레이드 비용(ShopTier.upgradeCost)과 같은 타입(TradeCost) — 지불 경로를 공유한다.
+export type CommissionCost = TradeCost
 
 // 화면에 떠 있는 거래 1건. 비용·보상은 생성 시점 기준으로 정해져 freeze 된다.
-// (생성 후 보유 골드가 바뀌어 다른 버킷이 되어도, 발급된 거래의 비용/보상은 발급 시점 값을 유지한다 → freeze.)
+// (생성 후 상점이 업그레이드돼 다른 티어가 되어도, 발급된 거래의 비용/보상은 발급 시점 값을 유지한다 → freeze.)
 //  - cost: 지불(납품)할 것 — Material(골드 또는 아이템). shop price 와 동일 타입 재사용.
 //  - reward: 지불 시 받는 것 — Material(골드 계산값 또는 아이템).
 export type Commission = {
@@ -39,7 +41,7 @@ export type Commission = {
   reward: Material
 }
 
-// 출제 풀 1항목 — 셸이 버킷 items[] 의 비용(cost)을 해석하고 (골드 보상이면) basePrice 를 붙여 만든다.
+// 출제 풀 1항목 — 셸이 티어 items[] 의 비용(cost)을 해석하고 (골드 보상이면) basePrice 를 붙여 만든다.
 // 비용/보상 산정값이 아이템별이라 PoolEntry 가 그 값을 들고 다닌다(코어는 DataManager 비의존 유지).
 export type PoolEntry = {
   weight: number
@@ -60,7 +62,7 @@ export type PoolEntry = {
     }
 )
 
-// 제안 세션의 버킷 공통 설정 묶음 — 셸이 현재 버킷에서 합성해 주입한다.
+// 제안 세션의 티어 공통 설정 묶음 — 셸이 현재 상점 티어에서 합성해 주입한다.
 // (보상 배수/가산은 아이템별이라 여기 없고 PoolEntry 에 있다. 세션 크기 등 글로벌도 별도 인자.)
 //  - refreshWeights: 세션 카운터(갱신까지의 강화 시도 횟수) 후보의 가중 추첨 목록.
 export type BucketSettings = {
@@ -89,7 +91,7 @@ export function bootstrapCommissionQueue(
   return refresh(rng, pool, settings, sessionSize, 1)
 }
 
-// 출제 풀(순수 — DataManager 비의존). 버킷 items[] 의 각 itemId 에 basePrice 를 붙여 PoolEntry[] 로 만든다.
+// 출제 풀(순수 — DataManager 비의존). 티어 items[] 의 각 itemId 에 basePrice 를 붙여 PoolEntry[] 로 만든다.
 // basePrice 를 못 구한 항목(basePriceOf 가 undefined)은 방어적으로 제외한다 — 로드 검증이 itemId 존재를
 // 보장하므로 실제로는 걸리지 않지만(판매 가능 검·카탈로그만 출제 가능), 코어 단독으로도 안전하게 유지한다.
 export function commissionPool(

@@ -127,7 +127,8 @@
 ### 그림자
 
 - **글로우 그림자는 항상 토큰 변수로**: `shadow-[0_0_28px_-4px_var(--color-gold)]`(강화 버튼 활성),
-  `shadow-[0_0_12px_-2px_var(--color-success)]`(의뢰 카드), `boxShadow: '0 0 22px 3px var(--color-gold-glow)'`(골드창 도달).
+  `shadow-[0_0_12px_-2px_var(--color-success)]`(의뢰 카드), `shadow-[0_0_12px_-2px_var(--color-gold)]`(상점 카드 업그레이드 가능 — 의뢰의 초록과 구분되는 '상점' 어휘),
+  `boxShadow: '0 0 22px 3px var(--color-gold-glow)'`(골드창 도달).
 - 스프라이트 입체감은 `drop-shadow` 2단계: 일반 `[0_4px_10px_rgba(0,0,0,0.25)]`, 강조(망치) `[0_6px_10px_rgba(0,0,0,0.35)]`.
 - 구조 그림자는 Tailwind 기본(`shadow-md`, `shadow-2xl`)을 쓴다.
 - `rgba(0,0,0,α)`/`white`는 색이 아니라 **명암**(텍스트 섀도·오버레이 어둠·결계 흰빛) 용도로만 허용된다.

@@ -104,9 +104,11 @@ describe('아이템 아이콘 ↔ 스프라이트 무결성', () => {
       if (sword.enchantCost?.kind === 'item') ids.add(sword.enchantCost.itemId)
       for (const d of sword.dropOnFail) ids.add(d.itemId)
     }
-    // 거래에 등장하는 모든 아이템(아이템 비용의 납품 아이템 + 아이템 보상의 지급 아이템)도 아이콘으로 표시되므로 함께 검증한다.
-    for (const bucket of dataManager.getCommissionConfig().buckets) {
-      for (const e of bucket.items) {
+    // 거래에 등장하는 모든 아이템(아이템 비용의 납품 아이템 + 아이템 보상의 지급 아이템)과 상점 업그레이드
+    // 아이템 비용도 아이콘으로 표시되므로 함께 검증한다.
+    for (const tier of dataManager.getCommissionConfig().tiers) {
+      if (tier.upgradeCost?.kind === 'item') ids.add(tier.upgradeCost.itemId)
+      for (const e of tier.items) {
         if (e.costKind !== 'gold') ids.add(e.itemId)
         if (e.rewardKind === 'item') ids.add(e.rewardItemId)
       }
@@ -203,12 +205,17 @@ describe('아이템 카탈로그 ↔ i18n 무결성', () => {
   })
 })
 
-// 의뢰 버킷에 출제되는 모든 itemId 는 표시명으로 해석 가능해야 한다(검 또는 카탈로그 아이템).
+// 의뢰 티어에 출제되는 모든 itemId(와 상점 업그레이드 아이템 비용)는 표시명으로 해석 가능해야 한다(검 또는 카탈로그 아이템).
 describe('의뢰 데이터 ↔ 표시명 무결성', () => {
-  it('모든 버킷의 모든 출제 itemId 가 표시 가능하다', () => {
+  it('모든 티어의 모든 출제 itemId 가 표시 가능하다', () => {
     dataManager.load()
-    for (const bucket of dataManager.getCommissionConfig().buckets) {
-      for (const e of bucket.items) {
+    for (const tier of dataManager.getCommissionConfig().tiers) {
+      if (tier.upgradeCost?.kind === 'item')
+        expect(
+          isDisplayableItemId(tier.upgradeCost.itemId),
+          `'${tier.upgradeCost.itemId}'`,
+        ).toBe(true)
+      for (const e of tier.items) {
         if (e.costKind !== 'gold')
           expect(isDisplayableItemId(e.itemId), `'${e.itemId}'`).toBe(true)
         if (e.rewardKind === 'item')

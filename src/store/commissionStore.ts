@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { dataManager } from '../data/DataManager'
-import type { CommissionConfig, GoldBucket } from '../data/types'
+import type { CommissionConfig, ShopTier, TradeCost } from '../data/types'
 import {
   bootstrapCommissionQueue,
   commissionPool,
@@ -13,10 +13,19 @@ import {
 } from './commissionQueue'
 import { useGameStore } from './gameStore'
 
-// 골드 버킷 정의에서 세션 생성에 필요한 설정 묶음만 뽑는다(코어 BucketSettings 형태로).
+// 상점 티어 정의에서 세션 생성에 필요한 설정 묶음만 뽑는다(코어 BucketSettings 형태로).
 // (보상 배수/가산은 아이템별이라 여기 없고 buildPool 이 PoolEntry 로 실어 나른다.)
-function settingsOf(bucket: GoldBucket): BucketSettings {
-  return { refreshWeights: bucket.refreshWeights }
+function settingsOf(tier: ShopTier): BucketSettings {
+  return { refreshWeights: tier.refreshWeights }
+}
+
+// 다음 상점 업그레이드 비용(순수 셀렉터 — 뷰(상점 카드)와 upgradeShop 이 공유). 최고 레벨이면 null.
+// tiers[level + 1].upgradeCost 는 로더가 시작 티어 외 모든 티어에 비용을 강제하므로 존재하지만, 방어적으로 ?? null.
+export function nextUpgradeCost(
+  config: CommissionConfig,
+  shopLevel: number,
+): TradeCost | null {
+  return config.tiers[shopLevel + 1]?.upgradeCost ?? null
 }
 
 // 의뢰(Commission) 시스템의 얇은 셸 — 순수 전이 코어(commissionQueue)에 "강화 시도 신호"와 "데이터"만 입힌다.
@@ -28,9 +37,10 @@ function settingsOf(bucket: GoldBucket): BucketSettings {
 // (DataManager.ensureLoaded), 모듈 평가 시점에 즉시 도는 zustand 초기화에서는 읽지 않는다 — 초기 상태는
 // config 없는 빈 큐로 두고, start()(App useEffect → load 이후)에서 bootstrapCommissionQueue 로 재초기화한다.
 //
-// 출제 풀은 "보유 골드"가 고른다: 매 갱신 시 현재 골드로 담당 버킷(currentBucket)을 골라 그 items[] 을 제안
-// 풀로 삼는다. 세션이 갱신될 때 spawnSession 이 그 풀에서 서로 다른 항목 maxCommissions 개를 골라 한 번에
-// 출제한다. 골드가 바뀌어 버킷이 달라지면 다음 갱신부터 반영된다(이미 발급된 제안은 freeze 유지).
+// 출제 풀은 "상점 레벨(shopLevel)"이 고른다: 매 갱신 시 tiers[shopLevel](currentTier)의 items[] 을 제안 풀로
+// 삼는다. 세션이 갱신될 때 spawnSession 이 그 풀에서 서로 다른 항목 maxCommissions 개를 골라 한 번에 출제한다.
+// 상점 레벨은 upgradeShop(비용 지불)으로만 오르고 내려가지 않는다 — 업그레이드 즉시 새 티어 풀로 세션을
+// 무료 갱신해 효과가 바로 보이게 한다(이미 발급됐던 제안은 교체되므로 freeze 는 납품 시점 값에만 해당).
 //
 // 완료는 두 store 에 걸친 트랜잭션이다: PlayerState 변경(검 소모+골드)은 gameStore 가 소유하고,
 // 제안 생명주기(선택 시 세션 카드 제거)는 여기가 소유한다 — gameStore 가 완료를 수락(true)할 때만 complete 를
@@ -47,11 +57,17 @@ type CommissionActions = {
   // 제안 강제 갱신: refreshCost 골드를 지불하고 현재 세션을 즉시 새로 출제한다(상단 갱신 버튼). 정지/잠금이거나
   // 골드가 부족하면 무변화로 false(골드는 지불 성공 시에만 빠진다). 성공이면 true.
   refreshNow: () => boolean
+  // 상점 업그레이드: 다음 티어의 upgradeCost(골드 또는 아이템 — 거래 비용과 같은 지불 경로)를 내고 shopLevel 을
+  // 1 올린 뒤 세션을 새 티어 풀로 즉시 무료 갱신한다(상점 카드). 정지/잠금/최고 레벨이거나 지불 불가면 무변화 false.
+  upgradeShop: () => boolean
   // 의뢰 완료 시도: gameStore 가 검 소모+보상을 수락하면 complete 적용 후 true. 미보유면 false(무변화).
   fulfill: (id: number) => boolean
 }
 
-export type CommissionStore = CommissionQueueState & CommissionActions
+export type CommissionStore = CommissionQueueState & {
+  // 현재 상점 레벨(= config.tiers 인덱스, 0 부터). 단조 — upgradeShop 으로만 오른다. stop 에서 0 으로 리셋.
+  shopLevel: number
+} & CommissionActions
 
 type CreateOpts = {
   // 생성 rng(테스트에서 결정적 주입). 미지정 시 Math.random.
@@ -77,20 +93,13 @@ export function createCommissionStore(opts: CreateOpts = {}) {
   const isUnlocked = (config: CommissionConfig): boolean =>
     useGameStore.getState().maxLevelReached >= config.unlockAtLevel
 
-  // 현재 보유 골드가 담당하는 버킷을 읽는다. 매 갱신 새로 읽어 골드 변동이 다음 스폰부터 반영된다.
-  // 로더가 보장(정렬·연속·첫 minGold=0·마지막 maxGold=null)하므로 "maxGold 가 null 이거나 gold < maxGold 인
-  // 첫 버킷"이 담당이다(minGold 는 스폰 시 읽지 않는다). find 가 못 찾는 경우(방어)는 마지막 버킷으로 폴백.
-  const currentBucket = (config: CommissionConfig): GoldBucket => {
-    const gold = useGameStore.getState().gold
-    return (
-      config.buckets.find((b) => b.maxGold === null || gold < b.maxGold) ??
-      config.buckets[config.buckets.length - 1]
-    )
-  }
+  // 상점 레벨이 담당하는 티어. 호출 측이 이 store 의 shopLevel(단조)을 넘긴다 — 범위 밖(방어)이면 마지막 티어로 폴백.
+  const tierAt = (config: CommissionConfig, level: number): ShopTier =>
+    config.tiers[level] ?? config.tiers[config.tiers.length - 1]
 
-  // 출제 풀 조립: 현재 버킷의 items[] 에 basePrice 를 붙여 PoolEntry[] 로. start(부트스트랩)·notifyAttempt 가 공유.
-  const buildPool = (bucket: GoldBucket): PoolEntry[] =>
-    commissionPool(bucket.items, (id) => dataManager.getItemBasePrice(id))
+  // 출제 풀 조립: 현재 티어의 items[] 에 basePrice 를 붙여 PoolEntry[] 로. start(부트스트랩)·notifyAttempt 가 공유.
+  const buildPool = (tier: ShopTier): PoolEntry[] =>
+    commissionPool(tier.items, (id) => dataManager.getItemBasePrice(id))
 
   return create<CommissionStore>((set, get) => ({
     // 초기 상태는 빈 큐 — start()에서 bootstrapCommissionQueue 로 채운다(모듈 평가 시 load 전이라 config 미접근).
@@ -98,6 +107,7 @@ export function createCommissionStore(opts: CreateOpts = {}) {
     attemptsRemaining: 0,
     attemptsTotal: 0,
     nextId: 1,
+    shopLevel: 0,
 
     start: () => {
       if (started) return
@@ -107,12 +117,12 @@ export function createCommissionStore(opts: CreateOpts = {}) {
       // 시작 시점에 이미 해제됐으면(예: 도달 레벨이 임계 이상) 즉시 첫 세션을 채운다. 아직 잠겨 있으면 초기
       // 빈 상태(active:[]) 그대로 두고, 해제되는 첫 notifyAttempt 가 부트스트랩한다(아래). 잠금 중엔 set 0회.
       if (isUnlocked(config)) {
-        const bucket = currentBucket(config)
+        const tier = tierAt(config, get().shopLevel)
         set(
           bootstrapCommissionQueue(
             rng,
-            buildPool(bucket),
-            settingsOf(bucket),
+            buildPool(tier),
+            settingsOf(tier),
             config.maxCommissions,
           ),
         )
@@ -123,7 +133,13 @@ export function createCommissionStore(opts: CreateOpts = {}) {
     stop: () => {
       started = false
       bootstrapped = false
-      set({ active: [], attemptsRemaining: 0, attemptsTotal: 0, nextId: 1 })
+      set({
+        active: [],
+        attemptsRemaining: 0,
+        attemptsTotal: 0,
+        nextId: 1,
+        shopLevel: 0,
+      })
     },
 
     notifyAttempt: () => {
@@ -131,15 +147,15 @@ export function createCommissionStore(opts: CreateOpts = {}) {
       const config = getConfig()
       // 잠금 중이면 아무것도 하지 않는다 — 초기 빈 상태를 그대로 두므로 set 호출이 없어 리렌더가 없다.
       if (!isUnlocked(config)) return
-      const bucket = currentBucket(config)
+      const tier = tierAt(config, get().shopLevel)
       if (!bootstrapped) {
         // 해제 직후 첫 알림 — 이 강화 시도가 잠금을 넘긴 경우. 즉시 첫 세션을 채우고 카운터는 차감하지 않는다
         // (해제 교차 시도는 첫 세션을 "만드는" 시도이지 그 세션의 시도를 소비하는 게 아니다).
         set(
           bootstrapCommissionQueue(
             rng,
-            buildPool(bucket),
-            settingsOf(bucket),
+            buildPool(tier),
+            settingsOf(tier),
             config.maxCommissions,
           ),
         )
@@ -150,8 +166,8 @@ export function createCommissionStore(opts: CreateOpts = {}) {
         attempt(
           get(),
           rng,
-          buildPool(bucket),
-          settingsOf(bucket),
+          buildPool(tier),
+          settingsOf(tier),
           config.maxCommissions,
         ),
       )
@@ -162,14 +178,13 @@ export function createCommissionStore(opts: CreateOpts = {}) {
       const config = getConfig()
       // 잠금 중이면 갱신할 세션이 없다 — 강제 갱신도 불가(잠금 게이트를 골드로 우회하지 못하게). 무변화 false.
       if (!isUnlocked(config)) return false
-      // 비용을 낼 수 있는지만 먼저 확인(차감 전). 출제 풀은 "지불 전" 골드 기준 버킷에서 고른다 — 지불로
-      // 골드 티어가 내려가 더 낮은(불리한) 풀을 뽑는 경계 근처 강등을 막는다("내가 선 티어에서 갱신").
+      // 비용을 낼 수 있는지만 먼저 확인(차감 전). 출제 풀은 현재 상점 티어(골드와 무관)에서 고른다.
       if (useGameStore.getState().gold < config.refreshCost) return false
-      const bucket = currentBucket(config)
+      const tier = tierAt(config, get().shopLevel)
       const next = refresh(
         rng,
-        buildPool(bucket),
-        settingsOf(bucket),
+        buildPool(tier),
+        settingsOf(tier),
         config.maxCommissions,
         get().nextId,
       )
@@ -180,6 +195,36 @@ export function createCommissionStore(opts: CreateOpts = {}) {
       set(next)
       // 강제 갱신은 잠금 해제 후에만 도달하므로 부트스트랩 래치를 세워 둔다 — 만약 자연 부트스트랩 전에
       // 갱신했다면, 다음 notifyAttempt 가 다시 부트스트랩해 방금 산 세션을 덮어쓰지 않도록(방어).
+      bootstrapped = true
+      return true
+    },
+
+    upgradeShop: () => {
+      if (!started) return false
+      const config = getConfig()
+      // 잠금 중이면 상점 자체가 닫혀 있다 — 업그레이드도 불가(잠금 게이트를 재화로 우회하지 못하게). 무변화 false.
+      if (!isUnlocked(config)) return false
+      const level = get().shopLevel
+      const cost = nextUpgradeCost(config, level)
+      if (cost === null) return false // 최고 레벨
+      // 새 티어 풀로 세션을 먼저 지어 본 뒤에만 과금한다(refreshNow·fulfill 과 동일한 두 store 트랜잭션 규율).
+      // 빈 세션(방어: 로더가 빈 풀을 막지만 코어 단독 안전성 유지)이면 재화를 물지 않고 무변화 false.
+      const nextTier = tierAt(config, level + 1)
+      const next = refresh(
+        rng,
+        buildPool(nextTier),
+        settingsOf(nextTier),
+        config.maxCommissions,
+        get().nextId,
+      )
+      if (next.active.length === 0) return false
+      // 지불은 거래 성사와 같은 경로(gameStore.fulfillCommission) — 골드면 골드 차감, 아이템이면 가방(→ 장착 검)
+      // 소모. 보상은 없다(free). 지불 불가(재화 부족)면 gameStore 가 false 로 거절하고 여기서도 무변화.
+      if (
+        !useGameStore.getState().fulfillCommission(cost, { kind: 'free' })
+      )
+        return false
+      set({ ...next, shopLevel: level + 1 })
       bootstrapped = true
       return true
     },

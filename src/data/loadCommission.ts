@@ -2,8 +2,9 @@ import commissionRaw from '../../public/data/commission.json'
 import type {
   CommissionConfig,
   CommissionItemEntry,
-  GoldBucket,
   RefreshWeight,
+  ShopTier,
+  TradeCost,
 } from './types'
 import { isRecord, makeFail } from './validate'
 
@@ -20,9 +21,10 @@ import { isRecord, makeFail } from './validate'
 // 이는 commissionQueue 의 런타임 sellPrice 필터를 로드 시점으로 옮긴 것으로, sword_1(판매 불가) 출제 →
 // "무한 골드" 익스플로잇을 차단한다. 동시에 미지의(오타) itemId 도 여기서 즉시 실패한다.
 //
-// 골드 버킷 커버리지(load-bearing): buckets[] 는 보유 골드 [0, ∞) 를 빈틈·겹침 없이 덮어야 한다 —
-// 첫 버킷 minGold=0, 연속(buckets[i].minGold === buckets[i-1].maxGold), 마지막 maxGold=null(=∞).
-// 셀렉터(commissionStore.currentBucket)가 maxGold 만으로 담당 버킷을 고를 수 있게 하는 전제다.
+// 상점 티어(load-bearing): tiers[] 의 인덱스가 곧 상점 레벨이다(tiers[0] = 시작 티어). 시작 티어는
+// upgradeCost 가 없어야(null) 하고, 그 외 모든 티어는 upgradeCost(골드 또는 아이템 — 거래 비용과 같은
+// 체계)가 있어야 한다. 셀렉터(commissionStore.currentTier)가 tiers[shopLevel] 로 담당 티어를 고르고,
+// 상점 카드가 tiers[shopLevel + 1].upgradeCost 를 다음 업그레이드 비용으로 쓰는 전제다.
 //
 // parseCommissionConfig 는 순수 함수로 분리해 테스트 가능하게 두고, loadCommission 이 번들 데이터의 진입점이다.
 
@@ -48,28 +50,60 @@ function intAtLeast(
   return v
 }
 
-// 골드 버킷 1구간 검증. 담당 골드 구간(minGold/maxGold) + 등장 아이템 목록 + 보상·시간 범위를 검증한다.
-function parseBucket(
-  raw: unknown,
-  idx: number,
-  knownItemIds: ReadonlySet<string>,
-): GoldBucket {
-  const where = `buckets[${idx}]`
-  if (!isRecord(raw)) fail(`${where} must be an object`)
+// 거래 비용 필드 파싱(items[] 항목과 상점 upgradeCost 가 공유하는 "같은 체계"):
+//  - costKind 누락 시 'item'(기존 납품형 항목 호환). 'gold' 면 costAmount(정수 >= 1),
+//    'item' 이면 itemId(출제 가능 집합에 존재) + requiredCount(정수 >= 1, 누락 시 1).
+// 반환은 로더 내부 표현(costKind 구분 필드) — 항목은 그대로 싣고, 상점 비용은 toTradeCost 로 Material 화한다.
+type ParsedCost =
+  | { costKind: 'item'; itemId: string; requiredCount: number }
+  | { costKind: 'gold'; costAmount: number }
 
-  // 버킷 컨텍스트(where)를 붙인 숫자/정수 검증 헬퍼 — 에러 메시지로 어느 버킷·필드인지 즉시 알 수 있게.
-  const fnum = (key: string): number => {
+function parseCost(
+  raw: Record<string, unknown>,
+  where: string,
+  knownItemIds: ReadonlySet<string>,
+): ParsedCost {
+  const iint = (key: string, min: number): number => {
     const v = raw[key]
     if (typeof v !== 'number' || !Number.isFinite(v))
       fail(`${where}.${key} must be a finite number`)
-    return v
-  }
-  const fint = (key: string, min: number): number => {
-    const v = fnum(key)
     if (!Number.isInteger(v)) fail(`${where}.${key} must be an integer`)
     if (v < min) fail(`${where}.${key} must be >= ${min}`)
     return v
   }
+  const costKind = raw.costKind === undefined ? 'item' : raw.costKind
+  if (costKind !== 'item' && costKind !== 'gold')
+    fail(`${where}.costKind must be 'item' or 'gold'`)
+  if (costKind === 'gold')
+    return { costKind: 'gold', costAmount: iint('costAmount', 1) }
+  const itemId = raw.itemId
+  if (typeof itemId !== 'string' || itemId.length === 0)
+    fail(`${where}.itemId must be a non-empty string`)
+  // load-bearing 무결성: 판매 가능 검 또는 카탈로그 아이템만 지불 가능(sword_1 등 비판매·미지 id 차단).
+  if (!knownItemIds.has(itemId))
+    fail(`${where}.itemId is not a sellable sword or catalog item: ${itemId}`)
+  const requiredCount =
+    raw.requiredCount === undefined ? 1 : iint('requiredCount', 1)
+  return { costKind: 'item', itemId, requiredCount }
+}
+
+// 로더 내부 비용 표현 → 런타임 Material(TradeCost). 상점 업그레이드 비용은 gameStore.fulfillCommission 에
+// 그대로 넘기므로 로드 시점에 Material 로 바꿔 둔다(거래 항목은 셸의 commissionPool 이 같은 변환을 한다).
+function toTradeCost(c: ParsedCost): TradeCost {
+  return c.costKind === 'gold'
+    ? { kind: 'gold', amount: c.costAmount }
+    : { kind: 'item', itemId: c.itemId, count: c.requiredCount }
+}
+
+// 상점 티어 1단계 검증. 업그레이드 비용(upgradeCost) + 등장 아이템 목록 + 보상·갱신 범위를 검증한다.
+// idx 가 0(시작 티어)이면 upgradeCost 는 없어야 하고(null/누락), 그 외 티어는 반드시 있어야 한다.
+function parseTier(
+  raw: unknown,
+  idx: number,
+  knownItemIds: ReadonlySet<string>,
+): ShopTier {
+  const where = `tiers[${idx}]`
+  if (!isRecord(raw)) fail(`${where} must be an object`)
 
   // items: 비어있지 않은 배열. 각 항목은 { itemId, weight > 0, 아이템별 incentive/additive 범위 }.
   const rawItems = raw.items
@@ -101,35 +135,13 @@ function parseBucket(
     if (rewardKind !== 'gold' && rewardKind !== 'item')
       fail(`${iw}.rewardKind must be 'gold' or 'item'`)
 
-    // 지불(cost) 종류 — 누락 시 'item'(기존 납품형 의뢰 호환).
-    const costKind = it.costKind === undefined ? 'item' : it.costKind
-    if (costKind !== 'item' && costKind !== 'gold')
-      fail(`${iw}.costKind must be 'item' or 'gold'`)
+    // 지불(cost) — 상점 upgradeCost 와 같은 체계(parseCost): 골드(costAmount) 또는 아이템(itemId+requiredCount).
+    const costFields = parseCost(it, iw, knownItemIds)
     // 골드 비용(골드로 구매)은 아이템 보상만 허용한다 — 골드 보상은 "납품 아이템"의 기준가가 필요하므로.
-    if (costKind === 'gold' && rewardKind !== 'item')
+    if (costFields.costKind === 'gold' && rewardKind !== 'item')
       fail(
         `${iw}.costKind 'gold' requires rewardKind 'item' (gold reward needs a delivered item's base price)`,
       )
-
-    // 비용 필드 — 골드 비용은 costAmount(정수 >=1), 아이템 비용은 itemId + requiredCount.
-    const costFields:
-      | { costKind: 'item'; itemId: string; requiredCount: number }
-      | { costKind: 'gold'; costAmount: number } =
-      costKind === 'gold'
-        ? { costKind: 'gold', costAmount: iint('costAmount', 1) }
-        : (() => {
-            const itemId = it.itemId
-            if (typeof itemId !== 'string' || itemId.length === 0)
-              fail(`${iw}.itemId must be a non-empty string`)
-            // load-bearing 무결성: 판매 가능 검 또는 카탈로그 아이템만 납품 가능(sword_1 등 비판매·미지 id 차단).
-            if (!knownItemIds.has(itemId))
-              fail(
-                `${iw}.itemId is not a sellable sword or catalog item: ${itemId}`,
-              )
-            const requiredCount =
-              it.requiredCount === undefined ? 1 : iint('requiredCount', 1)
-            return { costKind: 'item', itemId, requiredCount }
-          })()
 
     if (rewardKind === 'item') {
       // 물물교환/구매: 지불하면 rewardItemId 를 rewardItemCount 개 지급.
@@ -174,9 +186,21 @@ function parseBucket(
     }
   })
 
-  // 담당 골드 구간. minGold 는 정수 >= 0. maxGold 는 null(=∞, 마지막 버킷) 또는 정수 >= 1.
-  const minGold = fint('minGold', 0)
-  const maxGold = raw.maxGold === null ? null : fint('maxGold', 1)
+  // 업그레이드 비용. 시작 티어(idx 0)는 비용이 없어야 하고(null/누락), 그 외 티어는 반드시 객체여야 한다.
+  // 비용은 items[] 의 지불과 같은 체계(parseCost) — 골드(costAmount) 또는 아이템(itemId+requiredCount).
+  const rawCost = raw.upgradeCost
+  let upgradeCost: TradeCost | null
+  if (idx === 0) {
+    if (rawCost !== undefined && rawCost !== null)
+      fail(`${where}.upgradeCost must be absent on the first (starting) tier`)
+    upgradeCost = null
+  } else {
+    if (!isRecord(rawCost))
+      fail(`${where}.upgradeCost must be an object (gold or item cost)`)
+    upgradeCost = toTradeCost(
+      parseCost(rawCost, `${where}.upgradeCost`, knownItemIds),
+    )
+  }
 
   // refreshWeights: 세션 갱신까지의 강화 시도 횟수 후보(가중 추첨). 비어있지 않은 배열.
   // 각 항목 { value: 정수 >= 1, weight: 유한수 > 0 } — items[] 의 weight 검증 관례를 그대로 따른다.
@@ -199,21 +223,12 @@ function parseBucket(
     return { value, weight }
   })
 
-  // 의미(범위·관계) 검증 — reducer 가 전제하는 불변.
-  if (maxGold !== null && minGold >= maxGold)
-    fail(`${where}.minGold must be < maxGold`)
-
-  return {
-    minGold,
-    maxGold,
-    items,
-    refreshWeights,
-  }
+  return { upgradeCost, items, refreshWeights }
 }
 
 // 순수 검증기: 임의 입력(unknown)을 검증된 CommissionConfig 로 변환한다.
-// 글로벌 시스템 파라미터(maxCommissions=세션 크기 / unlockAtLevel) + 골드 버킷 정의(buckets[])를 검증한다.
-// knownItemIds: 출제 가능 itemId 집합(판매 가능 검 ∪ 아이템 카탈로그) — 버킷 itemId 무결성 검증에 쓴다.
+// 글로벌 시스템 파라미터(maxCommissions=세션 크기 / unlockAtLevel / refreshCost) + 상점 티어 정의(tiers[])를 검증한다.
+// knownItemIds: 출제 가능 itemId 집합(판매 가능 검 ∪ 아이템 카탈로그) — 티어 itemId·업그레이드 비용 무결성 검증에 쓴다.
 export function parseCommissionConfig(
   raw: unknown,
   knownItemIds: ReadonlySet<string>,
@@ -230,32 +245,13 @@ export function parseCommissionConfig(
   // 누락/오타가 조용히 새지 않고 로드 시점에 즉시 실패하게 한다.
   const refreshCost = intAtLeast(raw, 'refreshCost', 0)
 
-  // buckets: 비어있지 않은 배열. 각 버킷은 parseBucket 으로 검증.
-  const rawBuckets = raw.buckets
-  if (!Array.isArray(rawBuckets) || rawBuckets.length === 0)
-    fail('buckets must be a non-empty array (gold 0 bucket = buckets[0])')
-  const buckets = rawBuckets.map((b, i) => parseBucket(b, i, knownItemIds))
+  // tiers: 비어있지 않은 배열. 각 티어는 parseTier 로 검증(인덱스 0 = 시작 티어, 비용 없음 / 그 외 비용 필수).
+  const rawTiers = raw.tiers
+  if (!Array.isArray(rawTiers) || rawTiers.length === 0)
+    fail('tiers must be a non-empty array (starting tier = tiers[0])')
+  const tiers = rawTiers.map((t, i) => parseTier(t, i, knownItemIds))
 
-  // 커버리지 불변: [0, ∞) 를 빈틈·겹침 없이 덮어야 한다(셀렉터가 maxGold 만으로 담당 버킷을 고르는 전제).
-  //  - 첫 버킷 minGold === 0.
-  //  - 연속: buckets[i].minGold === buckets[i-1].maxGold (앞 버킷 maxGold 가 null 이면 비말단인데 ∞ → 실패).
-  //  - 마지막 버킷 maxGold === null(=∞).
-  if (buckets[0].minGold !== 0) fail('buckets[0].minGold must be 0')
-  for (let i = 1; i < buckets.length; i += 1) {
-    const prevMax = buckets[i - 1].maxGold
-    if (prevMax === null)
-      fail(
-        `buckets[${i - 1}].maxGold must not be null (only the last bucket spans to infinity)`,
-      )
-    if (buckets[i].minGold !== prevMax)
-      fail(
-        `buckets[${i}].minGold must equal buckets[${i - 1}].maxGold (contiguous, no gap/overlap)`,
-      )
-  }
-  if (buckets[buckets.length - 1].maxGold !== null)
-    fail('the last bucket maxGold must be null (spans to infinity)')
-
-  return { maxCommissions, unlockAtLevel, refreshCost, buckets }
+  return { maxCommissions, unlockAtLevel, refreshCost, tiers }
 }
 
 // 게임 시작 시 호출되는 로드 진입점. 번들된 데이터 파일을 검증해 CommissionConfig 로 만든다.

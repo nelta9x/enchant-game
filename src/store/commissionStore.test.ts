@@ -2,7 +2,12 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { createCommissionStore } from './commissionStore'
 import { useGameStore } from './gameStore'
 import { dataManager } from '../data/DataManager'
-import type { CommissionConfig, GoldBucket, Material } from '../data/types'
+import type {
+  CommissionConfig,
+  Material,
+  ShopTier,
+  TradeCost,
+} from '../data/types'
 
 // 골드 보상 Material 에서 금액 추출(본 픽스처는 전부 골드 의뢰 — 아니면 0 으로 단언 실패 유도).
 const goldOf = (reward: Material): number =>
@@ -15,28 +20,26 @@ const idsOf = (store: ReturnType<typeof createCommissionStore>): number[] =>
   store.getState().active.map((c) => c.id)
 
 // 셸(강화 시도 신호+데이터) 통합 테스트. 풀 basePrice 는 실제 데이터(DataManager)를 쓰되, 설정은 픽스처를
-// 주입해 production 값과 독립시킨다. 출제 풀은 보유 골드가 고르므로(currentBucket), 테스트는 gold 를 세팅해
-// 어느 버킷이 뽑히는지 제어한다. 갱신 카운터는 결정적이도록 refreshWeights 를 단일 후보(value 3)로 둔다.
+// 주입해 production 값과 독립시킨다. 출제 풀은 상점 레벨(shopLevel)이 고르므로, 테스트는 upgradeShop 으로
+// 레벨을 올려 어느 티어가 뽑히는지 제어한다. 갱신 카운터는 결정적이도록 refreshWeights 를 단일 후보(value 3)로 둔다.
 beforeAll(() => {
   dataManager.load()
 })
 
 beforeEach(() => {
-  // 기본은 버킷 A([0, 500000)) 구간. 개별 테스트가 필요하면 gold 를 덮어 다른 버킷을 고른다.
+  // 기본은 시작 티어(레벨 0). 개별 테스트가 필요하면 upgradeShop 으로 티어를 올린다.
   // maxLevelReached 를 0 으로 리셋해 잠금 게이트 테스트의 출발 바닥을 고정한다(전역 store 공유 → 이전 테스트
   // 잔존값 방지). 본 파일의 CONFIG/BARTER 픽스처는 unlockAtLevel:0 이라 나머지 테스트는 값과 무관하게 활성.
   useGameStore.setState({ gold: 1000, maxLevelReached: 0 })
 })
 
-// 결정적 버킷 헬퍼: 갱신 후보 단일(value 3), incentive 1.0·additive 0 고정(reward = basePrice).
-function bucket(
-  minGold: number,
-  maxGold: number | null,
+// 결정적 티어 헬퍼: 갱신 후보 단일(value 3), incentive 1.0·additive 0 고정(reward = basePrice).
+function tier(
+  upgradeCost: TradeCost | null,
   items: { itemId: string; weight: number }[],
-): GoldBucket {
+): ShopTier {
   return {
-    minGold,
-    maxGold,
+    upgradeCost,
     // 아이템별 incentive 1.0·additive 0 고정 → reward = basePrice(결정적). 골드 보상·수량 1.
     items: items.map((it) => ({
       ...it,
@@ -51,27 +54,43 @@ function bucket(
   }
 }
 
-// 버킷 A([0,500000)): 검 3~5 / 버킷 B([500000,1000000)): 검 4~6 / 버킷 C([1000000,∞)): 재료 iron_scrap.
-// 보유 골드 구간이 [0,∞) 를 연속으로 덮는다(로더 불변 미러).
+// 티어 A(레벨 0, 시작): 검 3~5 / 티어 B(레벨 1, 골드 50만): 검 4~6 / 티어 C(레벨 2, 철조각 ×2): 재료 iron_scrap.
+// 업그레이드 비용은 골드·아이템을 하나씩 섞어 두 지불 경로를 모두 검증한다.
+const TIER_B_COST: TradeCost = { kind: 'gold', amount: 500_000 }
+const TIER_C_COST: TradeCost = { kind: 'item', itemId: 'iron_scrap', count: 2 }
 const CONFIG: CommissionConfig = {
   maxCommissions: 3,
   // unlockAtLevel:0 = 항상 활성(레거시 동작 유지). 잠금 게이트는 별도 describe 에서 nonzero 로 검증한다.
   unlockAtLevel: 0,
   // 강제 갱신 비용 픽스처 — refreshNow describe 가 이 값을 기준으로 차감을 단언한다(하드코딩 회피).
   refreshCost: 100_000,
-  buckets: [
-    bucket(0, 500_000, [
+  tiers: [
+    tier(null, [
       { itemId: 'sword_3', weight: 1 },
       { itemId: 'sword_4', weight: 1 },
       { itemId: 'sword_5', weight: 1 },
     ]),
-    bucket(500_000, 1_000_000, [
+    tier(TIER_B_COST, [
       { itemId: 'sword_4', weight: 1 },
       { itemId: 'sword_5', weight: 1 },
       { itemId: 'sword_6', weight: 1 },
     ]),
-    bucket(1_000_000, null, [{ itemId: 'iron_scrap', weight: 1 }]),
+    tier(TIER_C_COST, [{ itemId: 'iron_scrap', weight: 1 }]),
   ],
+}
+
+// 티어 C(최상위)까지 올린 store 를 만든다 — 재료 출제 테스트용 헬퍼. 지불 재화를 넉넉히 준 뒤 두 번 업그레이드.
+function storeAtTopTier() {
+  useGameStore.setState({
+    gold: 1_000_000,
+    currentSwordId: 'sword_1',
+    items: [{ itemId: 'iron_scrap', count: 5 }],
+  })
+  const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
+  store.getState().start()
+  expect(store.getState().upgradeShop()).toBe(true) // → 레벨 1
+  expect(store.getState().upgradeShop()).toBe(true) // → 레벨 2(최상위)
+  return store
 }
 
 describe('commissionStore — 제안 세션 모델', () => {
@@ -79,7 +98,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     expect(store.getState().active).toHaveLength(3) // 세션 3개 한 번에
-    // 버킷 A(검 단계 3,4,5)에서만 출제 + 세션 내 중복 없음.
+    // 시작 티어(검 단계 3,4,5)에서만 출제 + 세션 내 중복 없음.
     const ids = store.getState().active.map((c) => costItemId(c.cost))
     for (const id of ids)
       expect(['sword_3', 'sword_4', 'sword_5']).toContain(id)
@@ -146,51 +165,91 @@ describe('commissionStore — 제안 세션 모델', () => {
     expect(store.getState().active).toHaveLength(0)
   })
 
-  it('보유 골드가 출제 버킷을 결정한다: 저골드→버킷 A, 고골드→버킷 B (헤드라인 동작)', () => {
-    // 저골드(1000) → 버킷 A(검 3~5).
-    useGameStore.setState({ gold: 1000 })
-    const low = createCommissionStore({ rng: () => 0.5, config: CONFIG })
-    low.getState().start()
-    expect(low.getState().active.length).toBeGreaterThan(0)
-    for (const c of low.getState().active) {
-      expect(['sword_3', 'sword_4', 'sword_5']).toContain(costItemId(c.cost))
-    }
-    low.getState().stop()
-
-    // 고골드(600000) → 버킷 B(검 4~6).
-    useGameStore.setState({ gold: 600_000 })
-    const high = createCommissionStore({ rng: () => 0.5, config: CONFIG })
-    high.getState().start()
-    expect(high.getState().active.length).toBeGreaterThan(0)
-    for (const c of high.getState().active) {
-      expect(['sword_4', 'sword_5', 'sword_6']).toContain(costItemId(c.cost)) // buckets[1]
-    }
-    high.getState().stop()
-  })
-
-  it('버킷 경계(500000)는 상위 버킷에 속한다: 499999→버킷 A, 500000→버킷 B (50만 미만/이상 스펙)', () => {
-    // maxGold 는 미포함(gold < maxGold): 499999 는 버킷 A, 정확히 500000 은 버킷 B 로 떨어진다.
-    useGameStore.setState({ gold: 499_999 })
-    const below = createCommissionStore({ rng: () => 0.5, config: CONFIG })
-    below.getState().start()
-    for (const c of below.getState().active) {
-      expect(['sword_3', 'sword_4', 'sword_5']).toContain(costItemId(c.cost)) // 버킷 A
-    }
-    below.getState().stop()
-
-    useGameStore.setState({ gold: 500_000 })
-    const atBoundary = createCommissionStore({ rng: () => 0.5, config: CONFIG })
-    atBoundary.getState().start()
-    for (const c of atBoundary.getState().active) {
-      expect(['sword_4', 'sword_5', 'sword_6']).toContain(costItemId(c.cost)) // 버킷 B
-    }
-    atBoundary.getState().stop()
-  })
-
-  it('재료(검이 아닌) 아이템도 의뢰로 출제된다(최상위 골드 버킷)', () => {
-    useGameStore.setState({ gold: 1_500_000 }) // 버킷 C = iron_scrap 전용
+  it('시작 시 상점은 레벨 0(시작 티어)이고 보유 골드는 출제 티어에 영향을 주지 않는다', () => {
+    useGameStore.setState({ gold: 100_000_000 }) // 골드가 아무리 많아도 티어는 레벨이 고른다
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
+    expect(store.getState().shopLevel).toBe(0)
+    for (const c of store.getState().active) {
+      expect(['sword_3', 'sword_4', 'sword_5']).toContain(costItemId(c.cost)) // 티어 A
+    }
+    store.getState().stop()
+  })
+
+  it('upgradeShop: 골드 비용을 내면 레벨이 오르고 세션이 새 티어 풀로 즉시 갱신된다(새 ids)', () => {
+    const startGold = TIER_B_COST.kind === 'gold' ? TIER_B_COST.amount + 1 : 0
+    useGameStore.setState({ gold: startGold })
+    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
+    store.getState().start()
+    const before = idsOf(store)
+    store.getState().notifyAttempt() // 카운터 1 소비 — 업그레이드 갱신이 가득 채우는지 보기 위해
+    expect(store.getState().upgradeShop()).toBe(true)
+    expect(store.getState().shopLevel).toBe(1)
+    expect(useGameStore.getState().gold).toBe(1) // 비용만큼 차감
+    expect(store.getState().active).toHaveLength(3)
+    for (const id of idsOf(store)) expect(before).not.toContain(id) // 세션 교체
+    for (const c of store.getState().active) {
+      expect(['sword_4', 'sword_5', 'sword_6']).toContain(costItemId(c.cost)) // 티어 B
+    }
+    expect(store.getState().attemptsRemaining).toBe(
+      store.getState().attemptsTotal,
+    ) // 무료 갱신으로 카운터 가득
+    store.getState().stop()
+  })
+
+  it('upgradeShop: 아이템 비용은 거래 지불과 같은 경로로 가방에서 차감된다', () => {
+    const store = storeAtTopTier() // 골드 50만 + 철조각 2 지불
+    expect(store.getState().shopLevel).toBe(2)
+    expect(useGameStore.getState().gold).toBe(500_000)
+    expect(
+      useGameStore.getState().items.find((i) => i.itemId === 'iron_scrap')
+        ?.count,
+    ).toBe(3) // 5 → 3
+    expect(useGameStore.getState().currentSwordId).toBe('sword_1') // 장착검 불변
+    store.getState().stop()
+  })
+
+  it('upgradeShop: 재화가 부족하면 무변화(false) — 레벨·세션·재화 그대로', () => {
+    const poor = TIER_B_COST.kind === 'gold' ? TIER_B_COST.amount - 1 : 0
+    useGameStore.setState({ gold: poor })
+    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
+    store.getState().start()
+    const before = idsOf(store)
+    expect(store.getState().upgradeShop()).toBe(false)
+    expect(store.getState().shopLevel).toBe(0)
+    expect(useGameStore.getState().gold).toBe(poor)
+    expect(idsOf(store)).toEqual(before)
+    store.getState().stop()
+  })
+
+  it('upgradeShop: 최고 레벨이면 false 이고 재화를 물지 않는다', () => {
+    const store = storeAtTopTier()
+    const gold = useGameStore.getState().gold
+    expect(store.getState().upgradeShop()).toBe(false)
+    expect(store.getState().shopLevel).toBe(CONFIG.tiers.length - 1)
+    expect(useGameStore.getState().gold).toBe(gold)
+    store.getState().stop()
+  })
+
+  it('upgradeShop: 잠금 중(unlockAtLevel 미달)에는 재화가 있어도 업그레이드하지 않는다', () => {
+    const GATED: CommissionConfig = { ...CONFIG, unlockAtLevel: 10 }
+    useGameStore.setState({ gold: 10_000_000, maxLevelReached: 0 })
+    const store = createCommissionStore({ rng: () => 0.5, config: GATED })
+    store.getState().start()
+    expect(store.getState().upgradeShop()).toBe(false)
+    expect(store.getState().shopLevel).toBe(0)
+    expect(useGameStore.getState().gold).toBe(10_000_000)
+    store.getState().stop()
+  })
+
+  it('stop 은 상점 레벨을 0 으로 되돌린다', () => {
+    const store = storeAtTopTier()
+    store.getState().stop()
+    expect(store.getState().shopLevel).toBe(0)
+  })
+
+  it('재료(검이 아닌) 아이템도 의뢰로 출제된다(최상위 티어)', () => {
+    const store = storeAtTopTier() // 티어 C = iron_scrap 전용
     expect(store.getState().active.length).toBeGreaterThan(0)
     for (const c of store.getState().active) {
       expect(costItemId(c.cost)).toBe('iron_scrap')
@@ -230,9 +289,7 @@ describe('commissionStore — 제안 세션 모델', () => {
   })
 
   it('fulfill: 재료 의뢰는 인벤토리에서 차감하고 장착 검은 건드리지 않는다', () => {
-    useGameStore.setState({ gold: 1_500_000 }) // 버킷 C → iron_scrap 의뢰
-    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
-    store.getState().start()
+    const store = storeAtTopTier() // 티어 C → iron_scrap 의뢰
     const target = store.getState().active[0]
     expect(costItemId(target.cost)).toBe('iron_scrap')
     useGameStore.setState({
@@ -250,14 +307,13 @@ describe('commissionStore — 제안 세션 모델', () => {
     store.getState().stop()
   })
 
-  it('발급된 의뢰의 보상은 발급 시점 freeze: 이후 골드가 바뀌어 버킷이 달라져도 보상은 그대로다', () => {
-    // 저골드(버킷 A)에서 발급 → 발급 시점 reward freeze.
+  it('발급된 의뢰의 보상은 발급 시점 freeze: 이후 골드가 바뀌어도 보상은 그대로다', () => {
     useGameStore.setState({ gold: 1000 })
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     const target = store.getState().active[0]
     const frozenReward = goldOf(target.reward)
-    // 발급 후 고골드로 올려도(버킷 B) 이미 떠 있는 의뢰의 보상은 freeze 값을 유지한다.
+    // 발급 후 골드가 크게 바뀌어도 이미 떠 있는 의뢰의 보상은 freeze 값을 유지한다.
     useGameStore.setState({
       currentSwordId: null,
       items: [{ itemId: costItemId(target.cost), count: 1 }],
@@ -273,10 +329,9 @@ describe('commissionStore — 제안 세션 모델', () => {
     maxCommissions: 1,
     unlockAtLevel: 0,
     refreshCost: 100_000,
-    buckets: [
+    tiers: [
       {
-        minGold: 0,
-        maxGold: null,
+        upgradeCost: null,
         items: [
           {
             itemId: 'faded_fluorescent',
@@ -342,7 +397,7 @@ describe('commissionStore — 제안 세션 모델', () => {
 // 제안 활성화 잠금(unlockAtLevel) — 도달 강화 레벨(maxLevelReached)이 임계 미만이면 제안이 전혀 출제되지 않고,
 // 임계에 도달한 순간(다음 강화 시도)부터 첫 세션이 부트스트랩된다. maxLevelReached 는 단조라 한 번 해제되면 유지된다.
 describe('commissionStore — 제안 활성화 잠금(unlockAtLevel)', () => {
-  // CONFIG(버킷 A) 그대로 + 활성화 임계만 10 으로. 잠금/해제는 maxLevelReached 로 제어한다.
+  // CONFIG(시작 티어) 그대로 + 활성화 임계만 10 으로. 잠금/해제는 maxLevelReached 로 제어한다.
   const GATED: CommissionConfig = { ...CONFIG, unlockAtLevel: 10 }
 
   it('도달 레벨이 임계 미만이면 start 가 제안을 출제하지 않는다', () => {
@@ -409,7 +464,7 @@ describe('commissionStore — 제안 강제 갱신(refreshNow)', () => {
   const COST = CONFIG.refreshCost // 픽스처 비용 기준(파생 단언 — 하드코딩 회피)
 
   it('충분한 골드면 비용을 차감하고 세션을 즉시 새로 출제한다(새 ids)', () => {
-    const startGold = 300_000 // 버킷 A([0,500000)) — 지불 후에도 같은 버킷
+    const startGold = 300_000
     useGameStore.setState({ gold: startGold, maxLevelReached: 0 })
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()

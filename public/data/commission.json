@@ -2,10 +2,8 @@
   "maxCommissions": 3,
   "unlockAtLevel": 10,
   "refreshCost": 100000,
-  "buckets": [
+  "tiers": [
     {
-      "minGold": 0,
-      "maxGold": 1000000,
       "items": [
         {
           "itemId": "iron_scrap",
@@ -50,8 +48,10 @@
       ]
     },
     {
-      "minGold": 1000000,
-      "maxGold": 5000000,
+      "upgradeCost": {
+        "costKind": "gold",
+        "costAmount": 500000
+      },
       "items": [
         {
           "itemId": "iron_scrap",
@@ -94,8 +94,10 @@
       ]
     },
     {
-      "minGold": 5000000,
-      "maxGold": 20000000,
+      "upgradeCost": {
+        "costKind": "gold",
+        "costAmount": 2500000
+      },
       "items": [
         {
           "itemId": "iron_scrap",
@@ -188,8 +190,11 @@
       ]
     },
     {
-      "minGold": 20000000,
-      "maxGold": null,
+      "upgradeCost": {
+        "costKind": "item",
+        "itemId": "dark_matter",
+        "requiredCount": 5
+      },
       "items": [
         {
           "itemId": "iron_scrap",
