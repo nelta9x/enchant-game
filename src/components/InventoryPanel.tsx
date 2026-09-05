@@ -114,24 +114,22 @@ function EquippedRow({
     </>
   )
 
-  if (storable) {
-    return (
-      <li className="shrink-0">
-        <button
-          type="button"
-          onClick={onStore}
-          aria-label={`${t('action.store')}: ${t(sword.nameKey)}`}
-          className="flex h-14 w-full cursor-pointer items-center justify-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5 hover:bg-gold/20"
-        >
-          {body}
-        </button>
-      </li>
-    )
-  }
-
+  // 보관 가능 여부와 무관하게 항상 같은 트리 모양(<li><button>)으로 렌더한다 — 강화로 시작 검(+1)에서 벗어나
+  // storable 이 뒤집힐 때 <li> ↔ <li><button> 으로 모양이 바뀌면 React 가 서브트리를 리마운트해 스프라이트 캔버스를
+  // 다시 만들고(새 backing store + 강제 레이아웃) 탭 태스크에 끼어들었다. 불가 상태는 disabled 로만 표현한다.
   return (
-    <li className="flex h-14 shrink-0 items-center justify-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5">
-      {body}
+    <li className="shrink-0">
+      <button
+        type="button"
+        onClick={onStore}
+        disabled={!storable}
+        aria-label={`${t('action.store')}: ${t(sword.nameKey)}`}
+        className={`flex h-14 w-full items-center justify-center gap-2.5 rounded-md border border-gold/50 bg-gold/10 px-2.5 ${
+          storable ? 'cursor-pointer hover:bg-gold/20' : 'cursor-default'
+        }`}
+      >
+        {body}
+      </button>
     </li>
   )
 }

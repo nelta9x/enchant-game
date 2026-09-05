@@ -252,7 +252,7 @@ function NewSessionHighlight() {
   return (
     <motion.span
       aria-hidden
-      className="pointer-events-none absolute inset-0 rounded-lg border-2 border-gold"
+      className="fx-layer pointer-events-none absolute inset-0 rounded-lg border-2 border-gold"
       initial={{ opacity: 0.75 }}
       animate={{ opacity: 0 }}
       transition={{ duration: 0.35, ease: 'easeOut' }}

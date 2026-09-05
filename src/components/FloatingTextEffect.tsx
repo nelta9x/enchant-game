@@ -73,7 +73,7 @@ function FloatingTextBurst({
 
   return (
     <motion.span
-      className="whitespace-nowrap text-2xl font-extrabold"
+      className="fx-layer whitespace-nowrap text-2xl font-extrabold"
       style={{ color: 'var(--color-floating-text)' }}
       // 컨테이너(flex 중앙정렬)가 span 을 박스 중심에 두고, x/y 는 그 중심 기준 오프셋(spawn)으로만
       // 쓴다 — HammerStrike 의 motion.img 와 동일 관례. absolute left/top 을 쓰면 nowrap 텍스트의

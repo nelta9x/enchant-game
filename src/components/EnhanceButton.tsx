@@ -19,11 +19,12 @@ const GOLD_OUTLINE =
 const BANNER_BG =
   'linear-gradient(to right, var(--color-gold-glow), var(--color-gold-glow) 45%, var(--color-gold))'
 
-// 쿨다운 "리차지" 오버레이 — 평소엔 가득 밝은 배너. 쿨다운 시작에 어둡게 "소진"됐다가 밝은 골드가
-// 좌→우로 다시 차오른다. 이 오버레이는 아직 안 찬(오른쪽) 영역을 어둡게 덮고, 채움 비율(--cooldown-fill)
-// 만큼 좌→우로 물러난다(clip-path 왼쪽 inset). 채움 선두엔 골드 글로우 띠로 차오르는 끝선을 강조한다.
+// 쿨다운 "리차지" 디밍 레이어 — 평소엔 가득 밝은 배너. 쿨다운 시작에 어둡게 "소진"됐다가 밝은 골드가
+// 좌→우로 다시 차오른다. 이 레이어는 아직 안 찬(오른쪽) 영역을 어둡게 덮고, transform 으로 오른쪽으로
+// 밀려나며(CSS .fx-cooldown-dim) 밝은 배너를 드러낸다. 레이어의 왼쪽 가장자리가 "차오르는 선두"라
+// 거기에 골드 글로우 띠(0.6rem)를 두고 그 뒤로 어둠이 이어진다.
 const RECHARGE_DIM =
-  'linear-gradient(to right, color-mix(in srgb, var(--color-gold-glow) 80%, transparent) var(--cooldown-fill), rgba(0,0,0,0.5) calc(var(--cooldown-fill) + 0.6rem))'
+  'linear-gradient(to right, color-mix(in srgb, var(--color-gold-glow) 80%, transparent), rgba(0,0,0,0.5) 0.6rem)'
 
 // 강화 버튼 — 둥근 카드형 밝은 골드 배너(레퍼런스 "빠른 순찰" 타이틀 바 톤). 카드 안에 "강화" 라벨 +
 // 강화 조건(비용/재료)을 아이콘+수량으로 보여 준다. 글자는 흰색 + 갈금색 외곽선으로 밝은 금색 위에서도
@@ -70,11 +71,11 @@ export const EnhanceButton = memo(function EnhanceButton({
     onFire: onEnhance,
   })
 
-  // 쿨다운 리차지(좌→우 차오름) — 채움 경계(클립 비율) 보간은 CSS 가 소유한다(fx-cooldown-fill +
-  // @property — index.css): JS(motion)로 매 프레임 인라인 스타일을 갱신하면 연사 중(거의 항상 쿨다운)
-  // 60fps 스타일 리캘크가 계속 돌기 때문. charging 이 새로 켜질 때마다 사이클 키를 올려 오버레이를
-  // 재마운트 → CSS 애니메이션이 처음(0% = 가득 소진)부터 깨끗하게 재시작한다(연사의 true→false→true 토글마다).
-  // 전이 감지는 렌더 중 이전 값 비교(공식 "adjusting state during render" 패턴 — effect 의 set 회피).
+  // 쿨다운 리차지(좌→우 차오름) — 디밍 레이어의 이동은 CSS transform 애니메이션(fx-cooldown-recharge,
+  // index.css)이 소유한다: 합성 전용이라 쿨다운 내내 메인 스레드 스타일 재계산·리페인트가 0 이다(JS motion 이나
+  // clip-path 보간은 연사 중 — 거의 항상 쿨다운 — 매 프레임 버튼을 다시 래스터한다). charging 이 새로 켜질
+  // 때마다 사이클 키를 올려 레이어를 재마운트 → 애니메이션이 처음(가득 소진)부터 깨끗하게 재시작한다(연사의
+  // true→false→true 토글마다). 전이 감지는 렌더 중 이전 값 비교(공식 "adjusting state during render" 패턴).
   const [cooldownCycle, setCooldownCycle] = useState(0)
   const [prevCharging, setPrevCharging] = useState(charging)
   if (charging !== prevCharging) {
@@ -141,7 +142,7 @@ export const EnhanceButton = memo(function EnhanceButton({
       style={{ background: BANNER_BG }}
       // touch-none: 이 버튼에서 시작한 터치를 스크롤·줌 제스처로 넘기지 않는다 — 모바일 press-and-hold
       // 연사(useHoldRepeat)가 pointercancel 로 끊기지 않게 한다(페이지는 한 화면 맞춤이라 스크롤 손실 없음).
-      className={`relative flex w-full touch-none flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 px-3 py-5 transition-opacity ${
+      className={`fx-layer relative flex w-full touch-none flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 px-3 py-5 transition-opacity ${
         ready
           ? 'cursor-pointer border-frame shadow-[0_0_28px_-4px_var(--color-gold)]' // 가능 — 금색 글로우 + 펄스
           : charging
@@ -162,23 +163,25 @@ export const EnhanceButton = memo(function EnhanceButton({
         {t('action.enhance')}
       </span>
       {renderCost()}
-      {/* 쿨다운 리차지 오버레이 — 라벨/비용 위(z-10)에 얹어, 아직 안 찬(오른쪽) 영역을 어둡게 덮는다.
-          채움 비율(--cooldown-fill)만큼 왼쪽 inset 으로 물러나며(clip-path) 밝은 배너가 좌→우로 드러나
-          "리차지"된다. 차오르는 선두엔 골드 글로우 띠. 비율 보간은 CSS 애니메이션(fx-cooldown-fill,
-          forwards)이 0%→100% 진행하고, 쿨다운이 끝나면 opacity 만 0.15s 로 거둔다(정상 종료 땐 이미 다 찼고,
-          타이밍이 어긋나 잔여가 남아도 부드럽게 사라진다). overflow-hidden + rounded-2xl 가 모양대로 잘라 준다. */}
+      {/* 쿨다운 리차지 오버레이 — 라벨/비용 위(z-10). 바깥 span 은 버튼 모양대로 자르는 클립 창(overflow-hidden,
+          rounded-2xl)이자 쿨다운이 끝났을 때 0.15s 로 걷히는 페이드(정상 종료 땐 이미 다 밀려났고, 타이밍이
+          어긋나 잔여가 남아도 부드럽게 사라진다). 안쪽 디밍 레이어(.fx-cooldown-dim)가 chargeMs 동안 translateX
+          0 → 100% 로 밀려나며 밝은 배너를 좌→우로 드러낸다 — 합성 전용이라 리페인트 0. */}
       <span
         key={cooldownCycle}
         aria-hidden
-        className={`pointer-events-none absolute inset-0 z-10 rounded-2xl transition-opacity duration-150 ease-out ${
+        className={`pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-2xl transition-opacity duration-150 ease-out ${
           charging ? 'opacity-100' : 'opacity-0'
         }`}
-        style={{
-          background: RECHARGE_DIM,
-          clipPath: 'inset(0 0 0 var(--cooldown-fill))',
-          animation: `fx-cooldown-fill ${Math.max(chargeMs, 0)}ms linear forwards`,
-        }}
-      />
+      >
+        <span
+          className="fx-cooldown-dim absolute inset-0"
+          style={{
+            background: RECHARGE_DIM,
+            ['--fx-cooldown-ms' as string]: `${Math.max(chargeMs, 0)}ms`,
+          }}
+        />
+      </span>
     </motion.button>
   )
 })

@@ -766,3 +766,53 @@ describe('gameStore — 최고 도달 강화(maxLevelReached)', () => {
   })
 })
 
+
+describe('gameStore — items 참조 안정성(무변화 시 같은 배열)', () => {
+  // items 를 구독하는 memo 자식(인벤토리·거래 바)이 "아이템 소모가 없는" 전이마다 리렌더되지 않게, 변화가 없으면
+  // 새 배열을 만들지 않는다. (실제로 바뀌는 경우엔 당연히 새 참조 — 아래 대조군.)
+  it('골드 비용 검의 강화 성공은 items 참조를 유지한다', () => {
+    const goldSword = dataManager
+      .getSwords()
+      .find((s) => s.enchantCost?.kind === 'gold' && s.enchantCostItems.length === 0)
+    expect(goldSword).toBeDefined()
+    const items = [{ itemId: 'iron_scrap', count: 3 }]
+    const store = createGameStore({
+      enhancer: ALWAYS_SUCCESS(),
+      gold: 1_000_000_000,
+      currentSwordId: goldSword!.id,
+      items,
+    })
+    const before = store.getState().items
+    expect(store.getState().enhance(false)?.outcome).toBe('success')
+    expect(store.getState().items).toBe(before)
+  })
+
+  it('판매는 items 참조를 유지한다(가방 무변화)', () => {
+    const store = createGameStore({
+      currentSwordId: 'sword_5',
+      items: [{ itemId: 'iron_scrap', count: 1 }],
+    })
+    const before = store.getState().items
+    expect(store.getState().sell()).not.toBeNull()
+    expect(store.getState().items).toBe(before)
+  })
+
+  it('대조군: 재료를 소모하는 강화는 새 items 참조를 만든다', () => {
+    const matSword = dataManager
+      .getSwords()
+      .find((s) => s.enchantCost?.kind === 'item')
+    expect(matSword).toBeDefined()
+    const cost = matSword!.enchantCost
+    if (cost?.kind !== 'item') throw new Error('expected an item-cost sword')
+    const store = createGameStore({
+      enhancer: ALWAYS_SUCCESS(),
+      gold: 1_000_000_000,
+      currentSwordId: matSword!.id,
+      items: [{ itemId: cost.itemId, count: cost.count + 1 }],
+    })
+    const before = store.getState().items
+    expect(store.getState().enhance(false)?.outcome).toBe('success')
+    expect(store.getState().items).not.toBe(before)
+    expect(countOf(store.getState().items, cost.itemId)).toBe(1)
+  })
+})

@@ -51,7 +51,7 @@ export function ProtectionWard({
       {/* 흰빛 실드-블록 플레어(파괴보호장치 발동 순간) — 검 중심에서 흰 링이 퍼진다. */}
       <motion.div
         aria-hidden
-        className="absolute inset-4 rounded-full border-2 border-white"
+        className="fx-layer absolute inset-4 rounded-full border-2 border-white"
         style={{ opacity: 0 }}
         animate={flare}
       />

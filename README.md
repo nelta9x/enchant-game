@@ -31,8 +31,9 @@ npm test           # vitest 테스트
 
 - **로컬 더블클릭** — `dist/index.html` 을 브라우저로 곧바로 열면(`file://`) 실행된다.
   자산을 상대 경로(`base: './'`)로 참조하고, JS/CSS 를 `index.html` 에 인라인(`vite-plugin-singlefile`)해
-  `file://` 에서 외부 ES 모듈이 CORS 로 막히는 문제를 피한다. 이미지·오디오는 `dist/sprites/`, `dist/audio/`
-  에 상대 경로로 함께 둔다(같은 폴더 구조 유지 필요).
+  `file://` 에서 외부 ES 모듈이 CORS 로 막히는 문제를 피한다. 이미지는 `dist/sprites/` 에 상대 경로로 함께
+  둔다(같은 폴더 구조 유지 필요). 효과음은 게임 데이터 JSON 처럼 빌드 시 data URL 로 `index.html` 에 인라인해
+  Web Audio 로 디코드한다(`file://` 에서 `fetch` 가 막히므로) — `dist/audio/` 사본은 무해한 부산물이다.
 - **GitHub Pages** — `main` 에 push 하면 `.github/workflows/deploy.yml` 이 빌드 후 자동 배포한다.
   최초 1회만 리포지토리 **Settings → Pages → Source** 를 **"GitHub Actions"** 로 설정한다.
 
@@ -59,7 +60,7 @@ public/
   data/             # 게임 데이터 JSON (디자이너 편집 대상, import로 번들)
   sprites/swords/   # 검 스프라이트 PNG (단계별, 파일명 = 영문명 slug)
   sprites/items/    # 아이템 스프라이트 PNG
-  audio/            # 효과음 WAV
+  audio/            # 효과음 WAV (lib/audioAssets.ts 글롭이 빌드에 인라인)
 ```
 
 ## 진행 상황

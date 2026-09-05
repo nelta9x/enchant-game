@@ -35,7 +35,7 @@ export function FlightChip({
 
   return (
     <motion.div
-      className="absolute left-0 top-0"
+      className="fx-layer absolute left-0 top-0"
       initial={{ x: source.x, y: source.y, scale: 0, opacity: 0 }}
       animate={{
         x: [source.x, apexX, hoverX, target.x],
@@ -63,7 +63,7 @@ export function FlightChip({
 export function LaunchFlare({ at }: { at: Point }) {
   return (
     <motion.span
-      className="absolute rounded-full"
+      className="fx-layer absolute rounded-full"
       style={{
         left: at.x,
         top: at.y,

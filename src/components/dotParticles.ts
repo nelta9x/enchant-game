@@ -117,6 +117,30 @@ type Decor = {
   t: number // 경과(s)
   core: RGB // 섬광 색
   edge: RGB // 충격파 링 색
+  flashTex: HTMLCanvasElement // 섬광 방사 텍스처(코어 색으로 1회 구움 — 프레임마다 그라데이션 생성 없음)
+}
+
+// 섬광(flash) 텍스처 — 코어 색의 방사 페이드(중심 0.75 → 70% 지점 0)를 1회 굽는다. 프레임마다 createRadialGradient 를
+// 만들던 것을 drawImage + globalAlpha 로 대체(hitSparks 의 텍스처 베이크와 같은 규약).
+const flashTexCache = new Map<string, HTMLCanvasElement>()
+function getFlashTexture(coreCss: string): HTMLCanvasElement {
+  const cached = flashTexCache.get(coreCss)
+  if (cached) return cached
+  const core = resolveColor(coreCss)
+  const S = 128
+  const half = S / 2
+  const off = document.createElement('canvas')
+  off.width = off.height = S
+  const g = off.getContext('2d')
+  if (!g) throw new Error('flash texture 2d context unavailable')
+  const grad = g.createRadialGradient(half, half, 0, half, half, half)
+  grad.addColorStop(0, rgba(core, 0.75))
+  grad.addColorStop(0.7, rgba(core, 0))
+  grad.addColorStop(1, rgba(core, 0))
+  g.fillStyle = grad
+  g.fillRect(0, 0, S, S)
+  flashTexCache.set(coreCss, off)
+  return off
 }
 
 // ── 도트 파티클 캔버스 시스템 ─────────────────────────────────────────────────────
@@ -196,12 +220,13 @@ export class DotParticleSystem {
     // decor(섬광+충격파 링) 1세트 — 단일 슬롯 재사용. core/edge 는 resolveColor 의 캐시 배열 참조라 추가 할당 없음.
     let dec = this.decors[0]
     if (!dec) {
-      dec = { t: 0, core: [0, 0, 0], edge: [0, 0, 0] }
+      dec = { t: 0, core: [0, 0, 0], edge: [0, 0, 0], flashTex: tex }
       this.decors[0] = dec
     }
     dec.t = 0
     dec.core = resolveColor(spec.coreVar)
     dec.edge = resolveColor(spec.edgeVar)
+    dec.flashTex = getFlashTexture(spec.coreVar)
     this.decorCount = 1
     if (!this.running) {
       this.running = true
@@ -242,21 +267,11 @@ export class DotParticleSystem {
           const scale = 0.3 + easeOut(q) * (1.1 - 0.3)
           const op = keyframe(q, [0, 0.5, 1], [0, 0.85, 0])
           const r = FLASH_R * scale
-          const grad = ctx.createRadialGradient(
-            this.cx,
-            this.cy,
-            0,
-            this.cx,
-            this.cy,
-            r,
-          )
-          grad.addColorStop(0, rgba(d.core, 0.75 * op))
-          grad.addColorStop(0.7, rgba(d.core, 0))
+          // 구운 섬광 텍스처를 반경 r 로 가산 합성(알파 op 는 globalAlpha) — 프레임마다 그라데이션을 만들지 않는다.
           ctx.globalCompositeOperation = 'lighter'
-          ctx.fillStyle = grad
-          ctx.beginPath()
-          ctx.arc(this.cx, this.cy, r, 0, TAU)
-          ctx.fill()
+          ctx.globalAlpha = op
+          ctx.drawImage(d.flashTex, this.cx - r, this.cy - r, r * 2, r * 2)
+          ctx.globalAlpha = 1
           ctx.globalCompositeOperation = 'source-over'
           alive = true
         }
@@ -324,13 +339,14 @@ export class DotParticleSystem {
   // rect 무관(레이아웃 전이어도 가능), backing store 는 레이아웃이 잡힌 뒤에만(rect 0 이면 첫 emit 에서 잡는다 — 무해).
   warmup(reserve = 0) {
     // 슬롯 tex 는 자리표시 — emit 가 첫 사용 시 실제 텍스처로 덮어쓴다(그 전엔 dotCount=0 이라 그려지지 않는다).
+    const placeholder = document.createElement('canvas')
     if (reserve > this.dots.length) {
-      const placeholder = document.createElement('canvas')
       for (let i = this.dots.length; i < reserve; i++) {
         this.dots[i] = { tx: 0, ty: 0, size: 0, delay: 0, t: 0, tex: placeholder }
       }
     }
-    if (!this.decors[0]) this.decors[0] = { t: 0, core: [0, 0, 0], edge: [0, 0, 0] }
+    if (!this.decors[0])
+      this.decors[0] = { t: 0, core: [0, 0, 0], edge: [0, 0, 0], flashTex: placeholder }
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width > 0 && rect.height > 0) this.syncBackingStore(rect)
   }

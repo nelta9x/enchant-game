@@ -93,12 +93,12 @@ export function GoldDisplay({
     <motion.div
       animate={punch}
       aria-label={formatGold(gold, lang)}
-      className="relative inline-flex items-center gap-1.5 rounded-full bg-bezel px-2.5 py-1"
+      className="fx-layer relative inline-flex items-center gap-1.5 rounded-full bg-bezel px-2.5 py-1"
     >
       {/* 도달 글로우 — 코인이 빨려 들어오는 동안 알약에서 황금빛이 번진다(스트림처럼 두 번 일렁). */}
       <motion.span
         key={pulseKey}
-        className="pointer-events-none absolute inset-0 rounded-full"
+        className="fx-layer pointer-events-none absolute inset-0 rounded-full"
         style={{ boxShadow: '0 0 22px 3px var(--color-gold-glow)' }}
         initial={{ opacity: 0 }}
         animate={

@@ -79,7 +79,7 @@ function GoldGainBurst({
         >
           {/* 무리 전체의 떠오름(y) + 페이드(opacity) — 글로우와 텍스트가 함께 솟았다 사라진다. */}
           <motion.div
-            className="relative flex items-center justify-center"
+            className="fx-layer relative flex items-center justify-center"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: [0, 1, 1, 0], y: [10, -8, -26, -58] }}
             transition={RISE}

@@ -172,22 +172,35 @@ button {
   animation: fx-pulse-ring 1.6s ease-out infinite;
 }
 
-/* 강화 쿨다운 "리차지"(EnhanceButton) — 밝은 골드 배너가 좌→우로 다시 차오르는 채움 비율. 안 찬
-   영역을 덮는 디밍 오버레이의 clip-path 왼쪽 inset 과 차오르는 선두 글로우 띠(gradient stop)가 이
-   등록된 커스텀 프로퍼티를 함께 읽고, CSS 가 0%→100% 보간한다. JS(motion)로 매 프레임 인라인
-   스타일을 갱신하면 연사 중(거의 항상 쿨다운) 60fps 스타일 리캘크가 계속 돌기 때문. @property 미지원
-   브라우저에선 50% 지점 이산 점프로 열화되지만 쿨다운 인지는 보존된다(분기 없음). 지속시간은
-   쿨다운마다 달라 인라인으로 준다. reduced-motion 에도 유지 — "언제 다시 누를 수 있나"를 전달하는
-   정보 연출이라 멈추면 오히려 해롭다. */
-@property --cooldown-fill {
-  syntax: '<length-percentage>';
-  inherits: false;
-  initial-value: 0%;
+/* ── 1회성 연출 레이어 승격 ─────────────────────────────────────────────────
+   motion(JS)이 매 프레임 transform/opacity 를 쓰는 요소는 자기 합성 레이어가 없으면 그 변경이
+   조상(루트) 레이어를 무효화해 화면 전체(마법진 글로우·점선 원·결계 SVG·텍스트 섀도)를 매 프레임
+   다시 래스터한다 — DPR 3 모바일에서 프레임당 ~2.3M px. .fx-layer 는 그 요소를 컴포지터 레이어로
+   승격해 transform/opacity 변경이 합성만으로 끝나게 한다(리페인트 0). 규약: 강화 경로에서 motion 으로
+   움직이는 모든 요소(검 등장·떨림·잔상·가격 pop·플로팅 텍스트·비행 토큰·골드창 펄스…)에 붙인다.
+   레이어는 텍스처 메모리를 쓰므로 "상시 존재 + 실제로 움직이는" 요소에만 — 정적 장식엔 금지. */
+.fx-layer {
+  will-change: transform, opacity;
 }
-@keyframes fx-cooldown-fill {
-  to {
-    --cooldown-fill: 100%;
+
+/* 강화 쿨다운 "리차지"(EnhanceButton) — 밝은 골드 배너가 좌→우로 다시 차오른다. 안 찬 영역을 덮는
+   디밍 레이어(.fx-cooldown-dim)가 transform 으로 오른쪽으로 밀려나며(0 → 100%) 밝은 배너를 드러낸다.
+   transform 은 합성 전용 속성이라 쿨다운 내내 리페인트·스타일 재계산이 0 이다. (이전 구현은 등록
+   커스텀 프로퍼티로 clip-path 를 보간했는데, clip-path 는 페인트 속성이라 잠금 창 내내 매 프레임
+   버튼 전체 — 8방향 텍스트 섀도·그라데이션 — 를 다시 래스터했다. 모바일 프레임 드랍의 주요 원인.)
+   지속시간은 쿨다운마다 달라 인라인(animation-duration)으로 준다. reduced-motion 에도 유지 —
+   "언제 다시 누를 수 있나"를 전달하는 정보 연출이라 멈추면 오히려 해롭다. */
+@keyframes fx-cooldown-recharge {
+  from {
+    transform: translateX(0);
   }
+  to {
+    transform: translateX(100%);
+  }
+}
+.fx-cooldown-dim {
+  animation: fx-cooldown-recharge var(--fx-cooldown-ms, 0ms) linear forwards;
+  will-change: transform;
 }
 
 /* 모션 민감 사용자: 상시 연출 정지(짧은 1회성 연출은 유지). 펄스 링은 정지 시 진한 테두리로

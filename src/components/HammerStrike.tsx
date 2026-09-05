@@ -172,7 +172,7 @@ export function HammerStrike({
         src={HAMMER_SPRITE}
         alt=""
         draggable={false}
-        className="h-24 w-24 object-contain sm:h-28 sm:w-28"
+        className="fx-layer h-24 w-24 object-contain sm:h-28 sm:w-28"
         style={{ imageRendering: 'pixelated' }}
         initial={initial}
         animate={controls}

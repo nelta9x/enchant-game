@@ -1,57 +1,55 @@
 import { describe, it, expect } from 'vitest'
-import { sfxUrl, acquireVoice } from './sound'
+import {
+  SFX_NAMES,
+  BGM_NAMES,
+  sfxAsset,
+  bgmAsset,
+  assertAudioAssets,
+  decodeDataUrl,
+  scheduleAt,
+} from './sound'
 
-// SoundManager 의 재생은 HTMLAudio 사이드이펙트라 단위 테스트 대상이 아니다(sprites 와 동일한 경계).
-// 대신 "이름 → 자산 경로" 순수 해석을 검증해, 레지스트리 파일명·디렉토리·BASE_URL 조립의 오타를 잡는다.
-describe('sfxUrl — 효과음 자산 경로(순수)', () => {
-  it('레지스트리 이름을 public/audio 경로로 해석(BASE_URL 접두)', () => {
-    expect(sfxUrl('enhance')).toBe(
-      `${import.meta.env.BASE_URL}audio/enhance_kang.wav`,
-    )
+// SoundManager 의 재생은 Web Audio 사이드이펙트라 단위 테스트 대상이 아니다(sprites 와 동일한 경계).
+// 대신 "레지스트리 이름 → 번들 자산" 해석과 순수 헬퍼(base64 디코드·스케줄 환산)를 검증해 등록·파일명 오타와
+// 타이밍 산식 회귀를 잡는다.
+describe('오디오 레지스트리 — 번들 자산 해석', () => {
+  it('모든 효과음 이름이 번들된 data URL 로 해석된다', () => {
+    expect(SFX_NAMES.length).toBeGreaterThan(0)
+    for (const name of SFX_NAMES) {
+      const asset = sfxAsset(name)
+      expect(asset, name).toBeDefined()
+      expect(asset!.startsWith('data:')).toBe(true)
+    }
   })
 
-  it('항상 BASE_URL 로 시작하고 audio/ 디렉토리를 포함한다', () => {
-    const url = sfxUrl('enhance')
-    expect(url.startsWith(import.meta.env.BASE_URL)).toBe(true)
-    expect(url).toContain('audio/')
+  it('BGM 레지스트리도 같은 규약으로 해석된다(현재 비어 있어도 무해)', () => {
+    for (const name of BGM_NAMES) expect(bgmAsset(name)).toBeDefined()
+  })
+
+  it('assertAudioAssets 는 레지스트리가 전부 해석되면 throw 하지 않는다', () => {
+    expect(() => assertAudioAssets()).not.toThrow()
   })
 })
 
-// SFX 풀 보이스 선택 정책 — 재사용/증식/상한을 결정하는 부분. (paused=멈춤 → 빌릴 수 있는 보이스)
-describe('acquireVoice — SFX 풀 보이스 선택(순수)', () => {
-  const voice = (paused: boolean, id: number) => ({ paused, id })
-
-  it('빈 풀이면 새 보이스를 만들어 추가한다', () => {
-    const pool: { paused: boolean; id: number }[] = []
-    let made = 0
-    const v = acquireVoice(pool, 4, () => voice(true, ++made))
-    expect(pool).toHaveLength(1)
-    expect(v).toBe(pool[0])
+describe('decodeDataUrl — base64 data URL → 바이트(순수)', () => {
+  it('base64 본문을 원래 바이트로 복원한다', () => {
+    const bytes = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 255, 7])
+    const b64 = Buffer.from(bytes).toString('base64')
+    const out = new Uint8Array(decodeDataUrl(`data:audio/wav;base64,${b64}`))
+    expect([...out]).toEqual([...bytes])
   })
 
-  it('멈춘 보이스가 있으면 새로 만들지 않고 재사용한다', () => {
-    const pool = [voice(false, 1), voice(true, 2)]
-    let made = 0
-    const v = acquireVoice(pool, 4, () => {
-      made++
-      return voice(true, 99)
-    })
-    expect(made).toBe(0)
-    expect(v).toBe(pool[1]) // 멈춰 있던 보이스
-    expect(pool).toHaveLength(2)
+  it('base64 가 아닌 data URL 은 거부한다', () => {
+    expect(() => decodeDataUrl('data:text/plain,hello')).toThrow()
+  })
+})
+
+describe('scheduleAt — 예정 시각 → AudioContext 시간축(순수)', () => {
+  it('미래 예정은 남은 시간만큼 뒤에 건다', () => {
+    expect(scheduleAt(10, 1000, 1325)).toBeCloseTo(10.325)
   })
 
-  it('모두 재생 중이고 상한 미만이면 보이스를 늘린다', () => {
-    const pool = [voice(false, 1), voice(false, 2)]
-    const v = acquireVoice(pool, 4, () => voice(true, 3))
-    expect(pool).toHaveLength(3)
-    expect(v).toBe(pool[2])
-  })
-
-  it('모두 재생 중이고 상한 도달이면 가장 오래된 보이스를 재사용한다(증식 없음)', () => {
-    const pool = [voice(false, 1), voice(false, 2)]
-    const v = acquireVoice(pool, 2, () => voice(true, 3))
-    expect(pool).toHaveLength(2) // 안 늘어남
-    expect(v).toBe(pool[0]) // 가장 오래된 것
+  it('이미 지난 예정은 지금(ctxNow)이다 — 늦은 디코드는 즉시 재생', () => {
+    expect(scheduleAt(10, 2000, 1325)).toBe(10)
   })
 })

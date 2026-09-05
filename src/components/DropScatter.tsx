@@ -157,7 +157,7 @@ function DropToken({
 
   return (
     <motion.div
-      className="absolute left-0 top-0 select-none"
+      className="fx-layer absolute left-0 top-0 select-none"
       style={{
         width: spec.size,
         height: spec.size,

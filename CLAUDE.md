@@ -30,7 +30,7 @@
 - 모든 게임 데이터는 `DataManager` 경유로만 접근(단일 출처). `main.tsx`가 시작 시 동기 `load()` 한다.
 - 표시명(검·아이템 이름)을 JSON에 박지 말 것 — i18n 키로 파생한다(검 `sword.<level>.name`, 아이템 `item.<id>`).
 - **새 검/아이템 추가 = JSON 항목 + i18n 키를 한 세트로.** 키를 빠뜨리면 컴파일이 아니라 게임 시작 시 런타임 throw(`assertNameKeysResolve`)로 터진다.
-- 새 사운드는 `lib/sound.ts`의 `SFX_FILES`/`BGM_FILES`에 등록한다(이름이 곧 타입). 파일만 `public/audio/`에 두면 타입이 안 맞는다.
+- 새 사운드는 `public/audio/`에 파일을 두고 `lib/sound.ts`의 `SFX_FILES`/`BGM_FILES`에 등록한다(이름이 곧 타입). 파일은 `lib/audioAssets.ts`의 글롭이 빌드에 data URL 로 인라인해 Web Audio 로 디코드한다(`file://`에서 `fetch`가 막히기 때문) — `<audio>`/`new Audio()`로 되돌리지 말 것(보이스마다 미디어 파이프라인을 세워 모바일 프레임을 떨군다). 등록만 하고 파일이 없으면 시작 시 `assertAudioAssets`가 throw 한다.
 
 ## 문자열·다국어
 
@@ -44,6 +44,9 @@
 - 연출 상수·계산도 `.ts`로 분리(`components/particles.ts`·`coins.ts` 등)하고, 컴포넌트는 렌더만 한다. 애니메이션 시간값을 컴포넌트에 하드코딩하면 연출 동기화가 깨진다.
 - 색상은 Tailwind v4 `@theme` 토큰(`--color-*`, `index.css`)을 쓰고 hex 하드코딩 금지.
 - 연출 재생은 증가하는 trigger key(0은 무시)로, 컴포넌트 정리는 `useOneShot`으로. 좌표는 엘리먼트 unmount 전에 동기로 `getBoundingClientRect()` 측정.
+- **연출은 합성 전용 속성(transform·opacity)만 움직인다.** `clip-path`·`filter`·`box-shadow`·`background-position`·등록 커스텀 프로퍼티 보간처럼 페인트 속성을 매 프레임 바꾸면 화면 전체가 프레임마다 다시 래스터된다(모바일 프레임 드랍의 실측 원인). 상시 반복은 CSS `@keyframes`, 1회성은 motion — 어느 쪽이든 움직이는 요소엔 `.fx-layer`(index.css)를 붙여 자기 합성 레이어를 준다(정적 장식엔 금지).
+- **커밋 중 레이아웃 읽기 금지.** 캔버스 스프라이트는 `SpriteCanvasBinding`(lib/spriteStore.ts) 경유 — 크기는 ResizeObserver 가 준다. 렌더/effect 안에서 `offsetWidth`·`getBoundingClientRect()`를 읽고 `canvas.width`를 쓰는 패턴을 새로 만들지 말 것(여러 캔버스가 한 커밋에서 이걸 번갈아 하면 강제 레이아웃이 캔버스 수만큼 반복된다).
+- 캔버스 파티클은 프레임마다 그라데이션·객체를 만들지 않는다 — 단면 텍스처를 1회 구워(`hitSparks.ts`/`dotParticles.ts`의 `bake*`/`get*Texture`) `drawImage`+`globalAlpha`로 찍는다.
 
 ## 테스트
 

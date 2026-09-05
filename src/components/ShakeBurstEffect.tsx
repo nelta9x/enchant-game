@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { motion, useAnimationControls } from 'motion/react'
-import { drawSpriteContain } from '../lib/spriteStore'
+import { SpriteCanvasBinding } from '../lib/spriteStore'
 import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { makeParticles } from './particles'
@@ -84,14 +84,26 @@ export function ShakeAfterimage({ event }: { event: ShakeBurstEvent | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const shakeControls = useAnimationControls()
   const popControls = useAnimationControls()
+  // 잔상 캔버스 바인딩(마운트 1회) — 크기 측정(ResizeObserver)·블릿·자가 치유는 SpriteCanvasBinding 이 소유한다
+  // (검 본체·아이콘과 공유). 여기선 이벤트 시점에 스프라이트만 정한다(강제 레이아웃 없음).
+  const bindingRef = useRef<SpriteCanvasBinding | null>(null)
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const binding = new SpriteCanvasBinding(canvas)
+    bindingRef.current = binding
+    return () => {
+      binding.dispose()
+      bindingRef.current = null
+    }
+  }, [])
   // 그리기·재생은 paint 전(useLayoutEffect)에 한다 — 대기 중 opacity 0 이라 깜빡임은 없지만, 연사 중
   // 이전 잔상이 떠 있을 때 새 강화가 오면 같은 프레임에 새 스프라이트로 갈아 그려 옛 잔상이 한 프레임
   // 비치지 않게 한다(하드 컷). id 만 의존해 무관한 리렌더로 재시작하지 않는다(event 객체는 매번 새로 생성).
   const evtId = event?.id ?? null
   useLayoutEffect(() => {
     if (evtId === null || !event) return
-    const canvas = canvasRef.current
-    if (canvas) drawSpriteContain(canvas, swordSpriteUrl(event.sprite))
+    bindingRef.current?.setSprite(swordSpriteUrl(event.sprite))
     // 떨림 — 망치가 닿는 순간(impact)부터 검 데이터 떨림 시간(shakeMs)만큼. delay 동안은 가만히 있는다(윈드업).
     // shakeMs 0 이하면 떨림 없음 → 원점만 두고 start 는 건너뛴다(잔상은 burstAt=impact 에 그대로 팝업·소멸).
     shakeControls.set({ x: 0, rotate: 0 })
@@ -127,7 +139,7 @@ export function ShakeAfterimage({ event }: { event: ShakeBurstEvent | null }) {
     >
       {/* 떨림 레이어(x/rotate) — 대기 시 원점(initial). */}
       <motion.div
-        className="flex items-center justify-center"
+        className="fx-layer flex items-center justify-center"
         initial={{ x: 0, rotate: 0 }}
         animate={shakeControls}
       >
@@ -136,7 +148,7 @@ export function ShakeAfterimage({ event }: { event: ShakeBurstEvent | null }) {
         <motion.canvas
           ref={canvasRef}
           aria-hidden
-          className="h-36 w-36 object-contain sm:h-40 sm:w-40"
+          className="fx-layer h-36 w-36 object-contain sm:h-40 sm:w-40"
           style={{ imageRendering: 'pixelated' }}
           initial={{ scale: 1, opacity: 0 }}
           animate={popControls}

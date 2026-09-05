@@ -1,6 +1,5 @@
 import {
   memo,
-  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -11,7 +10,7 @@ import { motion, useAnimationControls } from 'motion/react'
 import { useI18nStore, useT } from '../i18n'
 import type { SwordData } from '../data/types'
 import { formatAmount, formatGold } from '../lib/format'
-import { drawSpriteContain, spriteStore } from '../lib/spriteStore'
+import { SpriteCanvasBinding } from '../lib/spriteStore'
 import { swordSpriteUrl } from '../lib/sprites'
 import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
@@ -114,17 +113,26 @@ export const SwordStage = memo(function SwordStage({
   // <img> 대신 <canvas>로 SpriteStore 의 GPU 상주 ImageBitmap 을 그린다 — 강화 교체 프레임이 디코드·
   // 업로드 없이 블릿만 하게 해 모바일 끊김을 없앤다. 캔버스는 영속(remount 없음) — key 재마운트는 매 교체마다
   // 새 합성 레이어를 만들어(레이어 churn) 그 자체로 끊김을 유발하므로, 등장 애니메이션은 명령형으로 다시 튼다.
+  // 크기 측정(ResizeObserver)·블릿·미적재 자가 치유는 SpriteCanvasBinding 이 소유한다(아이콘·잔상과 공유) —
+  // 이 컴포넌트는 URL 교체 시점에 등장 애니메이션만 얹는다. 바인딩은 offsetWidth 를 읽지 않으므로 강화 커밋에
+  // 강제 레이아웃이 끼지 않는다.
   const spriteCanvasRef = useRef<HTMLCanvasElement>(null)
+  const bindingRef = useRef<SpriteCanvasBinding | null>(null)
   const entranceControls = useAnimationControls()
   const spriteName = hasSword ? sword.sprite : null
 
-  // 캔버스에 sprite 를 그린다 — 블릿(DPR backing·object-contain·픽셀아트·default.png 폴백)은 공유 헬퍼
-  // drawSpriteContain 이 소유한다(잔상 ShakeBurstEffect 와 동일 구현). useCallback(stable)로 sprite 를 인자로
-  // 받아 ResizeObserver 재구독을 막는다.
-  const drawSprite = useCallback((sprite: string) => {
+  // 바인딩은 캔버스 마운트/언마운트(검 유무 전환)에 맞춰 생성·해제한다.
+  useLayoutEffect(() => {
     const canvas = spriteCanvasRef.current
-    if (canvas) drawSpriteContain(canvas, swordSpriteUrl(sprite))
-  }, [])
+    if (!canvas) return
+    const binding = new SpriteCanvasBinding(canvas)
+    bindingRef.current = binding
+    return () => {
+      binding.dispose()
+      bindingRef.current = null
+    }
+    // hasSword 가 바뀌면 캔버스 엘리먼트가 마운트/언마운트되므로 그때 바인딩을 다시 만든다.
+  }, [hasSword])
 
   // 스프라이트가 바뀌면(강화·장착 등) 보이기 전에(opacity 0) 캔버스를 새로 그리고 등장 애니메이션을 다시 튼다
   // — useLayoutEffect(paint 전)라 새 검이 한 프레임 깜빡 비치지 않는다. remount 가 아니라 같은 캔버스를 재사용.
@@ -138,44 +146,13 @@ export const SwordStage = memo(function SwordStage({
     if (prevSpriteRef.current === spriteName) return
     prevSpriteRef.current = spriteName
     entranceControls.set({ opacity: 0, scale: 0.8 })
-    drawSprite(spriteName)
+    bindingRef.current?.setSprite(swordSpriteUrl(spriteName))
     entranceControls.start({
       opacity: 1,
       scale: 1,
       transition: { duration: 0.35, ease: 'easeOut', delay: entranceDelay },
     })
-    // 첫 무기 안 보임 방지 — 스프라이트가 아직 풀에 없으면(첫 페인트가 시작검 적재를 앞질렀거나, 다음 검이
-    // 백그라운드 적재 중) 위 drawSprite 는 default.png 폴백을 그린다. 적재되는 즉시 한 번 더 그려 빈/폴백
-    // 검이 남지 않게 한다(그 사이 검이 또 바뀌지 않았을 때만). load 는 적재 완료/캐시 히트에 resolve 하고
-    // 동시 호출을 합친다(중복 디코드 없음).
-    const spriteUrl = swordSpriteUrl(spriteName)
-    if (!spriteStore.has(spriteUrl)) {
-      let cancelled = false
-      void spriteStore.load(spriteUrl).then(() => {
-        if (!cancelled && prevSpriteRef.current === spriteName) drawSprite(spriteName)
-      })
-      return () => {
-        cancelled = true
-      }
-    }
-  }, [spriteName, entranceDelay, entranceControls, drawSprite])
-
-  // rem 반응 스케일(뷰포트 변화)로 표시 크기가 바뀌면 backing store 를 맞춰 다시 그린다(현재 스프라이트 유지).
-  // 현재 스프라이트는 ref(effect 에서 갱신 — 규약)로 읽는다(ResizeObserver 콜백은 렌더 밖에서 돈다).
-  const spriteNameRef = useRef(spriteName)
-  useEffect(() => {
-    spriteNameRef.current = spriteName
-  })
-  useEffect(() => {
-    const canvas = spriteCanvasRef.current
-    if (!canvas || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(() => {
-      const s = spriteNameRef.current
-      if (s !== null) drawSprite(s)
-    })
-    ro.observe(canvas)
-    return () => ro.disconnect()
-  }, [drawSprite])
+  }, [spriteName, entranceDelay, entranceControls])
 
   // 판매가(검의 sellPrice) 표시 여부 — 검 없음/판매 불가(null·0)면 자리만 지키고 숨긴다.
   // 이름·스탯과 함께 지연 공개되는 displaySword 기준(강화 직후 새 가격이 먼저 새지 않게).
@@ -240,7 +217,7 @@ export const SwordStage = memo(function SwordStage({
             크기(h-2/3)가 풀리도록(중간 래퍼가 콘텐츠 크기면 % 가 0 으로 무너진다). 검은 가운데 정렬. */}
         <motion.div
           animate={shakeControls}
-          className="relative flex h-full w-full items-center justify-center"
+          className="fx-layer relative flex h-full w-full items-center justify-center"
         >
           {/* 스프라이트 등장(스프라이트 변할 때마다 재생) — 영속 캔버스에 명령형(entranceControls)으로 다시 튼다.
               key 재마운트를 쓰지 않는 이유: 매 교체마다 새 합성 레이어를 만들어(레이어 churn) 모바일에서 끊김을
@@ -248,7 +225,7 @@ export const SwordStage = memo(function SwordStage({
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={entranceControls}
-            className="flex h-full w-full items-center justify-center"
+            className="fx-layer flex h-full w-full items-center justify-center"
           >
             {hasSword ? (
               // SpriteStore 의 GPU 상주 ImageBitmap 을 그리는 캔버스(영속) — 교체는 디코드·업로드 없는 블릿.
@@ -302,7 +279,7 @@ export const SwordStage = memo(function SwordStage({
               : undefined
           }
           aria-hidden={hasPrice ? undefined : true}
-          className={`flex min-h-[1.75rem] items-center justify-center gap-1.5 text-xl font-bold tabular-nums text-gold ${
+          className={`fx-layer flex min-h-[1.75rem] items-center justify-center gap-1.5 text-xl font-bold tabular-nums text-gold ${
             hasPrice ? '' : 'invisible'
           }`}
           style={{ textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}

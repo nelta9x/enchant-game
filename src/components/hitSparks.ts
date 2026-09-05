@@ -85,6 +85,51 @@ const rgba = (c: number[], a: number) =>
 // 부드러운 글로우 스프라이트(오프스크린, 1회 구움) — 가산 합성으로 화구·불혀에 blit 해 발광 후광을 낸다.
 // shadowBlur(매 draw 가우시안 블러)는 임팩트 때 프레임을 떨어뜨려, 캐시한 텍스처 복사(drawImage)로 대체한다.
 // 색은 머리 노랑(--color-hit-flash)으로 고정 — 캐시는 정적(런타임 테마 전환 경로 없음; 도입 시 무효화 필요).
+// 방사 그라데이션 텍스처 베이커 — 화구·불혀의 "백열 심지 → 노랑 → 주황 → 적색 치마" 단면을 오프스크린에 1회 굽고
+// 매 프레임 drawImage 로 찍는다. 이전엔 프레임마다 불혀 단(6×3)·화구마다 createRadialGradient + addColorStop ×4 를
+// 새로 만들었는데(초당 ~1,000개), 그라데이션 객체 할당(GC)과 GPU 셰이더 fill 이 모바일 GPU 시간의 큰 몫이었다.
+// 알파는 모든 stop 에 균일하게 곱해지므로(마지막 stop 은 0) globalAlpha 로 완전히 등가 재현된다.
+const TEX_SIZE = 128
+const texCache = new Map<string, HTMLCanvasElement>()
+function bakeRadialTexture(
+  key: string,
+  stops: readonly (readonly [number, number[], number])[],
+): HTMLCanvasElement {
+  const cached = texCache.get(key)
+  if (cached) return cached
+  const half = TEX_SIZE / 2
+  const off = document.createElement('canvas')
+  off.width = off.height = TEX_SIZE
+  const g = off.getContext('2d')
+  if (!g) throw new Error('radial texture 2d context unavailable')
+  const grad = g.createRadialGradient(half, half, 0, half, half, half)
+  for (const [pos, color, a] of stops) grad.addColorStop(pos, rgba(color, a))
+  g.fillStyle = grad
+  g.fillRect(0, 0, TEX_SIZE, TEX_SIZE)
+  texCache.set(key, off)
+  return off
+}
+// 임팩트 화구 단면(반경 = 텍스처 절반) — 백열 중심 → 노랑 → 주황 → 적색 가장자리(투명).
+function getFireballTexture(): HTMLCanvasElement {
+  const pal = resolvePalette()
+  return bakeRadialTexture('fireball', [
+    [0, pal.arcCore, 0.95],
+    [0.25, pal.cool[0], 0.85],
+    [0.6, pal.cool[1], 0.5],
+    [1, pal.cool[2], 0],
+  ])
+}
+// 불혀 단 단면 — 백색 심지 → 노랑 → 주황 → 적색 치마.
+function getLickTexture(): HTMLCanvasElement {
+  const pal = resolvePalette()
+  return bakeRadialTexture('lick', [
+    [0, pal.arcCore, 0.95],
+    [0.35, pal.cool[0], 0.75],
+    [0.7, pal.cool[1], 0.45],
+    [1, pal.cool[2], 0],
+  ])
+}
+
 let glowSprite: HTMLCanvasElement | null = null
 function getGlowSprite(): HTMLCanvasElement {
   if (glowSprite) return glowSprite
@@ -250,22 +295,10 @@ export class HitSparkSystem {
       const q = this.fireT / S.fireDur
       const fa = Math.pow(1 - q, 1.5)
       const r = S.fireR * S.scale * this.k * (0.55 + 0.45 * q)
-      const grad = ctx.createRadialGradient(
-        this.cx,
-        this.cy,
-        0,
-        this.cx,
-        this.cy,
-        r,
-      )
-      grad.addColorStop(0, rgba(pal.arcCore, 0.95 * fa))
-      grad.addColorStop(0.25, rgba(pal.cool[0], 0.85 * fa))
-      grad.addColorStop(0.6, rgba(pal.cool[1], 0.5 * fa))
-      grad.addColorStop(1, rgba(pal.cool[2], 0))
-      ctx.fillStyle = grad
-      ctx.beginPath()
-      ctx.arc(this.cx, this.cy, r, 0, TAU)
-      ctx.fill()
+      // 구운 화구 텍스처를 반경 r 로 찍는다(알파 fa 는 globalAlpha — 프레임마다 그라데이션을 만들지 않는다).
+      ctx.globalAlpha = fa
+      ctx.drawImage(getFireballTexture(), this.cx - r, this.cy - r, r * 2, r * 2)
+      ctx.globalAlpha = 1
       // 후광 — 구운 글로우 스프라이트를 화구보다 크게 한 장 덧대 빛이 주변으로 번진다.
       if (S.fireGlow > 0) {
         const gr = r * 1.7
@@ -321,16 +354,10 @@ export class HitSparkSystem {
           ctx.translate(sx, sy)
           ctx.scale(1, 1.5 + 0.7 * Math.sin(l.t * 20 + l.ph + s)) // 맥동 신장 — 빠르고 깊게 핥아 올리는 박동
           const r2 = seg * roil
-          // 단마다 백열 심지를 품는다: 백색 심지 → 노랑 → 주황 → 적색 치마(불꽃 단면).
-          const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r2)
-          grad.addColorStop(0, rgba(pal.arcCore, 0.95 * sa))
-          grad.addColorStop(0.35, rgba(pal.cool[0], 0.75 * sa))
-          grad.addColorStop(0.7, rgba(pal.cool[1], 0.45 * sa))
-          grad.addColorStop(1, rgba(pal.cool[2], 0))
-          ctx.fillStyle = grad
-          ctx.beginPath()
-          ctx.arc(0, 0, r2, 0, TAU)
-          ctx.fill()
+          // 단마다 백열 심지를 품는다: 백색 심지 → 노랑 → 주황 → 적색 치마(불꽃 단면) — 구운 텍스처를 반경 r2 로
+          // 찍는다(알파 sa 는 globalAlpha). 위 scale 변환을 따라 늘어나 혀 모양 그대로 그려진다.
+          ctx.globalAlpha = sa
+          ctx.drawImage(getLickTexture(), -r2, -r2, r2 * 2, r2 * 2)
           // 후광 — 단마다 글로우를 덧댄다(스케일 변환을 따라 늘어나 혀 모양 그대로 빛이 번진다).
           if (S.lickGlow > 0) {
             const gr = r2 * 1.9
@@ -361,6 +388,8 @@ export class HitSparkSystem {
     if (rect.width <= 0 || rect.height <= 0) return
     this.syncBackingStore(rect)
     getGlowSprite()
+    getFireballTexture()
+    getLickTexture()
   }
 
   dispose() {

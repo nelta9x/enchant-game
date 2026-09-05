@@ -5,6 +5,7 @@ import App from './App.tsx'
 import { dataManager } from './data/DataManager'
 import { INITIAL_SWORD_ID, useGameStore } from './store/gameStore'
 import { spriteStore } from './lib/spriteStore'
+import { assertAudioAssets, sound } from './lib/sound'
 import { swordSpriteUrl, itemSpriteUrl } from './lib/sprites'
 import { itemSpriteName, PROTECTION_TICKET_ID } from './lib/items'
 
@@ -19,6 +20,13 @@ async function boot() {
   // 전역 store 는 적재 전(모듈 평가 시점) 생성돼 최고 도달치(maxLevelReached)가 0 으로 출발한다.
   // 적재 후 시작 검 레벨(+1)로 보정한다 — RecordGauge 의 "현재 ≤ 최고" 불변식을 첫 프레임부터 지킨다.
   useGameStore.getState().syncRecordToCurrent()
+
+  // 효과음 레지스트리(SFX_FILES/BGM_FILES)가 전부 번들 자산으로 해석되는지 시작 시 검사(오타 = 조용한 무음 방지).
+  // AudioContext 생성(동기 수십~수백 ms)과 전 자산 디코드는 지금(로딩 중) 해 두고, 첫 사용자 제스처(pointerdown/keydown
+  // 캡처)에서는 resume 만 한다 — 첫 강화 탭 안에 오디오 초기화 비용이 끼지 않게(lib/sound.ts 머리 주석).
+  assertAudioAssets()
+  sound.prime()
+  sound.installUnlock()
 
   // 폴백(default.png)과 시작검만 첫 렌더 전에 보장한다 — 오프닝에 폴백이 비치지 않게(둘 다 빠름).
   await spriteStore.loadDefault()

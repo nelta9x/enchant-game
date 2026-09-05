@@ -105,21 +105,25 @@ class SpriteStore {
 // 앱 전역 단일 스토어(DataManager 와 같은 싱글턴 관례).
 export const spriteStore = new SpriteStore()
 
-// 캔버스에 스프라이트를 object-contain 으로 그린다(뷰 경계 헬퍼) — 검 본체(SwordStage)·잔상(ShakeBurstEffect)·
-// 아이템 아이콘(SpriteCanvas)이 같은 블릿을 공유한다(구현 분기 방지). backing store 는 표시 크기×DPR(crisp),
-// 보간은 nearest(픽셀아트 — <img> 의 imageRendering:pixelated 와 동일), 미로드/없는 경로면 get 의 default.png
-// 폴백(never null). 그릴 게 없으면(컨텍스트 없음·0 크기·소스 0 크기) 조용히 반환한다.
+// 캔버스 CSS 크기(px) — ResizeObserver 가 준 값을 그대로 쓴다(레이아웃 강제 읽기 없음).
+export type CanvasCssSize = { width: number; height: number }
+
+// 캔버스에 스프라이트를 object-contain 으로 그린다(순수 블릿). backing store 는 표시 크기×DPR(crisp), 보간은
+// nearest(픽셀아트 — <img> 의 imageRendering:pixelated 와 동일), 미로드/없는 경로면 get 의 default.png 폴백
+// (never null). 그릴 게 없으면(컨텍스트 없음·0 크기·소스 0 크기) 조용히 반환한다.
+// 표시 크기는 호출자가 준다 — 여기서 offsetWidth 를 읽지 않는다. 한 커밋에서 여러 캔버스가 "크기 읽기 →
+// backing store 쓰기"를 번갈아 하면 강제 동기 레이아웃이 캔버스 수만큼 반복되던(탭 태스크의 1/3) 스래시를
+// 구조적으로 막기 위해, 크기 측정은 SpriteCanvasBinding 의 ResizeObserver 한 곳이 소유한다.
 export function drawSpriteContain(
   canvas: HTMLCanvasElement,
   url: string,
+  size: CanvasCssSize,
 ): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const dpr = Math.min(3, window.devicePixelRatio || 1)
-  // backing 은 표시(레이아웃) 크기 × DPR. getBoundingClientRect 는 부모 transform(scale)에 영향받아
-  // (드롭·비행 아이콘은 scale 애니메이션 중) backing 이 작아져 흐려지므로, transform 무관한 offsetWidth/Height 를 쓴다.
-  const bw = Math.round(canvas.offsetWidth * dpr)
-  const bh = Math.round(canvas.offsetHeight * dpr)
+  const bw = Math.round(size.width * dpr)
+  const bh = Math.round(size.height * dpr)
   if (bw <= 0 || bh <= 0) return
   if (canvas.width !== bw || canvas.height !== bh) {
     canvas.width = bw
@@ -128,7 +132,6 @@ export function drawSpriteContain(
   ctx.imageSmoothingEnabled = false
   ctx.clearRect(0, 0, bw, bh)
   const src = spriteStore.get(url)
-  // 고유(원본) 크기 — HTMLImageElement 는 naturalWidth, ImageBitmap·canvas 는 width.
   const sw = src instanceof HTMLImageElement ? src.naturalWidth : src.width
   const sh = src instanceof HTMLImageElement ? src.naturalHeight : src.height
   if (!sw || !sh) return
@@ -136,4 +139,73 @@ export function drawSpriteContain(
   const dw = sw * scale
   const dh = sh * scale
   ctx.drawImage(src, (bw - dw) / 2, (bh - dh) / 2, dw, dh)
+}
+
+// 캔버스 1장과 스프라이트 URL 을 묶는 바인딩(React 무관 DOM 헬퍼) — 검 본체(SwordStage)·잔상(ShakeAfterimage)·
+// 아이템 아이콘(SpriteCanvas)이 공유한다. 책임:
+//  · 크기: ResizeObserver 가 준 contentRect 를 캐시해 그린다. 마운트 프레임엔 RO 초기 콜백(레이아웃 뒤·페인트 전)
+//    이 첫 그림을 그리고, 이후 URL 교체는 캐시된 크기로 즉시 그린다 — 어느 경로도 offsetWidth 를 읽지 않아
+//    강제 레이아웃이 없다(리사이즈·rem 스케일 변화는 RO 가 다시 그린다).
+//  · 자가 치유: 스프라이트가 아직 풀에 없으면 폴백을 그리고 적재 즉시 한 번 더 그린다(그 사이 URL 이 또 바뀌지
+//    않았을 때만). load 는 적재 완료/캐시 히트에 resolve 하고 동시 호출을 합친다(중복 디코드 없음).
+//  · 중복 없음: 같은 URL·같은 크기면 다시 그리지 않는다(이전 구현은 URL 교체마다 effect 1회 + RO 초기 콜백 1회 = 2회).
+// ResizeObserver 가 없는 환경(테스트 등)은 offsetWidth 1회 읽기로 폴백한다.
+export class SpriteCanvasBinding {
+  private readonly canvas: HTMLCanvasElement
+  private readonly ro: ResizeObserver | null
+  private size: CanvasCssSize | null = null
+  private url: string | null = null
+  private drawnUrl: string | null = null
+  private drawnSize: CanvasCssSize | null = null
+  private disposed = false
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas
+    if (typeof ResizeObserver === 'undefined') {
+      this.ro = null
+      this.size = { width: canvas.offsetWidth, height: canvas.offsetHeight }
+      return
+    }
+    this.ro = new ResizeObserver((entries) => {
+      const rect = entries[entries.length - 1]?.contentRect
+      if (!rect) return
+      this.size = { width: rect.width, height: rect.height }
+      this.draw()
+    })
+    this.ro.observe(canvas)
+  }
+
+  // 그릴 스프라이트를 정한다(같은 URL 이면 무변화). 크기를 이미 알면 즉시 그리고, 아니면 RO 초기 콜백이 그린다.
+  setSprite(url: string): void {
+    if (this.disposed || this.url === url) return
+    this.url = url
+    this.draw()
+    if (!spriteStore.has(url)) {
+      void spriteStore.load(url).then(() => {
+        if (!this.disposed && this.url === url) this.draw()
+      })
+    }
+  }
+
+  private draw(): void {
+    const { url, size } = this
+    if (url === null || size === null) return
+    if (
+      this.drawnUrl === url &&
+      this.drawnSize !== null &&
+      this.drawnSize.width === size.width &&
+      this.drawnSize.height === size.height &&
+      spriteStore.has(url)
+    ) {
+      return // 같은 스프라이트·같은 크기·이미 실물로 그림 — 중복 블릿 없음
+    }
+    drawSpriteContain(this.canvas, url, size)
+    this.drawnUrl = url
+    this.drawnSize = size
+  }
+
+  dispose(): void {
+    this.disposed = true
+    this.ro?.disconnect()
+  }
 }

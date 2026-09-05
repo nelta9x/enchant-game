@@ -61,7 +61,7 @@ export function RecordGauge() {
         {/* +강화 정도 — 최고치가 오를 때 popControls 로 한 번 통 튄다(위 effect). */}
         <motion.span
           animate={popControls}
-          className="inline-block text-sm font-extrabold tabular-nums text-gold"
+          className="fx-layer inline-block text-sm font-extrabold tabular-nums text-gold"
         >
           +{best}
         </motion.span>

@@ -65,10 +65,14 @@ type CreateOpts = {
 
 // 불변 차감: removals 수량만큼 빼고, 0 이하가 된 슬롯은 제거한다.
 // (전제조건은 호출 전 enhancer가 검증하므로 음수는 발생하지 않지만 방어적으로 필터)
+// 참조 안정성: removals 가 비어 있거나 전부 0 이면 원본 배열을 그대로 돌려준다(새 배열 없음). items 는 모든 경로가
+// 불변으로 다루므로 안전하고, 인벤토리·거래 바처럼 items 를 구독하는 memo 자식이 "소모 없는 강화"마다 리렌더되지
+// 않게 한다(이전엔 매 강화가 복제본을 만들어 참조가 바뀌었다).
 function subtractItems(
   items: readonly ItemStack[],
   removals: readonly ItemStack[],
 ): ItemStack[] {
+  if (!removals.some((r) => r.count > 0)) return items as ItemStack[]
   const next = items.map((i) => ({ ...i }))
   for (const r of removals) {
     const slot = next.find((i) => i.itemId === r.itemId)
@@ -78,10 +82,12 @@ function subtractItems(
 }
 
 // 불변 추가: additions를 기존 스택에 합산(없으면 새 슬롯 생성).
+// 참조 안정성: additions 가 비어 있거나 전부 0 이면 원본 배열을 그대로 돌려준다(subtractItems 와 동일 규약).
 function addItems(
   items: readonly ItemStack[],
   additions: readonly ItemStack[],
 ): ItemStack[] {
+  if (!additions.some((a) => a.count > 0)) return items as ItemStack[]
   const next = items.map((i) => ({ ...i }))
   for (const a of additions) {
     const slot = next.find((i) => i.itemId === a.itemId)
@@ -103,7 +109,7 @@ function bankOutgoing(
   outgoingId: string | null,
 ): ItemStack[] {
   if (outgoingId === null || outgoingId === INITIAL_SWORD_ID) {
-    return items.map((i) => ({ ...i }))
+    return items as ItemStack[] // 무변화 — 참조 유지(subtractItems 규약)
   }
   return addItems(items, [{ itemId: outgoingId, count: 1 }])
 }
@@ -224,7 +230,7 @@ export function createGameStore(opts: CreateOpts = {}) {
           return {
             gold: state.gold + price,
             currentSwordId: INITIAL_SWORD_ID,
-            items: state.items.map((i) => ({ ...i })),
+            items: state.items, // 무변화 — 참조 유지
           }
         })
         return price
@@ -312,7 +318,7 @@ export function createGameStore(opts: CreateOpts = {}) {
           gold: number,
         ): { items: ItemStack[]; gold: number } => {
           if (reward.kind === 'gold')
-            return { items: items.map((i) => ({ ...i })), gold: gold + reward.amount }
+            return { items: items as ItemStack[], gold: gold + reward.amount }
           if (reward.kind === 'item')
             return {
               items: addItems(items, [
@@ -320,7 +326,7 @@ export function createGameStore(opts: CreateOpts = {}) {
               ]),
               gold,
             }
-          return { items: items.map((i) => ({ ...i })), gold } // free
+          return { items: items as ItemStack[], gold } // free
         }
 
         // 골드 비용(골드로 구매): 보유 골드로 지불하고 보상을 지급한다(가방/검 무관).
