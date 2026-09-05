@@ -148,7 +148,8 @@ export function drawSpriteContain(
 //    강제 레이아웃이 없다(리사이즈·rem 스케일 변화는 RO 가 다시 그린다).
 //  · 자가 치유: 스프라이트가 아직 풀에 없으면 폴백을 그리고 적재 즉시 한 번 더 그린다(그 사이 URL 이 또 바뀌지
 //    않았을 때만). load 는 적재 완료/캐시 히트에 resolve 하고 동시 호출을 합친다(중복 디코드 없음).
-//  · 중복 없음: 같은 URL·같은 크기면 다시 그리지 않는다(이전 구현은 URL 교체마다 effect 1회 + RO 초기 콜백 1회 = 2회).
+//  · 중복 없음: 같은 URL·같은 크기로 이미 "실물"을 그렸으면 다시 그리지 않는다(이전 구현은 URL 교체마다 effect
+//    1회 + RO 초기 콜백 1회 = 2회). 폴백을 그린 뒤의 적재 완료 재그리기는 중복이 아니다(drawnReal).
 // ResizeObserver 가 없는 환경(테스트 등)은 offsetWidth 1회 읽기로 폴백한다.
 export class SpriteCanvasBinding {
   private readonly canvas: HTMLCanvasElement
@@ -157,6 +158,10 @@ export class SpriteCanvasBinding {
   private url: string | null = null
   private drawnUrl: string | null = null
   private drawnSize: CanvasCssSize | null = null
+  // 마지막 그림이 "실물"이었는지(적재된 스프라이트) — 폴백(default.png)을 그린 상태면 false. 중복 방지의 조건:
+  // 폴백을 그렸다면 적재 완료 후 반드시 한 번 더 그려야 한다(이 플래그 없이 has(url) 만 보면, RO 가 디코드보다
+  // 먼저 끝난 경우 적재 후 재그리기가 "같은 URL·같은 크기·적재됨"으로 오판돼 폴백이 영구히 남는다).
+  private drawnReal = false
   private disposed = false
 
   constructor(canvas: HTMLCanvasElement) {
@@ -192,16 +197,19 @@ export class SpriteCanvasBinding {
     if (url === null || size === null) return
     if (
       this.drawnUrl === url &&
+      this.drawnReal &&
       this.drawnSize !== null &&
       this.drawnSize.width === size.width &&
-      this.drawnSize.height === size.height &&
-      spriteStore.has(url)
+      this.drawnSize.height === size.height
     ) {
       return // 같은 스프라이트·같은 크기·이미 실물로 그림 — 중복 블릿 없음
     }
+    // has() 는 drawSpriteContain 이 get() 으로 실물/폴백 중 무엇을 그릴지와 같은 시점의 판정이다.
+    const real = spriteStore.has(url)
     drawSpriteContain(this.canvas, url, size)
     this.drawnUrl = url
     this.drawnSize = size
+    this.drawnReal = real
   }
 
   dispose(): void {

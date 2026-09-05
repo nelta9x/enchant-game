@@ -143,9 +143,12 @@ export const SwordStage = memo(function SwordStage({
       prevSpriteRef.current = null
       return
     }
+    // 바인딩에는 항상 현재 URL 을 넘긴다(같은 URL 이면 바인딩이 무시 — 중복 블릿 없음). prevSprite 가드 "앞"에
+    // 두는 이유: 바인딩이 재생성됐는데(위 effect 재실행 — StrictMode 이중 마운트 등) 스프라이트는 그대로인 경우,
+    // 가드 뒤에 있으면 새 바인딩이 URL 을 영영 못 받아 캔버스가 빈 채로 남는다(첫 무기 안 보임).
+    bindingRef.current?.setSprite(swordSpriteUrl(spriteName))
     if (prevSpriteRef.current === spriteName) return
     prevSpriteRef.current = spriteName
-    bindingRef.current?.setSprite(swordSpriteUrl(spriteName))
     // 등장: delay(burstAt) 동안 첫 키프레임(opacity 0)을 유지했다가 페이드·확대로 나타난다(fill both) — 컴포지터 전용.
     playFx(entranceRef.current, {
       channels: { opacity: [0, 1], scale: [0.8, 1] },

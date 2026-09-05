@@ -6,7 +6,7 @@ import { dataManager } from './data/DataManager'
 import { INITIAL_SWORD_ID, useGameStore } from './store/gameStore'
 import { spriteStore } from './lib/spriteStore'
 import { assertAudioAssets, sound } from './lib/sound'
-import { swordSpriteUrl, itemSpriteUrl } from './lib/sprites'
+import { swordSpriteUrl, itemSpriteUrl, uiSpriteUrl, UI_SPRITES } from './lib/sprites'
 import { itemSpriteName, PROTECTION_TICKET_ID } from './lib/items'
 
 // 게임 부팅 — 데이터 적재(동기) → 폴백·시작검 스프라이트 GPU 풀링(await) → 첫 렌더 → 나머지 검 백그라운드 로드.
@@ -33,7 +33,7 @@ async function boot() {
   const startSword = dataManager.getSwordById(INITIAL_SWORD_ID)
   if (startSword) await spriteStore.load(swordSpriteUrl(startSword.sprite))
 
-  // 나머지 검 + 아이템 스프라이트를 첫 페인트를 막지 않게 백그라운드로 채운다(await 안 함). 아이템 아이콘
+  // 나머지 검 + 아이템 + UI 스프라이트를 첫 페인트를 막지 않게 백그라운드로 채운다(await 안 함). 아이템 아이콘
   // (SpriteCanvas)도 같은 풀을 쓰므로 함께 풀링한다 — 미적재분은 표시 시 on-demand 로 채워진다(self-heal).
   const ticketSprite = itemSpriteName(PROTECTION_TICKET_ID)
   void spriteStore.loadAll([
@@ -42,6 +42,8 @@ async function boot() {
       .getItems()
       .flatMap((i) => (i.sprite ? [itemSpriteUrl(i.sprite)] : [])),
     ...(ticketSprite ? [itemSpriteUrl(ticketSprite)] : []),
+    // UI 스프라이트(상점 카드 아이콘 등)도 같은 풀 — 등록 목록 전부를 백그라운드 적재한다.
+    ...(Object.keys(UI_SPRITES) as (keyof typeof UI_SPRITES)[]).map(uiSpriteUrl),
   ])
 
   createRoot(document.getElementById('root')!).render(
