@@ -8,11 +8,9 @@ import {
   generateOne,
   pickDistinctEntries,
   refresh,
-  rollAttempts,
   spawnSession,
   type Commission,
   type CommissionQueueState,
-  type BucketSettings,
   type PoolEntry,
 } from './commissionQueue'
 
@@ -27,8 +25,8 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-// 버킷 공통 설정 픽스처 — 갱신 후보를 단일 값(3)으로 두어 rollAttempts 가 결정적이게 한다.
-const SETTINGS: BucketSettings = { refreshWeights: [{ value: 3, weight: 1 }] }
+// 세션 갱신 주기 픽스처(고정 — 한 세션이 버티는 강화 시도 횟수 = 세그먼트 칸 수).
+const ATTEMPTS = 3
 
 const SESSION = 3 // 글로벌 세션 크기(한 세션에 한 번에 출제할 제안 수)
 
@@ -104,79 +102,29 @@ describe('emptyCommissionQueue', () => {
 })
 
 describe('bootstrapCommissionQueue — 시작 즉시 첫 세션', () => {
-  it('첫 세션을 즉시 채운다(서로 다른 제안 SESSION 개) + 갱신 카운터를 뽑는다', () => {
-    const s = bootstrapCommissionQueue(RNG, POOL3, SETTINGS, SESSION)
+  it('첫 세션을 즉시 채운다(서로 다른 제안 SESSION 개) + 갱신 카운터를 가득 채운다', () => {
+    const s = bootstrapCommissionQueue(RNG, POOL3, ATTEMPTS, SESSION)
     expect(s.active).toHaveLength(3)
     expect(new Set(s.active.map((c) => costId(c.cost))).size).toBe(3) // 중복 없음
-    // 단일 후보(3) → 총·남은 카운터 모두 3.
-    expect(s.attemptsTotal).toBe(3)
-    expect(s.attemptsRemaining).toBe(3)
+    // 고정 주기(ATTEMPTS) → 총·남은 카운터 모두 ATTEMPTS.
+    expect(s.attemptsTotal).toBe(ATTEMPTS)
+    expect(s.attemptsRemaining).toBe(ATTEMPTS)
     expect(s.nextId).toBe(4)
     expect(checkInvariant(s)).toBe(true)
   })
 
   it('풀의 서로 다른 항목이 SESSION 보다 적으면 있는 만큼만(min)', () => {
-    const s = bootstrapCommissionQueue(RNG, POOL, SETTINGS, SESSION) // 단일 항목
+    const s = bootstrapCommissionQueue(RNG, POOL, ATTEMPTS, SESSION) // 단일 항목
     expect(s.active).toHaveLength(1)
     expect(s.attemptsTotal).toBeGreaterThan(0)
     expect(checkInvariant(s)).toBe(true)
   })
 
   it('풀이 비면 0개 + 카운터 0(다음 시도에 재시도)', () => {
-    const s = bootstrapCommissionQueue(RNG, [], SETTINGS, SESSION)
+    const s = bootstrapCommissionQueue(RNG, [], ATTEMPTS, SESSION)
     expect(s.active).toHaveLength(0)
     expect(s.attemptsRemaining).toBe(0)
     expect(s.attemptsTotal).toBe(0)
-  })
-})
-
-describe('rollAttempts — 갱신 카운터 가중 추첨', () => {
-  it('단일 후보면 그 value 를 반환한다', () => {
-    expect(
-      rollAttempts(RNG, { refreshWeights: [{ value: 4, weight: 1 }] }),
-    ).toBe(4)
-  })
-
-  it('후보 범위(값) 안의 정수를 돌려준다', () => {
-    const settings: BucketSettings = {
-      refreshWeights: [1, 2, 3, 4, 5].map((value) => ({ value, weight: 1 })),
-    }
-    const rng = mulberry32(99)
-    for (let i = 0; i < 50; i += 1) {
-      const v = rollAttempts(rng, settings)
-      expect(Number.isInteger(v)).toBe(true)
-      expect(v).toBeGreaterThanOrEqual(1)
-      expect(v).toBeLessThanOrEqual(5)
-    }
-  })
-
-  it('weight 가 큰 후보가 더 자주 나온다(분포 방향)', () => {
-    const settings: BucketSettings = {
-      refreshWeights: [
-        { value: 1, weight: 1 },
-        { value: 5, weight: 9 },
-      ],
-    }
-    const rng = mulberry32(7)
-    let heavy = 0
-    let light = 0
-    for (let i = 0; i < 500; i += 1) {
-      if (rollAttempts(rng, settings) === 5) heavy += 1
-      else light += 1
-    }
-    expect(heavy).toBeGreaterThan(light)
-  })
-
-  it('같은 시드는 같은 값', () => {
-    const settings: BucketSettings = {
-      refreshWeights: [
-        { value: 1, weight: 1 },
-        { value: 5, weight: 1 },
-      ],
-    }
-    expect(rollAttempts(mulberry32(3), settings)).toBe(
-      rollAttempts(mulberry32(3), settings),
-    )
   })
 })
 
@@ -391,30 +339,25 @@ describe('commissionPool — entries + basePrice 결합', () => {
 })
 
 describe('refresh — 새 세션 갱신', () => {
-  it('세션을 한 번에 출제하고 갱신 카운터를 뽑는다(총=남음)', () => {
-    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1)
+  it('세션을 한 번에 출제하고 갱신 카운터를 고정 주기로 가득 채운다(총=남음)', () => {
+    const s = refresh(RNG, POOL3, ATTEMPTS, SESSION, 1)
     expect(s.active).toHaveLength(3)
     expect(new Set(s.active.map((c) => costId(c.cost))).size).toBe(3)
-    expect(s.attemptsTotal).toBe(3) // 단일 후보
-    expect(s.attemptsRemaining).toBe(3)
+    expect(s.attemptsTotal).toBe(ATTEMPTS)
+    expect(s.attemptsRemaining).toBe(ATTEMPTS)
     expect(s.nextId).toBe(4)
     expect(checkInvariant(s)).toBe(true)
   })
 
-  it('카운터는 refreshWeights 후보 범위 안에서 뽑힌다', () => {
-    const settings: BucketSettings = {
-      refreshWeights: [
-        { value: 1, weight: 1 },
-        { value: 5, weight: 1 },
-      ],
-    }
-    const s = refresh(mulberry32(5), POOL3, settings, SESSION, 1)
-    expect([1, 5]).toContain(s.attemptsTotal)
-    expect(s.attemptsRemaining).toBe(s.attemptsTotal)
+  it('카운터는 sessionAttempts 값 그대로이고, 1 미만이면 1 로 방어한다(0 칸 죽은 세션 방지)', () => {
+    expect(refresh(RNG, POOL3, 5, SESSION, 1).attemptsTotal).toBe(5)
+    const s = refresh(RNG, POOL3, 0, SESSION, 1)
+    expect(s.attemptsTotal).toBe(1)
+    expect(s.attemptsRemaining).toBe(1)
   })
 
   it('풀이 비면 빈 세션 + 카운터 0(nextId 유지)', () => {
-    const s = refresh(RNG, [], SETTINGS, SESSION, 7)
+    const s = refresh(RNG, [], ATTEMPTS, SESSION, 7)
     expect(s.active).toHaveLength(0)
     expect(s.attemptsRemaining).toBe(0)
     expect(s.attemptsTotal).toBe(0)
@@ -424,19 +367,19 @@ describe('refresh — 새 세션 갱신', () => {
 
 describe('attempt — 강화 시도 반영(차감/갱신)', () => {
   it('카운터가 1보다 크면 1 줄이고 세션은 그대로 둔다', () => {
-    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1) // remaining 3
+    const s = refresh(RNG, POOL3, ATTEMPTS, SESSION, 1) // remaining ATTEMPTS
     const before = ids(s)
-    const s2 = attempt(s, RNG, POOL3, SETTINGS, SESSION)
-    expect(s2.attemptsRemaining).toBe(2)
-    expect(s2.attemptsTotal).toBe(3)
+    const s2 = attempt(s, RNG, POOL3, ATTEMPTS, SESSION)
+    expect(s2.attemptsRemaining).toBe(ATTEMPTS - 1)
+    expect(s2.attemptsTotal).toBe(ATTEMPTS)
     expect(ids(s2)).toEqual(before) // 같은 세션(ids 동일)
     expect(checkInvariant(s2)).toBe(true)
   })
 
   it('카운터가 1에서 0으로 떨어지는 시도에 세션을 통째로 갱신한다(새 ids)', () => {
-    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1)
+    const s = refresh(RNG, POOL3, ATTEMPTS, SESSION, 1)
     const one: CommissionQueueState = { ...s, attemptsRemaining: 1 }
-    const s2 = attempt(one, RNG, POOL3, SETTINGS, SESSION)
+    const s2 = attempt(one, RNG, POOL3, ATTEMPTS, SESSION)
     expect(s2.active).toHaveLength(3)
     // 새 세션이라 id 가 직전 세션과 겹치지 않는다(단조 증가).
     for (const id of ids(s2)) expect(ids(one)).not.toContain(id)
@@ -446,27 +389,34 @@ describe('attempt — 강화 시도 반영(차감/갱신)', () => {
 
   it('빈-풀 상태(카운터 0)에서 풀이 차 있으면 다음 시도가 세션을 연다', () => {
     const empty = emptyCommissionQueue() // attemptsRemaining 0
-    const s = attempt(empty, RNG, POOL3, SETTINGS, SESSION)
+    const s = attempt(empty, RNG, POOL3, ATTEMPTS, SESSION)
     expect(s.active).toHaveLength(3)
     expect(s.attemptsRemaining).toBe(s.attemptsTotal)
     expect(checkInvariant(s)).toBe(true)
   })
 })
 
-describe('complete — 제안 선택 시 세션 카드 전부 제거(바만 남김, 갱신 아님)', () => {
-  it('고른 id 가 있으면 세션 카드를 전부 비우고 카운터는 그대로 둔다', () => {
-    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1) // 3개, remaining 3
-    const target = s.active[1].id
-    const s2 = complete(s, target)
-    expect(s2.active).toHaveLength(0) // 고른 것 + 나머지 전부 사라짐
-    // 카운터는 불변 — 갱신은 강화 시도로 카운터가 0 이 될 때만(바만 남는다).
-    expect(s2.attemptsRemaining).toBe(3)
-    expect(s2.attemptsTotal).toBe(3)
+describe('complete — 제안 선택(구매) 시 세션 즉시 갱신 + 카운터 회복', () => {
+  it('고른 id 가 있으면 세션을 새로 출제하고(새 ids) 카운터를 가득 채운다', () => {
+    const s = refresh(RNG, POOL3, ATTEMPTS, SESSION, 1)
+    const spent: CommissionQueueState = { ...s, attemptsRemaining: 1 } // 주기 거의 소진
+    const target = spent.active[1].id
+    const s2 = complete(spent, target, RNG, POOL3, ATTEMPTS, SESSION)
+    expect(s2.active).toHaveLength(3) // 새 세션 한 번에
+    for (const id of ids(s2)) expect(ids(spent)).not.toContain(id) // 전부 새 id(단조 증가)
+    expect(s2.attemptsRemaining).toBe(ATTEMPTS) // 주기 회복
+    expect(s2.attemptsTotal).toBe(ATTEMPTS)
     expect(checkInvariant(s2)).toBe(true)
   })
 
-  it('없는 id 는 무변화', () => {
-    const s = refresh(RNG, POOL3, SETTINGS, SESSION, 1)
-    expect(complete(s, 9999)).toBe(s)
+  it('없는 id 는 무변화(rng 소비 없음)', () => {
+    const s = refresh(RNG, POOL3, ATTEMPTS, SESSION, 1)
+    let calls = 0
+    const spy = () => {
+      calls += 1
+      return 0.3
+    }
+    expect(complete(s, 9999, spy, POOL3, ATTEMPTS, SESSION)).toBe(s)
+    expect(calls).toBe(0)
   })
 })

@@ -32,10 +32,6 @@ function itemEntry(
 function tier(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     items: [itemEntry(), itemEntry({ itemId: 'iron_scrap', weight: 2 })],
-    refreshWeights: [
-      { value: 1, weight: 1 },
-      { value: 5, weight: 1 },
-    ],
     ...over,
   }
 }
@@ -45,7 +41,7 @@ function cfg(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     maxCommissions: 3,
     unlockAtLevel: 10,
-    refreshCost: 100000,
+    sessionAttempts: 3,
     tiers: [tier()],
     ...over,
   }
@@ -74,17 +70,13 @@ describe('parseCommissionConfig — 구조 검증', () => {
     expect(parse()).toEqual({
       maxCommissions: 3,
       unlockAtLevel: 10,
-      refreshCost: 100000,
+      sessionAttempts: 3,
       tiers: [
         {
           upgradeCost: null,
           items: [
             { itemId: 'sword_3', weight: 3, ...itemFields },
             { itemId: 'iron_scrap', weight: 2, ...itemFields },
-          ],
-          refreshWeights: [
-            { value: 1, weight: 1 },
-            { value: 5, weight: 1 },
           ],
         },
       ],
@@ -113,11 +105,11 @@ describe('parseCommissionConfig — 구조 검증', () => {
     expect(() => parse({ unlockAtLevel: 1.5 })).toThrow()
   })
 
-  it('refreshCost 는 필수다 — 누락/비숫자/비유한/소수면 throw', () => {
-    expect(() => parse({ refreshCost: undefined })).toThrow()
-    expect(() => parse({ refreshCost: 'x' })).toThrow()
-    expect(() => parse({ refreshCost: Infinity })).toThrow()
-    expect(() => parse({ refreshCost: 1.5 })).toThrow()
+  it('sessionAttempts 는 필수다 — 누락/비숫자/비유한/소수면 throw', () => {
+    expect(() => parse({ sessionAttempts: undefined })).toThrow()
+    expect(() => parse({ sessionAttempts: 'x' })).toThrow()
+    expect(() => parse({ sessionAttempts: Infinity })).toThrow()
+    expect(() => parse({ sessionAttempts: 1.5 })).toThrow()
   })
 })
 
@@ -132,10 +124,10 @@ describe('parseCommissionConfig — 글로벌 의미 검증', () => {
     expect(parse({ unlockAtLevel: 10 }).unlockAtLevel).toBe(10)
   })
 
-  it('refreshCost < 0 이면 throw, 0 은 허용(무료 갱신)', () => {
-    expect(() => parse({ refreshCost: -1 })).toThrow()
-    expect(parse({ refreshCost: 0 }).refreshCost).toBe(0)
-    expect(parse({ refreshCost: 250_000 }).refreshCost).toBe(250_000)
+  it('sessionAttempts < 1 이면 throw, 1 이상은 그대로', () => {
+    expect(() => parse({ sessionAttempts: 0 })).toThrow()
+    expect(parse({ sessionAttempts: 1 }).sessionAttempts).toBe(1)
+    expect(parse({ sessionAttempts: 5 }).sessionAttempts).toBe(5)
   })
 })
 
@@ -222,39 +214,6 @@ describe('parseCommissionConfig — tiers 구조 검증', () => {
         tiers: [tier({ items: [{ itemId: 'sword_3', weight: 1 }] })],
       }),
     ).toThrow() // incentiveMin 등 누락
-  })
-
-  it('refreshWeights 가 비어있거나 배열이 아니면 throw', () => {
-    expect(() => parse({ tiers: [tier({ refreshWeights: [] })] })).toThrow()
-    expect(() =>
-      parse({ tiers: [tier({ refreshWeights: 'x' })] }),
-    ).toThrow()
-  })
-
-  it('refreshWeights 의 value 가 1 미만/정수 아니면 throw', () => {
-    expect(() =>
-      parse({
-        tiers: [tier({ refreshWeights: [{ value: 0, weight: 1 }] })],
-      }),
-    ).toThrow()
-    expect(() =>
-      parse({
-        tiers: [tier({ refreshWeights: [{ value: 2.5, weight: 1 }] })],
-      }),
-    ).toThrow()
-  })
-
-  it('refreshWeights 의 weight 가 0 이하/비숫자면 throw', () => {
-    expect(() =>
-      parse({
-        tiers: [tier({ refreshWeights: [{ value: 1, weight: 0 }] })],
-      }),
-    ).toThrow()
-    expect(() =>
-      parse({
-        tiers: [tier({ refreshWeights: [{ value: 1, weight: 'x' }] })],
-      }),
-    ).toThrow()
   })
 })
 
@@ -454,7 +413,7 @@ describe('loadCommission — 번들 데이터 진입점', () => {
     const known = realKnownIds()
     const config = loadCommission(known)
     expect(config.maxCommissions).toBeGreaterThanOrEqual(1)
-    expect(config.refreshCost).toBeGreaterThanOrEqual(0)
+    expect(config.sessionAttempts).toBeGreaterThanOrEqual(1)
     expect(config.tiers.length).toBeGreaterThanOrEqual(1)
     expect(config.tiers.flatMap((b) => b.items).length).toBeGreaterThan(0)
     // 상점 티어: 시작 티어는 비용 없음, 그 외 티어는 골드(금액>=1) 또는 아이템(출제 집합·수량>=1) 비용.
@@ -487,13 +446,6 @@ describe('loadCommission — 번들 데이터 진입점', () => {
           expect(known.has(e.rewardItemId)).toBe(true)
           expect(e.rewardItemCount).toBeGreaterThanOrEqual(1)
         }
-      }
-      // 세션 갱신 후보(가중 추첨): 비어있지 않고, 각 후보는 value>=1(정수)·weight>0.
-      expect(b.refreshWeights.length).toBeGreaterThan(0)
-      for (const w of b.refreshWeights) {
-        expect(Number.isInteger(w.value)).toBe(true)
-        expect(w.value).toBeGreaterThanOrEqual(1)
-        expect(w.weight).toBeGreaterThan(0)
       }
     }
   })

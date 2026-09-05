@@ -9,20 +9,19 @@
 // 모델 — "제안 세션(배치)"은 시간이 아니라 강화 시도 횟수로 굴러간다:
 //  - active: 현재 화면에 떠 있는 한 세션의 제안들. 세션이 시작되면 서로 다른 제안 sessionSize 개를 "한 번에"
 //    출제한다(풀의 서로 다른 항목 수가 그보다 적으면 있는 만큼만 — min). 세션 내 중복 제안은 없다(비복원 추출).
-//  - attemptsTotal / attemptsRemaining: 세션이 갱신되기까지의 강화 시도 카운터. 세션 시작 시 티어의
-//    refreshWeights 에서 가중 추첨으로 한 번 뽑아(attemptsTotal) attemptsRemaining 을 같게 둔다. 강화 시도가
+//  - attemptsTotal / attemptsRemaining: 세션이 갱신되기까지의 강화 시도 카운터. 세션 시작 시 글로벌 고정값
+//    sessionAttempts 로 채우고(attemptsTotal) attemptsRemaining 을 같게 둔다. 강화 시도가
 //    한 번 일어날 때마다 attemptsRemaining 을 1 줄이고, 1 에서 0 으로 떨어지는 그 시도에 세션 전체를 새로
 //    갱신한다(쿨다운 없음 — 즉시 교체). 카운트다운 UI 는 세그먼트 바로 표현한다(총 칸 attemptsTotal, 켜진
 //    칸 attemptsRemaining — 시도마다 한 칸씩 꺼짐).
 //  - 세션은 "한 번에" 출제되고 도중에 보충하지 않는다(트리클 아님).
-//  - 제안 선택(complete): 고른 것을 포함해 이번 세션의 카드를 "전부" 비운다 — 단 카운터는 건드리지 않는다.
-//    즉 "하나를 고르면 카드들은 사라지고 갱신 바만 남는다". 새 카드는 오직 attemptsRemaining 이 0 이 될 때 뜬다.
+//  - 제안 선택(complete): 고른 순간 세션 전체를 즉시 새로 갱신한다(새 제안 sessionSize 개 + 카운터 가득).
+//    즉 "하나를 사면 상점이 바로 새 물건으로 채워지고 갱신 주기도 회복된다".
 //  - 시간 개념(타임스탬프·만료·쿨다운)은 없다 — 탭 throttle·드리프트에 영향받지 않고 rng 주입으로 결정적.
 
 import type {
   CommissionItemEntry,
   Material,
-  RefreshWeight,
   TradeCost,
 } from '../data/types'
 import { weightedIndex } from '../lib/weightedPick'
@@ -62,13 +61,6 @@ export type PoolEntry = {
     }
 )
 
-// 제안 세션의 티어 공통 설정 묶음 — 셸이 현재 상점 티어에서 합성해 주입한다.
-// (보상 배수/가산은 아이템별이라 여기 없고 PoolEntry 에 있다. 세션 크기 등 글로벌도 별도 인자.)
-//  - refreshWeights: 세션 카운터(갱신까지의 강화 시도 횟수) 후보의 가중 추첨 목록.
-export type BucketSettings = {
-  refreshWeights: readonly RefreshWeight[]
-}
-
 export type CommissionQueueState = {
   active: Commission[]
   attemptsRemaining: number // 갱신까지 남은 강화 시도 수(0 = 다음 시도에 갱신/재시도)
@@ -85,10 +77,10 @@ export function emptyCommissionQueue(): CommissionQueueState {
 export function bootstrapCommissionQueue(
   rng: () => number,
   pool: readonly PoolEntry[],
-  settings: BucketSettings,
+  sessionAttempts: number,
   sessionSize: number,
 ): CommissionQueueState {
-  return refresh(rng, pool, settings, sessionSize, 1)
+  return refresh(rng, pool, sessionAttempts, sessionSize, 1)
 }
 
 // 출제 풀(순수 — DataManager 비의존). 티어 items[] 의 각 itemId 에 basePrice 를 붙여 PoolEntry[] 로 만든다.
@@ -142,16 +134,6 @@ function selectEntry(
 ): PoolEntry | null {
   const idx = weightedIndex(pool, (e) => e.weight, rng)
   return idx < 0 ? null : pool[idx]
-}
-
-// 세션 갱신 카운터 1회 뽑기 — refreshWeights 에서 weight 비례로 후보 하나를 골라 그 value 를 반환한다.
-// rng 1회 소비(weightedIndex). 빈 목록이면(방어 — 로더가 비어있지 않음을 강제) 1 로 폴백한다.
-export function rollAttempts(
-  rng: () => number,
-  settings: BucketSettings,
-): number {
-  const idx = weightedIndex(settings.refreshWeights, (w) => w.weight, rng)
-  return idx < 0 ? 1 : settings.refreshWeights[idx].value
 }
 
 // 주어진 항목으로 제안 1건의 내용(id 제외 — 발급은 호출자가 한다)을 만든다. 선택은 하지 않는다(항목은 이미 고른 것).
@@ -233,13 +215,13 @@ export function spawnSession(
   return { offers, nextId }
 }
 
-// 새 세션 갱신: 제안 sessionSize 개를 한 번에 출제하고 갱신 카운터를 뽑아 새 상태를 만든다.
-// rng 소비 순서(결정성): 1) spawnSession(선택+보상)  2) rollAttempts(카운터). 이 순서를 바꾸지 말 것 —
-// "세션을 먼저 짓고 그 카운터를 정한다". 풀이 비면(방어) active:[], 카운터 0 → 다음 attempt 가 재시도한다.
+// 새 세션 갱신: 제안 sessionSize 개를 한 번에 출제하고 갱신 카운터를 sessionAttempts(고정)로 채워 새 상태를
+// 만든다. rng 는 spawnSession(선택+보상)만 소비한다. 풀이 비면(방어) active:[], 카운터 0 → 다음 attempt 가 재시도한다.
+// sessionAttempts 가 1 미만이면(방어 — 로더가 >= 1 강제) 1 로 올린다(0 칸 죽은 세션 방지).
 export function refresh(
   rng: () => number,
   pool: readonly PoolEntry[],
-  settings: BucketSettings,
+  sessionAttempts: number,
   sessionSize: number,
   startId: number,
 ): CommissionQueueState {
@@ -247,7 +229,7 @@ export function refresh(
   if (offers.length === 0) {
     return { active: [], attemptsRemaining: 0, attemptsTotal: 0, nextId }
   }
-  const attempts = rollAttempts(rng, settings)
+  const attempts = Math.max(1, sessionAttempts)
   return {
     active: offers,
     attemptsRemaining: attempts,
@@ -263,23 +245,26 @@ export function attempt(
   state: CommissionQueueState,
   rng: () => number,
   pool: readonly PoolEntry[],
-  settings: BucketSettings,
+  sessionAttempts: number,
   sessionSize: number,
 ): CommissionQueueState {
   if (state.attemptsRemaining <= 1) {
-    return refresh(rng, pool, settings, sessionSize, state.nextId)
+    return refresh(rng, pool, sessionAttempts, sessionSize, state.nextId)
   }
   return { ...state, attemptsRemaining: state.attemptsRemaining - 1 }
 }
 
-// 제안 선택(납품): 고른 id 가 active 에 있으면 이번 세션의 제안을 "전부" 비운다(고른 것 + 나머지 모두) —
-// 단, 갱신 카운터(attemptsRemaining/attemptsTotal)는 건드리지 않는다. 즉 "하나를 고르면 카드들은 사라지고
-// 갱신 바만 남는다". 새 제안은 강화 시도로 카운터가 0 이 될 때 뜬다(납품 자체는 세션을 갱신하지 않는다).
-// 없는 id 면 무변화(참조 동일 반환).
+// 제안 선택(납품·구매): 고른 id 가 active 에 있으면 세션 전체를 "즉시 새로 갱신"한다 — 새 제안 sessionSize 개를
+// 한 번에 다시 출제하고 갱신 카운터도 sessionAttempts 로 가득 채운다(refresh 위임). 즉 "하나를 고르면 상점이
+// 바로 새 물건으로 채워지고 갱신 주기도 회복된다". 없는 id 면 무변화(참조 동일 반환, rng 소비 없음).
 export function complete(
   state: CommissionQueueState,
   id: number,
+  rng: () => number,
+  pool: readonly PoolEntry[],
+  sessionAttempts: number,
+  sessionSize: number,
 ): CommissionQueueState {
   if (!state.active.some((c) => c.id === id)) return state
-  return { ...state, active: [] }
+  return refresh(rng, pool, sessionAttempts, sessionSize, state.nextId)
 }

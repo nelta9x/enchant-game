@@ -121,15 +121,6 @@ export type CommissionItemEntry = {
       }
   )
 
-// 제안 갱신 후보 1개(가중 추첨). value = 한 세션이 버티는 강화 시도 횟수, weight = 추첨 빈도(기본 1).
-// 세션 시작 시 버킷의 refreshWeights 에서 weight 비례로 하나를 골라 그 value 를 세션 카운터로 삼는다.
-// 후보 값의 범위(최소/최대)와 각 값의 빈도가 전부 데이터(commission.json)로 표현된다 — 균등하게 하려면
-// 모든 weight 를 1 로 둔다(예: 값 1~5 각 weight 1 = 1~5 균등).
-export type RefreshWeight = {
-  value: number // 갱신까지의 강화 시도 횟수(정수 >= 1)
-  weight: number // 추첨 가중치(> 0)
-}
-
 // 거래 비용(언어 중립) — 골드 또는 아이템. Material 에서 'free' 만 뺀 것으로, 거래 제안의 지불(cost)과
 // 상점 업그레이드 비용이 같은 체계를 쓴다(gameStore.canFulfill/fulfillCommission 이 둘 다 처리).
 export type TradeCost = Exclude<Material, { kind: 'free' }>
@@ -141,13 +132,10 @@ export type TradeCost = Exclude<Material, { kind: 'free' }>
 //    시작 티어라 null 이고, 그 외 티어는 반드시 비용이 있다(로더 강제). 상점 카드가 다음 티어의 이 값을
 //    표시하고, 지불하면 레벨이 1 오르며 세션이 새 티어 풀로 즉시 무료 갱신된다(commissionStore.upgradeShop).
 //  - items: 이 티어에서 출제될 아이템 목록(itemId + weight + 아이템별 incentive/additive). 비어있지 않음
-//  - refreshWeights: 세션이 갱신되기까지의 강화 시도 횟수 후보(가중 추첨). 세션 시작 시 여기서 하나를 뽑아
-//    세션 카운터로 삼고, 강화 시도마다 1씩 차감해 0 이 되면 세션 전체가 새로 갱신된다(시간이 아니라 시도 기반).
-//    비어있지 않음.
+//    (세션 갱신 주기는 티어별이 아니라 글로벌 sessionAttempts 하나로 고정한다.)
 export type ShopTier = {
   upgradeCost: TradeCost | null
   items: CommissionItemEntry[]
-  refreshWeights: RefreshWeight[]
 }
 
 // 의뢰(Commission) 시스템 튜닝 설정(언어 중립). 코드 상수가 아니라 데이터 파일(commission.json)에 두고
@@ -160,13 +148,14 @@ export type ShopTier = {
 //    플레이어가 이 레벨에 한 번이라도 도달하기 전에는 제안이 전혀 출제되지 않는다(초반엔 재화가 없어 활용 불가 — 의도된 잠금).
 //    maxLevelReached 는 파괴·판매로 내려가지 않으므로(달성=영구) 한 번 해제되면 다시 잠기지 않는다. 0 = 처음부터 활성.
 //    데이터 파일(commission.json)에서 조절한다(코드 상수 아님).
-//  - refreshCost: 제안 세션을 강제로 갱신(상단 갱신 버튼)할 때 1회 차감되는 골드. 정수 >= 0(0 = 무료).
-//    잠금 해제 후에만 갱신할 수 있고, 보유 골드가 이 값 이상일 때만 동작한다(commissionStore.refreshNow).
+//  - sessionAttempts: 한 제안 세션이 버티는 강화 시도 횟수(정수 >= 1, 고정 — 가중 추첨 없음). 세션 시작 시
+//    카운터를 이 값으로 채우고 강화 시도마다 1씩 차감해 0 이 되면 세션 전체가 새로 갱신된다(시간이 아니라 시도 기반).
+//    UI 세그먼트 바의 총 칸 수이기도 하다. 강제 갱신(골드 지불) 기능은 없다 — 갱신은 오직 이 카운터로만.
 //  - tiers: 상점 레벨별 정의(tiers[0] = 시작 티어, 인덱스가 곧 레벨). 최고 레벨 = tiers.length - 1.
 export type CommissionConfig = {
   maxCommissions: number
   unlockAtLevel: number
-  refreshCost: number
+  sessionAttempts: number
   tiers: ShopTier[]
 }
 

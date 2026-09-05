@@ -1,7 +1,7 @@
 {
   "maxCommissions": 3,
   "unlockAtLevel": 10,
-  "refreshCost": 100000,
+  "sessionAttempts": 3,
   "tiers": [
     {
       "items": [
@@ -30,20 +30,6 @@
           "rewardKind": "item",
           "rewardItemId": "sword_10",
           "rewardItemCount": 1
-        }
-      ],
-      "refreshWeights": [
-        {
-          "value": 3,
-          "weight": 1
-        },
-        {
-          "value": 4,
-          "weight": 1
-        },
-        {
-          "value": 5,
-          "weight": 1
         }
       ]
     },
@@ -76,20 +62,6 @@
           "rewardKind": "item",
           "rewardItemId": "protection_ticket",
           "rewardItemCount": 5
-        }
-      ],
-      "refreshWeights": [
-        {
-          "value": 3,
-          "weight": 1
-        },
-        {
-          "value": 4,
-          "weight": 1
-        },
-        {
-          "value": 5,
-          "weight": 1
         }
       ]
     },
@@ -173,20 +145,6 @@
           "rewardItemId": "sword_23",
           "rewardItemCount": 1
         }
-      ],
-      "refreshWeights": [
-        {
-          "value": 3,
-          "weight": 1
-        },
-        {
-          "value": 4,
-          "weight": 1
-        },
-        {
-          "value": 5,
-          "weight": 1
-        }
       ]
     },
     {
@@ -235,20 +193,6 @@
           "rewardKind": "item",
           "rewardItemId": "sword_23",
           "rewardItemCount": 1
-        }
-      ],
-      "refreshWeights": [
-        {
-          "value": 3,
-          "weight": 1
-        },
-        {
-          "value": 4,
-          "weight": 1
-        },
-        {
-          "value": 5,
-          "weight": 1
         }
       ]
     }

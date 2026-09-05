@@ -22,9 +22,6 @@ type GameActions = {
   // 현재 검 판매: 판매가만큼 골드를 받고 검을 비운다(currentSwordId = null).
   // 판매 불가(검 없음 / sellPrice null)면 null 반환(변화 없음). 반환값 = 받은 골드.
   sell: () => number | null
-  // 골드 차감(범용 지불 primitive). amount 만큼 보유 골드에서 빼되, 보유분 이상일 때만 — 부족하거나
-  // amount 가 비정상(음수·비유한)이면 무변화로 false. 성공이면 true. 제안 강제 갱신 등 "골드만 무는" 동작이 쓴다.
-  spendGold: (amount: number) => boolean
   // 보관 가능 여부(현재 검이 있고 시작 검이 아님). UI 게이팅용.
   canStore: () => boolean
   // 현재 검을 인벤토리에 보관하고 시작 검(검 +1)으로 되돌린다.
@@ -237,13 +234,6 @@ export function createGameStore(opts: CreateOpts = {}) {
         return price
       },
 
-      spendGold: (amount) => {
-        // 비정상 금액(음수·비유한)은 거부 — 방어. 0 은 허용(무료 지불 = 무변화 성공).
-        if (!Number.isFinite(amount) || amount < 0) return false
-        if (get().gold < amount) return false
-        set((state) => ({ gold: state.gold - amount }))
-        return true
-      },
 
       canStore: () => {
         const id = get().currentSwordId

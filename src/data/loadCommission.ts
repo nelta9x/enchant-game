@@ -2,7 +2,6 @@ import commissionRaw from '../../public/data/commission.json'
 import type {
   CommissionConfig,
   CommissionItemEntry,
-  RefreshWeight,
   ShopTier,
   TradeCost,
 } from './types'
@@ -95,7 +94,7 @@ function toTradeCost(c: ParsedCost): TradeCost {
     : { kind: 'item', itemId: c.itemId, count: c.requiredCount }
 }
 
-// 상점 티어 1단계 검증. 업그레이드 비용(upgradeCost) + 등장 아이템 목록 + 보상·갱신 범위를 검증한다.
+// 상점 티어 1단계 검증. 업그레이드 비용(upgradeCost) + 등장 아이템 목록 + 보상 범위를 검증한다.
 // idx 가 0(시작 티어)이면 upgradeCost 는 없어야 하고(null/누락), 그 외 티어는 반드시 있어야 한다.
 function parseTier(
   raw: unknown,
@@ -202,32 +201,11 @@ function parseTier(
     )
   }
 
-  // refreshWeights: 세션 갱신까지의 강화 시도 횟수 후보(가중 추첨). 비어있지 않은 배열.
-  // 각 항목 { value: 정수 >= 1, weight: 유한수 > 0 } — items[] 의 weight 검증 관례를 그대로 따른다.
-  const rawWeights = raw.refreshWeights
-  if (!Array.isArray(rawWeights) || rawWeights.length === 0)
-    fail(`${where}.refreshWeights must be a non-empty array`)
-  const refreshWeights: RefreshWeight[] = rawWeights.map((rw, i) => {
-    const rwWhere = `${where}.refreshWeights[${i}]`
-    if (!isRecord(rw)) fail(`${rwWhere} must be an object`)
-    const value = rw.value
-    if (typeof value !== 'number' || !Number.isFinite(value))
-      fail(`${rwWhere}.value must be a finite number`)
-    if (!Number.isInteger(value)) fail(`${rwWhere}.value must be an integer`)
-    if (value < 1) fail(`${rwWhere}.value must be >= 1`)
-    const weight = rw.weight
-    if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0)
-      fail(
-        `${rwWhere}.weight must be a finite number > 0 (got ${String(weight)})`,
-      )
-    return { value, weight }
-  })
-
-  return { upgradeCost, items, refreshWeights }
+  return { upgradeCost, items }
 }
 
 // 순수 검증기: 임의 입력(unknown)을 검증된 CommissionConfig 로 변환한다.
-// 글로벌 시스템 파라미터(maxCommissions=세션 크기 / unlockAtLevel / refreshCost) + 상점 티어 정의(tiers[])를 검증한다.
+// 글로벌 시스템 파라미터(maxCommissions=세션 크기 / unlockAtLevel / sessionAttempts) + 상점 티어 정의(tiers[])를 검증한다.
 // knownItemIds: 출제 가능 itemId 집합(판매 가능 검 ∪ 아이템 카탈로그) — 티어 itemId·업그레이드 비용 무결성 검증에 쓴다.
 export function parseCommissionConfig(
   raw: unknown,
@@ -241,9 +219,9 @@ export function parseCommissionConfig(
   // 제안 활성화 도달 레벨(maxLevelReached 기준). 정수 >= 0(0 = 처음부터 활성). 다른 글로벌 필드와 같이
   // 필수+검증으로 둔다 — 누락/오타가 조용히 0(항상 활성)으로 새지 않고 로드 시점에 즉시 실패하게.
   const unlockAtLevel = intAtLeast(raw, 'unlockAtLevel', 0)
-  // 제안 강제 갱신 1회 비용(골드). 정수 >= 0(0 = 무료). unlockAtLevel 과 동일하게 필수+검증으로 둬
-  // 누락/오타가 조용히 새지 않고 로드 시점에 즉시 실패하게 한다.
-  const refreshCost = intAtLeast(raw, 'refreshCost', 0)
+  // 세션 갱신 주기(한 세션이 버티는 강화 시도 횟수). 정수 >= 1 고정값 — 세그먼트 바의 총 칸 수.
+  // unlockAtLevel 과 동일하게 필수+검증으로 둬 누락/오타가 조용히 새지 않고 로드 시점에 즉시 실패하게 한다.
+  const sessionAttempts = intAtLeast(raw, 'sessionAttempts', 1)
 
   // tiers: 비어있지 않은 배열. 각 티어는 parseTier 로 검증(인덱스 0 = 시작 티어, 비용 없음 / 그 외 비용 필수).
   const rawTiers = raw.tiers
@@ -251,7 +229,7 @@ export function parseCommissionConfig(
     fail('tiers must be a non-empty array (starting tier = tiers[0])')
   const tiers = rawTiers.map((t, i) => parseTier(t, i, knownItemIds))
 
-  return { maxCommissions, unlockAtLevel, refreshCost, tiers }
+  return { maxCommissions, unlockAtLevel, sessionAttempts, tiers }
 }
 
 // 게임 시작 시 호출되는 로드 진입점. 번들된 데이터 파일을 검증해 CommissionConfig 로 만든다.

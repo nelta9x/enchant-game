@@ -21,7 +21,7 @@ const idsOf = (store: ReturnType<typeof createCommissionStore>): number[] =>
 
 // 셸(강화 시도 신호+데이터) 통합 테스트. 풀 basePrice 는 실제 데이터(DataManager)를 쓰되, 설정은 픽스처를
 // 주입해 production 값과 독립시킨다. 출제 풀은 상점 레벨(shopLevel)이 고르므로, 테스트는 upgradeShop 으로
-// 레벨을 올려 어느 티어가 뽑히는지 제어한다. 갱신 카운터는 결정적이도록 refreshWeights 를 단일 후보(value 3)로 둔다.
+// 레벨을 올려 어느 티어가 뽑히는지 제어한다. 갱신 주기(sessionAttempts)는 픽스처 고정값이다.
 beforeAll(() => {
   dataManager.load()
 })
@@ -50,7 +50,6 @@ function tier(
       additiveMin: 0,
       additiveMax: 0,
     })),
-    refreshWeights: [{ value: 3, weight: 1 }],
   }
 }
 
@@ -62,8 +61,8 @@ const CONFIG: CommissionConfig = {
   maxCommissions: 3,
   // unlockAtLevel:0 = 항상 활성(레거시 동작 유지). 잠금 게이트는 별도 describe 에서 nonzero 로 검증한다.
   unlockAtLevel: 0,
-  // 강제 갱신 비용 픽스처 — refreshNow describe 가 이 값을 기준으로 차감을 단언한다(하드코딩 회피).
-  refreshCost: 100_000,
+  // 세션 갱신 주기(고정) — 강화 시도 이만큼이면 세션이 새로 뜬다. 테스트는 이 값을 파생 단언한다.
+  sessionAttempts: 3,
   tiers: [
     tier(null, [
       { itemId: 'sword_3', weight: 1 },
@@ -137,12 +136,13 @@ describe('commissionStore — 제안 세션 모델', () => {
     store.getState().stop()
   })
 
-  it('제안 하나를 선택(fulfill)하면 세션 카드가 전부 사라지고(바만 남음) 카운터는 그대로다', () => {
+  it('제안 하나를 선택(fulfill)하면 세션이 즉시 새로 뜨고(새 ids) 갱신 주기가 회복된다', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     expect(store.getState().active).toHaveLength(3)
+    store.getState().notifyAttempt() // 주기 1 소비 — 구매가 회복시키는지 보기 위해
+    const before = idsOf(store)
     const target = store.getState().active[0]
-    const total = store.getState().attemptsTotal
     // 고른 제안의 납품 재료만 보유시킨다.
     useGameStore.setState({
       currentSwordId: null,
@@ -150,9 +150,10 @@ describe('commissionStore — 제안 세션 모델', () => {
       gold: 0,
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
-    expect(store.getState().active).toHaveLength(0) // 카드 전부 사라짐(바만 남음)
-    expect(store.getState().attemptsRemaining).toBe(total) // 납품은 카운터 불변
-    expect(store.getState().attemptsTotal).toBe(total)
+    expect(store.getState().active).toHaveLength(3) // 새 세션 한 번에
+    for (const id of idsOf(store)) expect(before).not.toContain(id) // 전부 새 카드
+    expect(store.getState().attemptsRemaining).toBe(CONFIG.sessionAttempts) // 주기 회복
+    expect(store.getState().attemptsTotal).toBe(CONFIG.sessionAttempts)
     store.getState().stop()
   })
 
@@ -273,7 +274,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     store.getState().stop()
   })
 
-  it('fulfill: 요구 검 보유 시 골드 지급 + 세션 카드 전부 제거', () => {
+  it('fulfill: 요구 검 보유 시 골드 지급 + 세션 교체', () => {
     const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
     store.getState().start()
     const target = store.getState().active[0]
@@ -284,7 +285,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     })
     expect(store.getState().fulfill(target.id)).toBe(true)
     expect(useGameStore.getState().gold).toBe(goldOf(target.reward))
-    expect(store.getState().active).toHaveLength(0) // 카드 전부 사라짐(바만 남음)
+    expect(store.getState().active.some((c) => c.id === target.id)).toBe(false) // 산 카드는 사라짐(새 세션)
     store.getState().stop()
   })
 
@@ -328,7 +329,7 @@ describe('commissionStore — 제안 세션 모델', () => {
   const BARTER: CommissionConfig = {
     maxCommissions: 1,
     unlockAtLevel: 0,
-    refreshCost: 100_000,
+    sessionAttempts: 3,
     tiers: [
       {
         upgradeCost: null,
@@ -342,7 +343,6 @@ describe('commissionStore — 제안 세션 모델', () => {
             rewardItemCount: 1,
           },
         ],
-        refreshWeights: [{ value: 3, weight: 1 }],
       },
     ],
   }
@@ -454,73 +454,6 @@ describe('commissionStore — 제안 활성화 잠금(unlockAtLevel)', () => {
     useGameStore.setState({ maxLevelReached: 10 })
     store.getState().notifyAttempt()
     expect(store.getState().active).toHaveLength(3)
-    store.getState().stop()
-  })
-})
-
-// 제안 강제 갱신(refreshNow) — 상단 갱신 버튼. refreshCost 골드를 내고 현재 세션을 즉시 새로 출제한다.
-// 골드 지불은 gameStore(spendGold)가 소유하고, 세션 교체는 여기가 소유한다(fulfill 과 동일한 두 store 트랜잭션).
-describe('commissionStore — 제안 강제 갱신(refreshNow)', () => {
-  const COST = CONFIG.refreshCost // 픽스처 비용 기준(파생 단언 — 하드코딩 회피)
-
-  it('충분한 골드면 비용을 차감하고 세션을 즉시 새로 출제한다(새 ids)', () => {
-    const startGold = 300_000
-    useGameStore.setState({ gold: startGold, maxLevelReached: 0 })
-    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
-    store.getState().start()
-    const before = idsOf(store)
-    expect(store.getState().refreshNow()).toBe(true)
-    expect(useGameStore.getState().gold).toBe(startGold - COST) // 비용만큼 차감
-    expect(store.getState().active).toHaveLength(3) // 새 세션 한 번에
-    for (const id of idsOf(store)) expect(before).not.toContain(id) // id 가 전부 새 값(세션 교체)
-    store.getState().stop()
-  })
-
-  it('갱신 카운터를 새로 뽑아 가득 채운다(시도 소비분이 초기화된다)', () => {
-    useGameStore.setState({ gold: 300_000, maxLevelReached: 0 })
-    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
-    store.getState().start()
-    store.getState().notifyAttempt() // 카운터 1 소비
-    expect(store.getState().attemptsRemaining).toBeLessThan(
-      store.getState().attemptsTotal,
-    )
-    expect(store.getState().refreshNow()).toBe(true)
-    expect(store.getState().attemptsRemaining).toBe(
-      store.getState().attemptsTotal,
-    ) // 가득 참
-    store.getState().stop()
-  })
-
-  it('골드가 부족하면 무변화(false): 차감·갱신하지 않는다', () => {
-    const poor = COST - 1
-    useGameStore.setState({ gold: poor, maxLevelReached: 0 })
-    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
-    store.getState().start()
-    const before = idsOf(store)
-    expect(store.getState().refreshNow()).toBe(false)
-    expect(useGameStore.getState().gold).toBe(poor) // 차감 없음
-    expect(idsOf(store)).toEqual(before) // 같은 세션
-    store.getState().stop()
-  })
-
-  it('정지(start 전) 상태에서는 갱신하지 않는다(false)', () => {
-    useGameStore.setState({ gold: 1_000_000, maxLevelReached: 0 })
-    const store = createCommissionStore({ rng: () => 0.5, config: CONFIG })
-    // start 호출 안 함 — 시작 래치가 꺼져 있어 무동작.
-    expect(store.getState().refreshNow()).toBe(false)
-    expect(useGameStore.getState().gold).toBe(1_000_000) // 차감 없음
-    store.getState().stop()
-  })
-
-  it('잠금 중(unlockAtLevel 미달)에는 골드가 있어도 갱신하지 않는다(잠금을 골드로 우회 불가)', () => {
-    const GATED_PAID: CommissionConfig = { ...CONFIG, unlockAtLevel: 10 }
-    useGameStore.setState({ gold: 1_000_000, maxLevelReached: 0 }) // 잠금(임계 10 미달)
-    const store = createCommissionStore({ rng: () => 0.5, config: GATED_PAID })
-    store.getState().start()
-    expect(store.getState().active).toHaveLength(0) // 잠금 — 세션 없음
-    expect(store.getState().refreshNow()).toBe(false)
-    expect(useGameStore.getState().gold).toBe(1_000_000) // 차감 없음(잠금 게이트가 지불 전에 막음)
-    expect(store.getState().active).toHaveLength(0)
     store.getState().stop()
   })
 })

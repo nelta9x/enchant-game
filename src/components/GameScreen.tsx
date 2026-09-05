@@ -14,6 +14,7 @@ import { useCommissionStore } from '../store/commissionStore'
 import type { Commission } from '../store/commissionQueue'
 import { useUiStore } from '../store/uiStore'
 import { CommissionBar } from './CommissionBar'
+import { ShopCard } from './ShopCard'
 import { destructionTargetOf } from './destruction'
 import { coinCount } from './coins'
 import { CoinFlight, COIN_FLIGHT_MS } from './CoinFlight'
@@ -514,12 +515,19 @@ export function GameScreen() {
             여기서 같은 61rem 밴드(mx-auto)로 묶어 언어토글·게이지·상점 줄이 인벤토리/강화 패널의 좌우 끝과
             정렬되게 한다. bg-stage(베이지)는 바깥 div 가 계속 full-width 로 깐다. 61rem 은 위 그리드 컬럼
             합과 동기화할 것 — 컬럼/갭을 바꾸면 이 값도 함께 고친다. <lg(세로형)은 그대로 full-width. */}
-        <div className="lg:mx-auto lg:w-full lg:max-w-[61rem]">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 lg:mx-auto lg:w-full lg:max-w-[61rem]">
           <TopControls />
+          {/* 상점 카드 — 오른쪽 열에서 상단 컨트롤 줄(예전 갱신 버튼 자리)부터 제안 카드 줄까지 두 줄을 차지한다.
+              그리드 stretch 로 두 줄 높이를 꽉 채운다(카드 안은 h-full). */}
+          <div className="row-span-2 flex">
+            <ShopCard />
+          </div>
+          {/* 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다.
+              상단 컨트롤과의 간격(mt-3)은 왼쪽 열 안에서만 — 오른쪽 상점 카드는 그 간격까지 덮는다. */}
+          <div className="mt-3 min-w-0">
+            <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={true} />
+          </div>
         </div>
-
-        {/* 상단 거래 제안 바 — 요구 검을 보유했을 때 클릭하면 검을 넘기고 보상(판매가+인센티브)을 받는다. */}
-        <CommissionBar onFulfill={handleFulfill} hotkeysEnabled={true} />
 
         {/* 좁은 화면(<lg)은 단일 컬럼 세로 스택, lg+ 는 3열 그리드 — 3열은 고정폭 검 스테이지(검 박스 240·
             이름 배너 320)가 들어갈 만큼 넓을 때만 쓴다. sm(640) 기준이면 640~1024 구간에서 가운데 트랙이

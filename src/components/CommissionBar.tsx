@@ -5,22 +5,16 @@ import { useI18nStore, useT } from '../i18n'
 import { itemDisplayName } from '../lib/items'
 import { formatAmount, formatGold } from '../lib/format'
 import { useCommissionHotkey } from '../hooks/useCommissionHotkey'
-import { sound } from '../lib/sound'
-import { nextUpgradeCost, useCommissionStore } from '../store/commissionStore'
+import { useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
 import type { Commission } from '../store/commissionQueue'
 import { ItemIcon } from './ItemIcon'
-import { SpriteCanvas } from './SpriteCanvas'
-import { uiSpriteUrl } from '../lib/sprites'
 
-// 상점 카드 아이콘 — 검·아이템과 같은 32px 도트 스프라이트(public/sprites/ui/shop.png)를 SpriteCanvas 로 그린다.
-// URL 조립은 sprites.ts 경계(uiSpriteUrl — UI_SPRITES 등록 이름)에서만. 모듈 평가 시 1회 해석(BASE_URL 은 빌드 상수).
-const SHOP_SPRITE_URL = uiSpriteUrl('shop')
-
-// 상단 의뢰 바. 현재 떠 있는 의뢰(active)를 최대 MAX_COMMISSIONS 슬롯으로 보여 주고, 줄 맨 오른쪽에
-// 상점 카드(ShopCard — 상점 레벨 + 업그레이드)를 둔다. 각 의뢰서: 아이템 아이콘 + 이름 + 보상가(판매가에
-// 인센티브가 붙은 금액). 요구 검을 보유했을 때만 클릭(납품) 가능하다. 빈 슬롯은 보이지 않는 동일 크기
-// placeholder 로 채워 바 높이를 안정시킨다.
+// 거래 제안 바. 현재 떠 있는 의뢰(active)를 최대 MAX_COMMISSIONS 슬롯으로 보여 준다(상점 카드 ShopCard 는
+// GameScreen 이 이 바의 오른쪽에 상단 컨트롤까지 두 줄 span 으로 따로 놓는다). 각 의뢰서: 아이템 아이콘 +
+// 이름 + 보상가(판매가에 인센티브가 붙은 금액). 요구 검을 보유했을 때만 클릭(납품) 가능하다. 빈 슬롯은
+// 보이지 않는 동일 크기 placeholder 로 채워 바 높이를 안정시킨다.
+// 폭·정렬(61rem 밴드)은 GameScreen 의 그리드가 소유한다 — 여기선 카드 행 + 세그먼트 바만 세로로 쌓는다.
 //
 // 완료(검 소모+보상)는 부모(GameScreen)가 onFulfill 콜백으로 처리한다. 두 번째 인자는 코인 연출의
 // 출발점(클릭한/슬롯의 카드 엘리먼트)이며 연출 전용·선택이다 — null 이어도 납품은 진행된다(키보드 경로 대비).
@@ -72,27 +66,23 @@ export const CommissionBar = memo(function CommissionBar({
   useCommissionHotkey({ enabled: hotkeysEnabled, onSlot })
 
   // 제안 기능이 잠긴 초반에도 바 영역을 통째로 숨기지 않는다 — 잠금 중 스토어가 active 를 비워 두므로
-  // (출제 안 함) 일반 렌더 경로가 전 슬롯 EmptySlot + idle 타이머 스페이서로 같은 높이의 빈 영역을 확보해,
+  // (출제 안 함) 일반 렌더 경로가 전 슬롯 EmptySlot + 세그먼트 스페이서로 같은 높이의 빈 영역을 확보해,
   // 해제 전후로 아래 UI 위치가 흔들리지 않게 한다(픽셀 단위로 동일한 footprint). 해제는 단조라 한 번뿐.
 
   // 세션 갱신 게이지: 세션이 갱신되기까지 남은 강화 시도 수를 카드 묶음 아래 세그먼트 바로 표현한다.
-  // 총 칸(attemptsTotal)은 세션 시작 시 뽑은 카운터, 켜진 칸(attemptsRemaining)은 남은 시도 수 —
-  // 강화 시도마다 한 칸씩 꺼지고 0 이 되는 순간 세션이 통째로 새로 뜬다. 세션이 없으면(잠금/전부 납품 후
-  // 빈 상태에서 total 0) 동일 높이 스페이서로 자리만 지킨다(SessionSegments 내부).
+  // 총 칸(attemptsTotal)은 세션 주기(sessionAttempts, 고정), 켜진 칸(attemptsRemaining)은 남은 시도 수 —
+  // 강화 시도마다 한 칸씩 꺼지고 0 이 되는 순간 세션이 통째로 새로 뜬다(거래 성사 시에도 즉시 새로 뜨고 가득 찬다).
+  // 세션이 없으면(잠금 중 total 0) 동일 높이 스페이서로 자리만 지킨다(SessionSegments 내부).
   // (세그먼트 바의 remaining/total 은 SessionSegments 가 직접 구독한다 — 강화마다 이 바 전체가 재조정되지 않게.)
 
   return (
     <div
-      className="mt-3 flex flex-col gap-1.5"
+      className="flex min-w-0 flex-col gap-1.5"
       role="region"
       aria-label={t('commission.title')}
     >
-      {/* 거래 제안 카드는 게임 레이아웃이 허용하는 폭을 모두 쓴다 — 상단바(TopControls)·메인 그리드와
-          동일한 61rem 밴드(lg+)를 mx-auto 로 가운데 정렬해 좌우 끝이 인벤토리/강화 패널과 맞물리게 한다.
-          <lg(세로형)에선 컨테이너 폭을 그대로 꽉 채운다. 세그먼트 바는 카드 행 아래에 같은 밴드 폭으로
-          이어 붙인다(flex-col). 61rem 은 그리드 컬럼 합(16+28+16 + gap)과 동기화할 것 — 컬럼/갭을 바꾸면
-          이 값도 함께 고친다. */}
-      <div className="mx-auto flex w-full flex-col gap-1.5 lg:max-w-[61rem]">
+      {/* 카드 행: 슬롯은 flex-1 로 남는 폭을 균등 분할한다. 세그먼트 바는 카드 행 아래에 같은 폭으로 이어 붙인다. */}
+      <div className="flex min-w-0 flex-col gap-1.5">
         <div ref={slotsRef} className="flex gap-2">
           {slots.map((c, i) =>
             c ? (
@@ -106,8 +96,6 @@ export const CommissionBar = memo(function CommissionBar({
               <EmptySlot key={`empty-${i}`} />
             ),
           )}
-          {/* 상점 카드는 제안 카드 줄의 맨 오른쪽 고정 슬롯 — 세션이 비어도(잠금/납품 후) 항상 자리를 지킨다. */}
-          <ShopCard />
         </div>
         {/* 세그먼트 바 슬롯은 세션이 없어도(잠금/빈) 항상 자식으로 두어 부모 flex-col gap-1.5 의 간격과
             바 높이를 항상 확보한다 — 세션이 떴다 사라질 때 아래 UI 가 흔들리지 않게. 비활성 구간(total 0)은
@@ -244,79 +232,6 @@ function CommissionCard({
   )
 }
 
-// 상점 카드 — 제안 카드 줄의 맨 오른쪽 고정 슬롯. 상점 아이콘 + 현재 상점 레벨(표시는 1 부터 — 내부
-// shopLevel 0 = Lv.1) + 다음 업그레이드 비용을 보여 주고, 클릭하면 비용을 내고 상점을 업그레이드한다
-// (commissionStore.upgradeShop — 세션이 새 티어 풀로 즉시 갱신돼 카드들이 교체된다). 비용은 거래 비용과 같은
-// 체계(골드 또는 아이템)라 표시도 카드의 지불 라인과 같은 어휘(코인+금액 / 아이템 아이콘 ×N)를 쓴다.
-// 게이팅은 카드와 같은 idiom: 업그레이드 가능(잠금 해제 + 비용 충당) 불리언 셀렉터만 구독해, 골드·가방이
-// 임계를 넘나들 때만 리렌더한다. 최고 레벨이면 '최고 등급'으로 비활성. 세로 컴팩트 배치(아이콘 / 레벨 / 비용)로
-// 제안 카드 3장 옆에서 폭을 적게 차지하고, 줄의 stretch 로 카드와 같은 높이가 된다.
-function ShopCard() {
-  const t = useT()
-  const lang = useI18nStore((s) => s.lang)
-  const config = dataManager.getCommissionConfig()
-  const shopLevel = useCommissionStore((s) => s.shopLevel)
-  const cost = nextUpgradeCost(config, shopLevel)
-  const canUpgrade = useGameStore(
-    (s) =>
-      cost !== null &&
-      s.maxLevelReached >= config.unlockAtLevel &&
-      s.canFulfill(cost),
-  )
-  const onUpgrade = useCallback(() => {
-    // 업그레이드 성공(재화 실제 차감) 시에만 '재화 빠지는' 효과음 — 갱신 버튼·판매·거래 성사와 같은 item_sold.
-    if (useCommissionStore.getState().upgradeShop()) sound.playSfx('item_sold')
-  }, [])
-  const levelLabel = `${t('commission.shop')} ${t('commission.shopLevel')}${shopLevel + 1}`
-  // 비용 문구(스크린리더) — 골드는 formatGold(로케일 단위), 아이템은 표시명 ×N. 최고 레벨이면 '최고 등급'.
-  const costLabel =
-    cost === null
-      ? t('commission.shopMax')
-      : cost.kind === 'gold'
-        ? formatGold(cost.amount, lang)
-        : `${itemDisplayName(cost.itemId, t)}${cost.count > 1 ? ` ×${cost.count}` : ''}`
-
-  return (
-    <button
-      type="button"
-      onClick={onUpgrade}
-      disabled={!canUpgrade}
-      aria-label={`${t('commission.shopUpgrade')} (${levelLabel}): ${costLabel}`}
-      // 업그레이드 가능하면 황금색 강조(테두리 + 글로우 — 제안 카드의 초록과 구분되는 '상점' 어휘), 불가하면 흐리게.
-      className={`relative flex w-[5.5rem] shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border px-2 py-2 text-center transition-opacity ${
-        canUpgrade
-          ? 'cursor-pointer border-gold bg-panel ring-1 ring-gold/60 shadow-[0_0_12px_-2px_var(--color-gold)] hover:opacity-90'
-          : 'cursor-not-allowed border-frame/40 bg-panel-soft opacity-60'
-      }`}
-    >
-      <SpriteCanvas url={SHOP_SPRITE_URL} className="h-8 w-8" />
-      <span className="flex items-baseline gap-0.5 text-[0.65rem] font-semibold leading-none text-on-dark">
-        {t('commission.shop')}
-        <span className="font-bold tabular-nums text-gold">
-          {t('commission.shopLevel')}
-          {shopLevel + 1}
-        </span>
-      </span>
-      {/* 비용 라인 — 카드의 지불 라인과 같은 어휘. 최고 레벨이면 텍스트만. */}
-      {cost === null ? (
-        <span className="text-[0.65rem] font-semibold leading-none text-on-dark-soft">
-          {t('commission.shopMax')}
-        </span>
-      ) : cost.kind === 'gold' ? (
-        <span className="flex items-center gap-0.5 text-[0.65rem] font-bold leading-none text-gold tabular-nums">
-          <CoinIcon className="h-3 w-3" />
-          {formatAmount(cost.amount)}
-        </span>
-      ) : (
-        <span className="flex items-center gap-0.5 text-[0.65rem] font-bold leading-none text-gold tabular-nums">
-          <ItemIcon itemId={cost.itemId} className="h-4 w-4" />
-          {cost.count > 1 && <span>×{cost.count}</span>}
-        </span>
-      )}
-    </button>
-  )
-}
-
 // 새 세션 도착 하이라이트 — 카드가 mount 될 때(세션 갱신으로 id 가 새로 바뀔 때) 카드 테두리가 짧게
 // 황금빛으로 빛났다 가라앉는다. 카드 자체는 즉시 보이고(깜빡임 없음), 이 오버레이만 opacity 가
 // 0.75→0 으로 한 번 페이드아웃해 "방금 새로 떴다"는 신호만 은은하게 준다. 납품으로 남은 카드는
@@ -354,7 +269,7 @@ function KeyHint({ slot, active }: { slot: number; active: boolean }) {
 // total(세션 시작 시 뽑은 카운터)만큼 칸을 그리고 앞 remaining 칸을 켠다 — 강화 시도마다 한 칸씩 꺼지고,
 // 마지막 칸이 꺼지는 시도에 세션이 통째로 새로 떠 total 칸이 다시 가득 찬다. 시간 애니메이션은 없다(정적
 // 켜짐/꺼짐, 전환은 CSS color/opacity). 슬롯은 레이아웃 안정을 위해 항상 마운트돼 있고, 세션이 없으면
-// (total 0 — 잠금/전부 납품 후) 보이지 않는 동일 높이 스페이서만 그린다. 마지막 한 칸만 남으면 임박
+// (total 0 — 잠금 중) 보이지 않는 동일 높이 스페이서만 그린다. 마지막 한 칸만 남으면 임박
 // 경고로 황금→적색(bg-danger), 그 외 켜진 칸은 황금(bg-gold), 꺼진 칸은 어두운 트랙.
 function SessionSegments() {
   // 남은 강화 시도(세션 게이지)는 강화마다 바뀐다 — 이 리프만 구독해 바(카드 3장)를 재조정하지 않는다.

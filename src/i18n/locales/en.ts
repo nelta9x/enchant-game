@@ -37,12 +37,10 @@ export const en: Record<TranslationKey, string> = {
   'commission.title': 'Trade Offers',
   'commission.fulfill': 'Accept',
   'commission.arrived': 'New trade offers!',
-  // 제안 강제 갱신 버튼(상단바)
-  'commission.refresh': 'Refresh Offers',
   // 상점 카드
-  'commission.shop': 'Shop',
+  'commission.shop': 'SHOP',
   'commission.shopUpgrade': 'Upgrade Shop',
-  'commission.shopLevel': 'Lv.',
+  'commission.shopLevel': 'LV.',
   'commission.shopMax': 'Max Level',
 
   // 강화 결과 토스트
