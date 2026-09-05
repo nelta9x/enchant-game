@@ -4,6 +4,7 @@
   "sessionAttempts": 3,
   "tiers": [
     {
+      "sprite": "shop_lv1.png",
       "items": [
         {
           "itemId": "iron_scrap",
@@ -38,6 +39,7 @@
         "costKind": "gold",
         "costAmount": 500000
       },
+      "sprite": "shop_lv2.png",
       "items": [
         {
           "itemId": "iron_scrap",
@@ -70,6 +72,7 @@
         "costKind": "gold",
         "costAmount": 2500000
       },
+      "sprite": "shop_lv3.png",
       "items": [
         {
           "itemId": "iron_scrap",
@@ -153,6 +156,7 @@
         "itemId": "dark_matter",
         "requiredCount": 5
       },
+      "sprite": "shop_lv4.png",
       "items": [
         {
           "itemId": "iron_scrap",

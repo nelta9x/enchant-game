@@ -8,7 +8,7 @@
 const SWORD_SPRITE_DIR = 'sprites/swords/'
 // 아이템 스프라이트(코인 등 비-검 자산)는 public/sprites/items/ 에 둔다.
 const ITEM_SPRITE_DIR = 'sprites/items/'
-// UI 전용 스프라이트(상점 카드 아이콘 등 아이템이 아닌 픽셀아트)는 public/sprites/ui/ 에 둔다.
+// UI 전용 스프라이트(상점 티어별 카드 아이콘 등 아이템이 아닌 픽셀아트)는 public/sprites/ui/ 에 둔다.
 const UI_SPRITE_DIR = 'sprites/ui/'
 // 폴백(없는/미로드 스프라이트) 기본 이미지는 public/sprites/ 루트에 둔다.
 const DEFAULT_SPRITE = 'sprites/default.png'
@@ -23,21 +23,16 @@ export function itemSpriteUrl(filename: string): string {
   return `${import.meta.env.BASE_URL}${ITEM_SPRITE_DIR}${filename}`
 }
 
-// UI 스프라이트 목록(이름 → 파일명). 여기 등록된 파일은 public/sprites/ui/ 에 실제로 있어야 한다
-// (sprites.test 가 존재를 검증 — 파일명 오타·누락으로 깨진 아이콘이 배포되지 않게).
-export const UI_SPRITES = {
-  shop: 'shop.png', // 상점 카드(CommissionBar ShopCard) 아이콘
-} as const
-export type UiSpriteName = keyof typeof UI_SPRITES
-
-// UI 스프라이트 상대 경로(public 기준) — 테스트의 파일 존재 검증과 URL 조립이 같은 경로를 쓴다.
-export function uiSpritePath(name: UiSpriteName): string {
-  return `${UI_SPRITE_DIR}${UI_SPRITES[name]}`
+// UI 스프라이트 상대 경로(public 기준, 예: 'shop_lv1.png' → 'sprites/ui/shop_lv1.png') — 테스트의 파일 존재
+// 검증(DataManager.test: 상점 티어 sprite)과 URL 조립이 같은 경로를 쓴다.
+export function uiSpritePath(filename: string): string {
+  return `${UI_SPRITE_DIR}${filename}`
 }
 
-// UI 스프라이트 URL. 아이템·검과 같은 SpriteCanvas 경로로 그리되 카탈로그와는 무관한 장식 자산.
-export function uiSpriteUrl(name: UiSpriteName): string {
-  return `${import.meta.env.BASE_URL}${uiSpritePath(name)}`
+// UI 스프라이트 URL(파일명은 데이터가 든다 — 상점 티어 ShopTier.sprite). 아이템·검과 같은 SpriteCanvas 경로로
+// 그리되 카탈로그와는 무관한 장식 자산.
+export function uiSpriteUrl(filename: string): string {
+  return `${import.meta.env.BASE_URL}${uiSpritePath(filename)}`
 }
 
 // 폴백 기본 스프라이트(default.png) URL. SpriteStore 가 없는/미로드 스프라이트 자리에 그린다.

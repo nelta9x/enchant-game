@@ -5,6 +5,7 @@ import { DataManager, dataManager } from './DataManager'
 import { loadSwords } from './loadSwords'
 import { ko } from '../i18n/locales/ko'
 import { isDisplayableItemId, itemSpriteName } from '../lib/items'
+import { uiSpritePath } from '../lib/sprites'
 
 describe('DataManager', () => {
   it('load() 호출 전 조회하면 에러를 던진다', () => {
@@ -123,6 +124,22 @@ describe('아이템 아이콘 ↔ 스프라이트 무결성', () => {
       expect(
         existsSync(resolve('public/sprites/items', file as string)),
         `'${id}' 스프라이트 파일이 없다: ${file}`,
+      ).toBe(true)
+    }
+  })
+})
+
+// 상점 카드 아이콘 무결성: 모든 상점 티어의 sprite 가 public/sprites/ui/ 에 실제 PNG 로 존재해야 한다
+// (파일명 오타·누락 → 빈 캔버스 방지). 티어 스프라이트는 카탈로그가 아니라 commission.json 이 든다.
+describe('상점 티어 아이콘 ↔ 스프라이트 무결성', () => {
+  it('모든 티어의 sprite 파일이 존재한다', () => {
+    dataManager.load()
+    const tiers = dataManager.getCommissionConfig().tiers
+    expect(tiers.length).toBeGreaterThan(0)
+    for (const tier of tiers) {
+      expect(
+        existsSync(resolve('public', uiSpritePath(tier.sprite))),
+        `tier sprite file missing: ${tier.sprite}`,
       ).toBe(true)
     }
   })

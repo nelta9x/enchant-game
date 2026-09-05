@@ -94,7 +94,7 @@ function toTradeCost(c: ParsedCost): TradeCost {
     : { kind: 'item', itemId: c.itemId, count: c.requiredCount }
 }
 
-// 상점 티어 1단계 검증. 업그레이드 비용(upgradeCost) + 등장 아이템 목록 + 보상 범위를 검증한다.
+// 상점 티어 1단계 검증. 업그레이드 비용(upgradeCost) + 카드 아이콘(sprite) + 등장 아이템 목록 + 보상 범위를 검증한다.
 // idx 가 0(시작 티어)이면 upgradeCost 는 없어야 하고(null/누락), 그 외 티어는 반드시 있어야 한다.
 function parseTier(
   raw: unknown,
@@ -201,7 +201,12 @@ function parseTier(
     )
   }
 
-  return { upgradeCost, items }
+  // 상점 카드 아이콘 파일명(비어있지 않은 문자열). 파일 존재는 로드 시점에 알 수 없으니(브라우저) 테스트가 검증한다.
+  const sprite = raw.sprite
+  if (typeof sprite !== 'string' || sprite.length === 0)
+    fail(`${where}.sprite must be a non-empty string (shop icon file name)`)
+
+  return { upgradeCost, sprite, items }
 }
 
 // 순수 검증기: 임의 입력(unknown)을 검증된 CommissionConfig 로 변환한다.

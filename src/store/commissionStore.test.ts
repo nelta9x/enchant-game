@@ -40,6 +40,7 @@ function tier(
 ): ShopTier {
   return {
     upgradeCost,
+    sprite: 'shop_lv1.png',
     // 아이템별 incentive 1.0·additive 0 고정 → reward = basePrice(결정적). 골드 보상·수량 1.
     items: items.map((it) => ({
       ...it,
@@ -333,6 +334,7 @@ describe('commissionStore — 제안 세션 모델', () => {
     tiers: [
       {
         upgradeCost: null,
+        sprite: 'shop_lv1.png',
         items: [
           {
             itemId: 'faded_fluorescent',

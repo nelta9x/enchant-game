@@ -31,6 +31,7 @@ function itemEntry(
 // 최소 유효 티어 헬퍼(시작 티어 — upgradeCost 없음). override 로 개별 필드만 바꿔 검증 경로를 테스트한다.
 function tier(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
+    sprite: 'shop_lv1.png',
     items: [itemEntry(), itemEntry({ itemId: 'iron_scrap', weight: 2 })],
     ...over,
   }
@@ -74,6 +75,7 @@ describe('parseCommissionConfig — 구조 검증', () => {
       tiers: [
         {
           upgradeCost: null,
+          sprite: 'shop_lv1.png',
           items: [
             { itemId: 'sword_3', weight: 3, ...itemFields },
             { itemId: 'iron_scrap', weight: 2, ...itemFields },
@@ -247,6 +249,12 @@ describe('parseCommissionConfig — 상점 티어·업그레이드 비용 검증
       itemId: 'sword_4',
       count: 1,
     })
+  })
+
+  it('sprite 가 누락/빈 문자열/비문자열이면 throw', () => {
+    expect(() => parse({ tiers: [tier({ sprite: undefined })] })).toThrow()
+    expect(() => parse({ tiers: [tier({ sprite: '' })] })).toThrow()
+    expect(() => parse({ tiers: [tier({ sprite: 3 })] })).toThrow()
   })
 
   it('시작 티어(tiers[0])에 upgradeCost 가 있으면 throw, null 은 허용', () => {

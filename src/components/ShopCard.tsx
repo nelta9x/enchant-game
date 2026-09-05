@@ -11,10 +11,6 @@ import { Coin } from './Coin'
 import { ItemIcon } from './ItemIcon'
 import { SpriteCanvas } from './SpriteCanvas'
 
-// 상점 카드 아이콘 — 검·아이템과 같은 32px 도트 스프라이트(public/sprites/ui/shop.png)를 SpriteCanvas 로 그린다.
-// URL 조립은 sprites.ts 경계(uiSpriteUrl — UI_SPRITES 등록 이름)에서만. 모듈 평가 시 1회 해석(BASE_URL 은 빌드 상수).
-const SHOP_SPRITE_URL = uiSpriteUrl('shop')
-
 // 상점 카드 — 상단 컨트롤(언어 토글·최고 기록 게이지)과 거래 제안 카드 줄의 오른쪽에 두 줄 높이로 서는 세로
 // 패널(GameScreen 그리드의 row-span-2 — 예전 갱신 버튼 자리부터 제안 카드 밑단까지). 상점 아이콘 + 현재 상점
 // 레벨(표시는 1 부터 — 내부 shopLevel 0 = Lv.1) + 다음 업그레이드 비용을 보여 주고, 클릭하면 비용을 내고 상점을
@@ -29,6 +25,10 @@ export const ShopCard = memo(function ShopCard() {
   const config = dataManager.getCommissionConfig()
   const shopLevel = useCommissionStore((s) => s.shopLevel)
   const cost = nextUpgradeCost(config, shopLevel)
+  // 상점 카드 아이콘 — 현재 티어의 32px 도트 스프라이트(ShopTier.sprite, public/sprites/ui/)를 SpriteCanvas 로 그린다.
+  // 레벨이 오르면 URL 이 바뀌어 같은 캔버스에 새 스프라이트가 블릿된다. 범위 밖(방어)이면 마지막 티어.
+  const tier = config.tiers[shopLevel] ?? config.tiers[config.tiers.length - 1]
+  const spriteUrl = uiSpriteUrl(tier.sprite)
   const canUpgrade = useGameStore(
     (s) =>
       cost !== null &&
@@ -65,7 +65,7 @@ export const ShopCard = memo(function ShopCard() {
       <span className="text-[0.7rem] font-bold uppercase leading-none tracking-widest text-on-dark">
         {t('commission.shop')}
       </span>
-      <SpriteCanvas url={SHOP_SPRITE_URL} className="h-12 w-12" />
+      <SpriteCanvas url={spriteUrl} className="h-12 w-12" />
       <span className="text-[0.7rem] font-bold uppercase leading-none tabular-nums tracking-wide text-gold">
         {t('commission.shopLevel')}
         {shopLevel + 1}

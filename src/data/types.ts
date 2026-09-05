@@ -131,10 +131,13 @@ export type TradeCost = Exclude<Material, { kind: 'free' }>
 //  - upgradeCost: 이 티어로 올리는 데 드는 비용(골드 또는 아이템 — 거래 비용과 같은 체계). tiers[0] 은
 //    시작 티어라 null 이고, 그 외 티어는 반드시 비용이 있다(로더 강제). 상점 카드가 다음 티어의 이 값을
 //    표시하고, 지불하면 레벨이 1 오르며 세션이 새 티어 풀로 즉시 무료 갱신된다(commissionStore.upgradeShop).
+//  - sprite: 이 티어의 상점 카드 아이콘 파일명(public/sprites/ui/ 기준, 예: 'shop_lv1.png'). 레벨이 오르면 카드
+//    아이콘이 이 스프라이트로 바뀐다. 파일 존재는 테스트(DataManager.test)가 검증한다.
 //  - items: 이 티어에서 출제될 아이템 목록(itemId + weight + 아이템별 incentive/additive). 비어있지 않음
 //    (세션 갱신 주기는 티어별이 아니라 글로벌 sessionAttempts 하나로 고정한다.)
 export type ShopTier = {
   upgradeCost: TradeCost | null
+  sprite: string
   items: CommissionItemEntry[]
 }
 

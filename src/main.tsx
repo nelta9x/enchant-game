@@ -6,7 +6,7 @@ import { dataManager } from './data/DataManager'
 import { INITIAL_SWORD_ID, useGameStore } from './store/gameStore'
 import { spriteStore } from './lib/spriteStore'
 import { assertAudioAssets, sound } from './lib/sound'
-import { swordSpriteUrl, itemSpriteUrl, uiSpriteUrl, UI_SPRITES } from './lib/sprites'
+import { swordSpriteUrl, itemSpriteUrl, uiSpriteUrl } from './lib/sprites'
 import { itemSpriteName, PROTECTION_TICKET_ID } from './lib/items'
 
 // 게임 부팅 — 데이터 적재(동기) → 폴백·시작검 스프라이트 GPU 풀링(await) → 첫 렌더 → 나머지 검 백그라운드 로드.
@@ -42,8 +42,8 @@ async function boot() {
       .getItems()
       .flatMap((i) => (i.sprite ? [itemSpriteUrl(i.sprite)] : [])),
     ...(ticketSprite ? [itemSpriteUrl(ticketSprite)] : []),
-    // UI 스프라이트(상점 카드 아이콘 등)도 같은 풀 — 등록 목록 전부를 백그라운드 적재한다.
-    ...(Object.keys(UI_SPRITES) as (keyof typeof UI_SPRITES)[]).map(uiSpriteUrl),
+    // 상점 티어별 카드 아이콘(UI 스프라이트)도 같은 풀 — 전 티어를 백그라운드 적재한다.
+    ...dataManager.getCommissionConfig().tiers.map((t) => uiSpriteUrl(t.sprite)),
   ])
 
   createRoot(document.getElementById('root')!).render(
