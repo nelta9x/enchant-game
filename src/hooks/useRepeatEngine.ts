@@ -5,13 +5,15 @@ import { useEffect, useRef, useState } from 'react'
 // 두 입력원의 박자가 따로 놀면(상수·게이트가 한쪽만 바뀌면) 같은 "꾹 누름"이 입력 장치에 따라
 // 다르게 흐르므로, 입력원별 훅은 이벤트 배선만 하고 발사 정책은 전부 여기가 소유한다.
 //
-//  - 발사 게이트: disabled(강화 불가/쿨다운)면 쏘지 않고, 직전 발사 후 최소 REPEAT_MIN_GAP_MS 가
-//    지나야 다음 발사. min-gap 은 '이중 발사 방지턱'이다 — 쿨다운(lockCount) 상태의 React 커밋이
-//    폴링보다 늦게 반영돼도 그 사이에 두 번 쏘지 않는다. 실제 박자는 강화 잠금(연출 타임라인의
-//    lockMs = 버스트 + 재강화 가드, 매회 떨림 길이에 따라 다름)이 정한다 — min-gap < 잠금이라 잠금이 binding.
-//  - disabled 로 게이트를 통과하지 못하면 lastFireAt 을 건드리지 않아(쿨다운 중 헛발사로 박자가
-//    밀리지 않게) 잠금이 그대로 cadence 가 된다.
-//  - disabled/onFire 는 매 렌더 최신값을 ref 로 읽어, 잠금 토글마다 엔진을 재생성하지 않는다.
+//  - 발사 게이트: isDisabled()(강화 불가/쿨다운)면 쏘지 않고, 직전 발사 후 최소 REPEAT_MIN_GAP_MS 가
+//    지나야 다음 발사. min-gap 은 '이중 발사 방지턱'이다 — 쿨다운(lockCount) 상태 반영이 폴링보다 늦어도
+//    그 사이에 두 번 쏘지 않는다. 실제 박자는 강화 잠금(연출 타임라인의 lockMs = 버스트 + 재강화 가드,
+//    매회 떨림 길이에 따라 다름)이 정한다 — min-gap < 잠금이라 잠금이 binding.
+//  - 게이트는 "함수"로 받는다(isDisabled): 잠금(lockCount)은 React 커밋을 거치지 않고 store 를 직접 읽어
+//    판정하므로, 잠금 토글이 상위 화면을 리렌더하지 않아도 폴링이 정확한 최신값을 본다.
+//  - 게이트를 통과하지 못하면 lastFireAt 을 건드리지 않아(쿨다운 중 헛발사로 박자가 밀리지 않게)
+//    잠금이 그대로 cadence 가 된다.
+//  - isDisabled/onFire 는 매 렌더 최신 클로저를 ref 로 읽어, 엔진을 재생성하지 않는다.
 //  - 언마운트 시 연사 타이머를 정리한다(누른 채 화면이 사라져도 폭주하지 않게).
 
 // 누름 반복 폴링 주기(ms) — 잠금이 풀리는 즉시 다음 발사를 잡아낼 만큼 촘촘하게(실제 박자는 강화 잠금이 정함).
@@ -21,7 +23,7 @@ const REPEAT_POLL_MS = 50
 const REPEAT_MIN_GAP_MS = 350
 
 type UseRepeatEngineOptions = {
-  disabled: boolean
+  isDisabled: () => boolean
   onFire: () => void
 }
 
@@ -35,13 +37,13 @@ export type RepeatEngine = {
 }
 
 export function useRepeatEngine({
-  disabled,
+  isDisabled,
   onFire,
 }: UseRepeatEngineOptions): RepeatEngine {
-  // 발사 시점에 최신 disabled/onFire 를 읽는다(렌더 후 effect 로 갱신 — 엔진 재생성 불필요).
-  const stateRef = useRef({ disabled, onFire })
+  // 발사 시점에 최신 게이트/onFire 를 읽는다(렌더 후 effect 로 갱신 — 엔진 재생성 불필요).
+  const stateRef = useRef({ isDisabled, onFire })
   useEffect(() => {
-    stateRef.current = { disabled, onFire }
+    stateRef.current = { isDisabled, onFire }
   })
 
   // 엔진은 첫 렌더에 1회 생성(클로저에 타이머·박자 상태) — lazy useState 라 정체성이 안정적이어서
@@ -51,7 +53,7 @@ export function useRepeatEngine({
     let lastFireAt = -Infinity // 직전 발사 시각(performance.now). min-gap 판정용.
 
     const fireOnce = () => {
-      if (stateRef.current.disabled) return
+      if (stateRef.current.isDisabled()) return
       const now = performance.now()
       if (now - lastFireAt < REPEAT_MIN_GAP_MS) return
       lastFireAt = now

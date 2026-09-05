@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { motion, useAnimationControls } from 'motion/react'
+import { useEffect, useRef } from 'react'
+import { playFx } from '../lib/fx'
 import { useT } from '../i18n'
 import { PROTECTION_TICKET_ID } from '../lib/items'
 import { type ProtectionState } from './protection'
@@ -33,27 +33,28 @@ export function ProtectionWard({
   const t = useT()
 
   // 실드-블록 플레어 — blockKey 가 바뀔 때마다 흰빛 결계 링이 한 번 확 퍼졌다 사라진다(망치 임팩트에 맞춰).
-  const flare = useAnimationControls()
+  const flareRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (blockKey > 0) {
-      flare.start({
-        scale: [0.55, 1.5],
-        opacity: [0.85, 0],
-        transition: { delay: flareDelaySec, duration: 0.5, ease: 'easeOut' },
+      playFx(flareRef.current, {
+        channels: { scale: [0.55, 1.5], opacity: [0.85, 0] },
+        durationSec: 0.5,
+        delaySec: flareDelaySec,
+        ease: 'easeOut',
       })
     }
     // flareDelaySec 은 트리거(blockKey)가 바뀔 때의 최신값을 쓰면 충분하다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockKey, flare])
+  }, [blockKey])
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-visible">
       {/* 흰빛 실드-블록 플레어(파괴보호장치 발동 순간) — 검 중심에서 흰 링이 퍼진다. */}
-      <motion.div
+      <div
+        ref={flareRef}
         aria-hidden
         className="fx-layer absolute inset-4 rounded-full border-2 border-white"
         style={{ opacity: 0 }}
-        animate={flare}
       />
 
       {/* 보호 결계 서클 — 검 좌상단(마력의 근원). 검 캔버스와 닿지 않게 바깥(코너)으로 띄운다.

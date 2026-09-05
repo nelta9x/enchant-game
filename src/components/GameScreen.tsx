@@ -67,21 +67,14 @@ function FlightAnchor({
 // 결과 문구는 화면에 보이지 않는 sr-only 라이브 리전으로 음성 전달한다.
 export function GameScreen() {
   const t = useT()
-  // 골드도 구독한다(값은 쓰지 않고 void — 아래) — 보유 골드가 비용 경계를 넘는 순간 강화 버튼 게이팅
-  // (canEnhance)이 갱신되도록 재렌더만 유발한다(CommissionBar 와 동일 idiom). 골드 '값' 표시는 GoldDisplay
-  // 가 store 를 직접 구독하므로, GameScreen 이 골드에 재렌더돼도 InventoryPanel(gold prop 제거)·CenterStage·
-  // CardOverlays 는 memo 로 bail 한다 — 골드 차감만으로 무거운 트리가 재조정되지 않는다.
-  const gold = useGameStore((s) => s.gold)
-  void gold
+  // GameScreen 은 "탭 커밋"에 필요한 최소만 구독한다: 현재 검·강화/판매/보관 가능 불리언·보호권 수. 골드·가방 원본,
+  // 잠금(lockCount), 결과 공개(heldSwordId)는 각 리프(GoldDisplay·InventoryPanel·EnhanceButton·CenterStage·
+  // CommissionCard)가 직접 구독한다 — 강화 1회에 이 트리가 커밋되는 횟수를 탭 1번으로 줄이기 위해.
   const currentSwordId = useGameStore((s) => s.currentSwordId)
-  const items = useGameStore((s) => s.items)
   const enhance = useGameStore((s) => s.enhance)
-  const canEnhanceFn = useGameStore((s) => s.canEnhance)
   const sell = useGameStore((s) => s.sell)
-  const canSellFn = useGameStore((s) => s.canSell)
   const store = useGameStore((s) => s.store)
   const equip = useGameStore((s) => s.equip)
-  const canStoreFn = useGameStore((s) => s.canStore)
   // (collectDrop·flushDrops 는 CardOverlays 가 직접 구독한다 — 드롭 연출이 그쪽으로 이관됐다.)
 
   const protectionArmed = useUiStore((s) => s.protectionArmed)
@@ -93,7 +86,6 @@ export function GameScreen() {
   // 버스트·드롭·비행 등 다수)가 GameScreen 을 커밋시키지 않고, GameScreen 의 gold·lockCount·items 커밋도
   // 무거운 연출 서브트리를 재조정하지 않는다("검 변경 리렌더 폭풍"의 양방향 결합을 끊는다).
   const enqueueEffect = useEffectStore((s) => s.enqueueEffect)
-  const lockCount = useEffectStore((s) => s.lockCount)
 
   const sword =
     currentSwordId !== null
@@ -120,7 +112,7 @@ export function GameScreen() {
 
   // 보호 결계 상태(보호불가/부족/대기/발동) — 흩어진 조건 대신 순수 코어 한 곳에서 계산한다.
   // 검이 없으면 'disabled'(이 단계 보호 불가)로 본다. 실제 강화 적용 여부는 armed 일 때만.
-  const ownedTickets = countOf(items, PROTECTION_TICKET_ID)
+  const ownedTickets = useGameStore((s) => countOf(s.items, PROTECTION_TICKET_ID))
   const protection = useMemo(
     () =>
       protectionState(
@@ -133,16 +125,16 @@ export function GameScreen() {
   const effectiveProtection = isProtectionActive(protection)
   // 강화 가능 여부는 store 의 현재 골드·아이템·검으로 판정한다(canEnhanceFn 이 내부에서 읽음). 위 gold/items
   // 구독이 그 변화에 GameScreen 을 재렌더해 이 값을 최신으로 재계산한다 → 버튼 게이팅 갱신.
-  const canEnhance = canEnhanceFn(effectiveProtection)
-  const canSell = canSellFn()
-  const canStore = canStoreFn()
+  // 불리언 셀렉터 — 골드·가방·검이 바뀌어도 판정 결과가 같으면 리렌더되지 않는다(store 가 최신 상태로 판정).
+  const canEnhance = useGameStore((s) => s.canEnhance(effectiveProtection))
+  const canSell = useGameStore((s) => s.canSell())
+  const canStore = useGameStore((s) => s.canStore())
 
   // 강화 쿨다운(연출 잠금) 중인지 — 강화 직후 타임라인 lockMs(= 떨림 끝 + 재강화 가드) 동안 lockCount>0 이다.
-  const enhanceLocked = lockCount > 0
+  const isEnhanceLocked = () => useEffectStore.getState().lockCount > 0
   // 스페이스 단축키 게이트 — 꾹 누름 연사 박자가 이 잠금에 묶여 있으므로(useEnhanceHotkey) 잠금을 포함해 둔다.
   // 버튼은 잠금 동안 '비활성(흐림)'이 아니라 쿨다운 오버레이로 표현하므로, 아래에서 disabled={!canEnhance} 로
   // 따로 게이팅한다(클릭은 handleEnhance 의 잠금 가드가 막는다).
-  const enhanceDisabled = !canEnhance || enhanceLocked
 
   // 게임 클리어(승리) — 최종 검(다음 단계 없음)에 도달하면 축하 모달을 띄운다. reveal 시점에 resultStore
   // 가 켠다(가격강조·이름공개와 같은 박자) → 여기선 좁혀 구독해 모달만 띄운다.
@@ -209,9 +201,6 @@ export function GameScreen() {
   // 전이가 GameScreen 의 gold·lockCount 커밋과 얽혀 무거운 트리를 재조정하던 결합을 끊는다. 여기선 인벤토리
   // 장착행에 쓸 revealedSword 만 좁혀 구독해 파생한다(검 스테이지는 CenterStage 가 직접 resultStore 구독).
   // heldSwordId 가 있으면(강화 직후 떨림 동안) 강화 전 검을, null 이면 현재(결과) 검을 이름·스탯에 보인다.
-  const heldSwordId = useResultStore((s) => s.heldSwordId)
-  const revealedSword =
-    heldSwordId !== null ? dataManager.getSwordById(heldSwordId) : sword
 
   // originEl 은 코인 비행의 "출발점"(연출 전용·선택)이다 — 납품(검 소모·보상·생명주기)은 store 가 소유하며
   // 엘리먼트 유무와 무관하게 진행된다. 연출 엘리먼트에 게임 액션을 묶지 않는다(키보드 납품이 막히던 버그의 근본 차단).
@@ -296,7 +285,7 @@ export function GameScreen() {
     // 쿨다운(재강화 가드) 중 들어온 강화는 무시한다 — 버튼이 더 이상 disabled 가 아니라(클릭/Enter 가능)
     // 쿨다운 오버레이만 덮으므로, 이 가드로 '쿨다운 중 단발 입력'을 no-op 으로 만든다(요구사항: 재강화는
     // UI 가드만으로 막는다 — 게임 로직은 불변). hold 연사는 useHoldRepeat 가 동일 게이팅.
-    if (enhanceLocked) return
+    if (isEnhanceLocked()) return
     // 강화 전(현재) 검 — store 는 enhance() 에서 즉시 검을 교체하지만, currentSwordId 는 이번 렌더의
     // 스냅샷이라 이 핸들러 안에선 강화 전 값을 유지한다. 결과 공개 전까지 이름·스탯에 보여 줄 검이다.
     const prevSwordId = currentSwordId
@@ -491,7 +480,7 @@ export function GameScreen() {
   // 데스크탑에서 스페이스바 = 강화(강화 버튼과 동일한 게이트를 따른다).
   useEnhanceHotkey({
     enabled: true,
-    disabled: enhanceDisabled,
+    isDisabled: () => !canEnhance || isEnhanceLocked(),
     onEnhance: handleEnhance,
   })
 
@@ -547,13 +536,9 @@ export function GameScreen() {
             <div ref={inventoryRef}>
               <InventoryPanel
                 // 장착행도 무대 이름과 같은 박자로 공개한다(강화 결과가 망치 전에 새지 않도록).
-                sword={revealedSword}
-                level={revealedSword?.level ?? null}
-                items={items}
                 onEquip={handleEquip}
                 // 장착 행을 클릭하면 보관(별도 보관 버튼 제거 — 보관 트리거를 인벤토리로 옮김).
                 onStoreEquipped={handleStore}
-                canStoreEquipped={canStore}
                 goldPulseKey={goldPulse.key}
                 goldCoinCount={goldPulse.count}
                 goldRef={goldRef}
@@ -584,7 +569,6 @@ export function GameScreen() {
             <div className="flex w-full flex-col items-center gap-2 lg:grid lg:h-[20.1875rem] lg:grid-rows-[2fr_1fr] lg:items-stretch">
               <EnhanceButton
                 disabled={!canEnhance}
-                charging={enhanceLocked}
                 // 충전 오버레이는 직전 강화의 재강화 잠금 길이(매회 떨림에 따라 다름)로 걷힌다.
                 chargeMs={lastLockMs}
                 onEnhance={handleEnhance}

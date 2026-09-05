@@ -1,7 +1,7 @@
-import { motion } from 'motion/react'
 import { memo, type ReactNode, useState } from 'react'
 import type { ItemCost, Material } from '../data/types'
 import { useHoldRepeat } from '../hooks/useHoldRepeat'
+import { useEffectStore } from '../store/effectStore'
 import { useI18nStore, useT } from '../i18n'
 import { formatAmount, formatGold } from '../lib/format'
 import { itemDisplayName } from '../lib/items'
@@ -38,11 +38,10 @@ const RECHARGE_DIM =
 //  - 진짜 비활성(검 없음/비용 부족/최종): 흐리게(opacity-40 saturate-50) — 아예 누를 수 없음을 명확히.
 // aria-keyshortcuts="Space"로 데스크탑 단축키를 알린다(ARIA 키 토큰이라 로케일 무관 — i18n 대상 아님.
 // 실제 처리는 useEnhanceHotkey).
-//  - charging: 강화 쿨다운(입력 잠금) 중인지. 리차지 오버레이 표시·차오름 타이밍에 쓴다.
+//  - 쿨다운(charging)은 효과 store 의 lockCount 를 버튼이 직접 구독한다(prop 아님).
 //  - chargeMs: 쿨다운 길이(= 직전 강화의 타임라인 lockMs = 떨림 끝 + 재강화 가드). 리차지가 끝까지 차오르는 시간 기준.
 type EnhanceButtonProps = {
   disabled: boolean
-  charging: boolean
   chargeMs: number
   onEnhance: () => void
   enchantCost: Material | null
@@ -51,7 +50,6 @@ type EnhanceButtonProps = {
 
 export const EnhanceButton = memo(function EnhanceButton({
   disabled,
-  charging,
   chargeMs,
   onEnhance,
   enchantCost,
@@ -59,6 +57,9 @@ export const EnhanceButton = memo(function EnhanceButton({
 }: EnhanceButtonProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
+  // 쿨다운(입력 잠금) — 효과 store 의 lockCount 를 이 리프만 구독한다. 잠금 해제 전이가 상위 화면(GameScreen)을
+  // 커밋시키지 않고 버튼 하나만 다시 그린다(잠금 시작은 강화 탭 커밋에 이미 포함).
+  const charging = useEffectStore((s) => s.lockCount > 0)
 
   // 강화 가능 상태 = 강화 가능(검·비용 OK) && 쿨다운 아님. 평소 활성 연출(금색 글로우·펄스)의 기준.
   const ready = !disabled && !charging
@@ -66,8 +67,9 @@ export const EnhanceButton = memo(function EnhanceButton({
   // 마우스로 꾹 누르면 강화 → 쿨다운 → 강화 … 가 이어지도록 press-and-hold 연사(스페이스 단축키와 같은 박자).
   // 발사 게이트 disabled = !ready(불가·쿨다운). 터치/펜은 탭=1회, 키보드 Enter 는 합성 click 으로 1회
   // (스페이스는 전역 단축키 useEnhanceHotkey 가 전담). onEnhance 의 잠금 가드가 쿨다운 중 발사를 무효화한다.
+  // 발사 게이트는 함수 — 잠금은 store 를 직접 읽어(커밋 무관) 폴링이 항상 최신 잠금을 본다.
   const hold = useHoldRepeat<HTMLButtonElement>({
-    disabled: !ready,
+    isDisabled: () => disabled || useEffectStore.getState().lockCount > 0,
     onFire: onEnhance,
   })
 
@@ -131,18 +133,17 @@ export const EnhanceButton = memo(function EnhanceButton({
   }
 
   return (
-    <motion.button
+    <button
       type="button"
       onPointerDown={hold.onPointerDown}
       onClick={hold.onClick}
       disabled={disabled}
       aria-keyshortcuts="Space"
       aria-disabled={charging || undefined}
-      whileTap={{ scale: 0.95 }}
       style={{ background: BANNER_BG }}
       // touch-none: 이 버튼에서 시작한 터치를 스크롤·줌 제스처로 넘기지 않는다 — 모바일 press-and-hold
       // 연사(useHoldRepeat)가 pointercancel 로 끊기지 않게 한다(페이지는 한 화면 맞춤이라 스크롤 손실 없음).
-      className={`fx-layer relative flex w-full touch-none flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 px-3 py-5 transition-opacity ${
+      className={`fx-layer relative flex w-full touch-none flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 px-3 py-5 transition-[opacity,transform] duration-100 active:scale-95 ${
         ready
           ? 'cursor-pointer border-frame shadow-[0_0_28px_-4px_var(--color-gold)]' // 가능 — 금색 글로우 + 펄스
           : charging
@@ -182,6 +183,6 @@ export const EnhanceButton = memo(function EnhanceButton({
           }}
         />
       </span>
-    </motion.button>
+    </button>
   )
 })

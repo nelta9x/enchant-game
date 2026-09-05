@@ -6,13 +6,13 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
-import { motion, useAnimationControls } from 'motion/react'
 import { useI18nStore, useT } from '../i18n'
 import type { SwordData } from '../data/types'
 import { formatAmount, formatGold } from '../lib/format'
 import { SpriteCanvasBinding } from '../lib/spriteStore'
 import { swordSpriteUrl } from '../lib/sprites'
-import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
+import { playFx } from '../lib/fx'
+import { shakeFx } from './shake'
 import { ProtectionWard, type ProtectionWardProps } from './ProtectionWard'
 import { SuccessRateSigil } from './SuccessRateSigil'
 import { HammerStation } from './HammerStation'
@@ -81,33 +81,33 @@ export const SwordStage = memo(function SwordStage({
   const armed = protection.state.kind === 'armed'
 
   // 떨림은 remount 없이 명령형으로 제어한다 — key 를 바꿔 재마운트하면 등장 애니메이션이 다시
-  // 재생돼 검이 "재생성"되는 인상을 준다. shakeKey 가 바뀔 때마다 한 번 떤다(초기 0 은 무시).
-  const shakeControls = useAnimationControls()
+  // 재생돼 검이 "재생성"되는 인상을 준다. shakeKey 가 바뀔 때마다 한 번 떤다(초기 0 은 무시). 재생은 WAAPI(lib/fx)
+  // — transform 만 움직여 컴포지터가 단독으로 돈다(떨리는 동안 메인 스레드 비용 0).
+  const shakeRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    // shakeDurationSec 0 이하면 그 결과는 떨림 없음 → start 를 건너뛴다(검은 원점에 머문다).
+    // shakeDurationSec 0 이하면 그 결과는 떨림 없음 → 재생을 건너뛴다(검은 원점에 머문다).
     if (shakeKey > 0 && shakeDurationSec > 0) {
       // 망치가 닿는 순간(shakeImpactSec)부터 검 데이터의 떨림 시간(shakeDurationSec)만큼 떤다 — 성공/파괴
-      // 잔상의 떨림과 동일한 박자(makeShakeTransition). 윈드업 동안은 delay 로 가만히 있는다.
-      shakeControls.start({
-        ...SHAKE_KEYFRAMES,
-        transition: makeShakeTransition(shakeDurationSec, shakeImpactSec),
-      })
+      // 잔상의 떨림과 동일한 박자(shakeFx). 윈드업 동안은 delay 로 가만히 있는다.
+      playFx(shakeRef.current, shakeFx(shakeDurationSec, shakeImpactSec))
     }
     // shakeImpactSec/shakeDurationSec 은 트리거(shakeKey)가 바뀔 때의 최신값을 쓰면 충분하다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shakeKey, shakeControls])
+  }, [shakeKey])
 
   // 판매가 강조(pop) — 강화 성공으로 가격이 오를 때 pricePopKey 가 바뀌며 한 번 "커졌다 원래대로" 튄다
-  // (shakeControls 와 동일 idiom — RecordGauge 의 통 튀는 연출 미러). 첫 마운트(0)엔 조용.
-  const priceControls = useAnimationControls()
+  // (떨림과 동일 idiom — RecordGauge 의 통 튀는 연출 미러). 첫 마운트(0)엔 조용.
+  const priceRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (pricePopKey > 0) {
-      priceControls.start({
-        scale: [1, 1.35, 1], // 원래 크기 → 커졌다가 → 원래 크기
-        transition: { duration: 0.4, ease: 'easeOut', times: [0, 0.45, 1] },
+      playFx(priceRef.current, {
+        channels: { scale: [1, 1.35, 1] }, // 원래 크기 → 커졌다가 → 원래 크기
+        durationSec: 0.4,
+        times: [0, 0.45, 1],
+        ease: 'easeOut',
       })
     }
-  }, [pricePopKey, priceControls])
+  }, [pricePopKey])
 
   // ── 검 스프라이트 표시(canvas) ───────────────────────────────────────────────────
   // <img> 대신 <canvas>로 SpriteStore 의 GPU 상주 ImageBitmap 을 그린다 — 강화 교체 프레임이 디코드·
@@ -118,7 +118,7 @@ export const SwordStage = memo(function SwordStage({
   // 강제 레이아웃이 끼지 않는다.
   const spriteCanvasRef = useRef<HTMLCanvasElement>(null)
   const bindingRef = useRef<SpriteCanvasBinding | null>(null)
-  const entranceControls = useAnimationControls()
+  const entranceRef = useRef<HTMLDivElement>(null)
   const spriteName = hasSword ? sword.sprite : null
 
   // 바인딩은 캔버스 마운트/언마운트(검 유무 전환)에 맞춰 생성·해제한다.
@@ -145,14 +145,15 @@ export const SwordStage = memo(function SwordStage({
     }
     if (prevSpriteRef.current === spriteName) return
     prevSpriteRef.current = spriteName
-    entranceControls.set({ opacity: 0, scale: 0.8 })
     bindingRef.current?.setSprite(swordSpriteUrl(spriteName))
-    entranceControls.start({
-      opacity: 1,
-      scale: 1,
-      transition: { duration: 0.35, ease: 'easeOut', delay: entranceDelay },
+    // 등장: delay(burstAt) 동안 첫 키프레임(opacity 0)을 유지했다가 페이드·확대로 나타난다(fill both) — 컴포지터 전용.
+    playFx(entranceRef.current, {
+      channels: { opacity: [0, 1], scale: [0.8, 1] },
+      durationSec: 0.35,
+      delaySec: entranceDelay,
+      ease: 'easeOut',
     })
-  }, [spriteName, entranceDelay, entranceControls])
+  }, [spriteName, entranceDelay])
 
   // 판매가(검의 sellPrice) 표시 여부 — 검 없음/판매 불가(null·0)면 자리만 지키고 숨긴다.
   // 이름·스탯과 함께 지연 공개되는 displaySword 기준(강화 직후 새 가격이 먼저 새지 않게).
@@ -211,21 +212,21 @@ export const SwordStage = memo(function SwordStage({
           />
         </div>
 
-        {/* 떨림 레이어(방지 시 실제 검을 흔든다) — remount 하지 않고 shakeControls 로 제어한다.
+        {/* 떨림 레이어(방지 시 실제 검을 흔든다) — remount 하지 않고 WAAPI(playFx)로 제어한다.
             spriteOverlay(파괴 잔상·파티클)는 이 레이어 밖 형제라 함께 흔들리지 않는다.
             h-full w-full: 박스(aspect-square)를 꽉 채워 정의된 크기를 만든다 — 아래 캔버스의 퍼센트
             크기(h-2/3)가 풀리도록(중간 래퍼가 콘텐츠 크기면 % 가 0 으로 무너진다). 검은 가운데 정렬. */}
-        <motion.div
-          animate={shakeControls}
+        <div
+          ref={shakeRef}
           className="fx-layer relative flex h-full w-full items-center justify-center"
         >
-          {/* 스프라이트 등장(스프라이트 변할 때마다 재생) — 영속 캔버스에 명령형(entranceControls)으로 다시 튼다.
+          {/* 스프라이트 등장(스프라이트 변할 때마다 재생) — 영속 캔버스에 명령형(playFx)으로 다시 튼다.
               key 재마운트를 쓰지 않는 이유: 매 교체마다 새 합성 레이어를 만들어(레이어 churn) 모바일에서 끊김을
               유발한다. 파괴 연출 중에는 entranceDelay(burstAt)로 등장을 미뤄 잔상 뒤로 새 검이 비치지 않게 한다. */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={entranceControls}
+          <div
+            ref={entranceRef}
             className="fx-layer flex h-full w-full items-center justify-center"
+            style={{ opacity: 0 }}
           >
             {hasSword ? (
               // SpriteStore 의 GPU 상주 ImageBitmap 을 그리는 캔버스(영속) — 교체는 디코드·업로드 없는 블릿.
@@ -244,8 +245,8 @@ export const SwordStage = memo(function SwordStage({
                 ?
               </span>
             )}
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
 
         {/* 스프라이트 위 오버레이 슬롯(파괴 연출 등) — 자리만 제공, 내용은 주입받는다. */}
         {spriteOverlay}
@@ -271,8 +272,8 @@ export const SwordStage = memo(function SwordStage({
         {/* 판매가(코인 + 금색 숫자) — 강화 성공으로 오를 때 한 번 통 튄다(priceControls). 라벨 없이
             코인이 통화를 대신하고, 통화 맥락은 aria-label(formatGold)로 보존한다(SellButton 미러).
             판매 불가(검 없음/판매가 null·0)면 invisible 로 자리만 지켜 스테이지 높이를 고정한다. */}
-        <motion.div
-          animate={priceControls}
+        <div
+          ref={priceRef}
           aria-label={
             hasPrice
               ? `${t('cost.sell')}: ${formatGold(displaySword.sellPrice as number, lang)}`
@@ -292,7 +293,7 @@ export const SwordStage = memo(function SwordStage({
           <span className="min-w-[5rem] whitespace-nowrap text-center">
             {hasPrice ? formatAmount(displaySword.sellPrice as number) : ' '}
           </span>
-        </motion.div>
+        </div>
       </div>
 
       {/* 이름 배너 */}

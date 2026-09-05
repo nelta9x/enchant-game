@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { motion, useAnimationControls } from 'motion/react'
 import { SpriteCanvasBinding } from '../lib/spriteStore'
 import { swordSpriteUrl } from '../lib/sprites'
-import { SHAKE_KEYFRAMES, makeShakeTransition } from './shake'
+import { playFx, stopFx } from '../lib/fx'
+import { shakeFx } from './shake'
 import { makeParticles } from './particles'
 import { useParticleEmit } from './particleEmit'
 
@@ -50,21 +50,33 @@ export function BurstEmitter({
 
   // event 객체는 매 렌더 새로 만들어지므로 id(원시값)에만 의존해 무관한 리렌더로 두 번 터지지 않게 한다.
   // cleanup 이 이전 타이머를 지워 StrictMode 이중 마운트도 1회로 수렴한다.
+  // 새 id(새 강화)마다 burstAt 에 emit 타이머를 건다. 대기 중 타이머는 다음 id 가 와도 취소하지 않는다(겹친 옛
+  // 버스트 유실 방지 — 효과 store 가 kind 별 최신만 발행하므로 겹침 보존은 여기 타이머 집합이 책임진다). 언마운트에만 정리.
   const burstId = event?.id ?? null
   const burstAtMs = event ? event.impactMs + event.shakeMs : 0
+  const pending = useRef(new Set<ReturnType<typeof setTimeout>>())
   useEffect(() => {
     if (burstId === null || !event) return
     const particleCount = event.particleCount
+    const timers = pending.current
     const tid = setTimeout(() => {
+      timers.delete(tid)
       emit({
         particles: makeParticles(particleCount),
         coreVar,
         edgeVar,
       })
     }, burstAtMs)
-    return () => clearTimeout(tid)
+    timers.add(tid)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [burstId, burstAtMs, coreVar, edgeVar, emit])
+  }, [burstId])
+  useEffect(() => {
+    const timers = pending.current
+    return () => {
+      for (const t of timers) clearTimeout(t)
+      timers.clear()
+    }
+  }, [])
 
   return null
 }
@@ -82,8 +94,7 @@ export function BurstEmitter({
 // 출처)을 쓰므로 정확히 교대된다(crossover).
 export function ShakeAfterimage({ event }: { event: ShakeBurstEvent | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const shakeControls = useAnimationControls()
-  const popControls = useAnimationControls()
+  const shakeRef = useRef<HTMLDivElement>(null)
   // 잔상 캔버스 바인딩(마운트 1회) — 크기 측정(ResizeObserver)·블릿·자가 치유는 SpriteCanvasBinding 이 소유한다
   // (검 본체·아이콘과 공유). 여기선 이벤트 시점에 스프라이트만 정한다(강제 레이아웃 없음).
   const bindingRef = useRef<SpriteCanvasBinding | null>(null)
@@ -105,31 +116,21 @@ export function ShakeAfterimage({ event }: { event: ShakeBurstEvent | null }) {
     if (evtId === null || !event) return
     bindingRef.current?.setSprite(swordSpriteUrl(event.sprite))
     // 떨림 — 망치가 닿는 순간(impact)부터 검 데이터 떨림 시간(shakeMs)만큼. delay 동안은 가만히 있는다(윈드업).
-    // shakeMs 0 이하면 떨림 없음 → 원점만 두고 start 는 건너뛴다(잔상은 burstAt=impact 에 그대로 팝업·소멸).
-    shakeControls.set({ x: 0, rotate: 0 })
+    // shakeMs 0 이하면 떨림 없음 → 원점만 두고 재생은 건너뛴다(잔상은 burstAt=impact 에 그대로 팝업·소멸).
     if (event.shakeMs > 0) {
-      shakeControls.start({
-        ...SHAKE_KEYFRAMES,
-        transition: makeShakeTransition(
-          event.shakeMs / 1000,
-          event.impactMs / 1000,
-        ),
-      })
+      playFx(shakeRef.current, shakeFx(event.shakeMs / 1000, event.impactMs / 1000))
+    } else {
+      stopFx(shakeRef.current)
     }
-    // 팝업·소멸 — 떨림 동안 opacity 1(강화 전 검 노출)로 가만히 있다가 burstAt 에 팝업 후 소멸(opacity 0).
-    // 끝 상태가 opacity 0 이라 연출이 끝나면 알아서 숨는다(영속 노드 — 마운트/언마운트 없이 다음 재생 대기).
-    popControls.set({ scale: 1, opacity: 1 })
-    popControls.start({
-      scale: [1, 1.18, 0.5],
-      opacity: [1, 1, 0],
-      transition: {
-        delay: (event.impactMs + event.shakeMs) / 1000,
-        duration: 0.22,
-        times: [0, 0.45, 1],
-        ease: 'easeOut',
-      },
+    // 팝업·소멸 — 떨림 동안 opacity 1(강화 전 검 노출)로 가만히 있다가(delay 동안 첫 키프레임 유지) burstAt 에
+    // 팝업 후 소멸(opacity 0). 끝 상태가 opacity 0 이라 연출이 끝나면 알아서 숨는다(영속 노드 — 다음 재생 대기).
+    playFx(canvasRef.current, {
+      channels: { scale: [1, 1.18, 0.5], opacity: [1, 1, 0] },
+      durationSec: 0.22,
+      delaySec: (event.impactMs + event.shakeMs) / 1000,
+      times: [0, 0.45, 1],
+      ease: 'easeOut',
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evtId])
 
   return (
@@ -138,22 +139,16 @@ export function ShakeAfterimage({ event }: { event: ShakeBurstEvent | null }) {
       aria-hidden
     >
       {/* 떨림 레이어(x/rotate) — 대기 시 원점(initial). */}
-      <motion.div
-        className="fx-layer flex items-center justify-center"
-        initial={{ x: 0, rotate: 0 }}
-        animate={shakeControls}
-      >
+      <div ref={shakeRef} className="fx-layer flex items-center justify-center">
         {/* 잔상 캔버스(scale/opacity) — 실제 검(SwordStage)과 크기·픽셀아트 보간을 같게 그린다(소멸→새 검
             노출이 튀지 않게). drop-shadow 는 걸지 않는다(위 주석). 대기 시 opacity 0 으로 숨는다. */}
-        <motion.canvas
+        <canvas
           ref={canvasRef}
           aria-hidden
           className="fx-layer h-36 w-36 object-contain sm:h-40 sm:w-40"
-          style={{ imageRendering: 'pixelated' }}
-          initial={{ scale: 1, opacity: 0 }}
-          animate={popControls}
+          style={{ imageRendering: 'pixelated', opacity: 0 }}
         />
-      </motion.div>
+      </div>
     </div>
   )
 }

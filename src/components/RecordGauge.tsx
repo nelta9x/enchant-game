@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { motion, useAnimationControls } from 'motion/react'
+import { playFx } from '../lib/fx'
 import { dataManager } from '../data/DataManager'
 import { useGameStore } from '../store/gameStore'
 import { useT } from '../i18n'
@@ -31,18 +31,18 @@ export function RecordGauge() {
 
   // 최고치가 "오를 때만" +N 숫자가 한 번 통 튄다(명령형 — GoldDisplay 의 punch 와 동일 idiom).
   // 직전 best 는 effect 에서만 읽고 쓴다(렌더 중 ref 접근 금지). 첫 마운트엔 prev==best 라 조용.
-  const popControls = useAnimationControls()
+  const popRef = useRef<HTMLSpanElement>(null)
   const prevBest = useRef(best)
   useEffect(() => {
     if (best > prevBest.current) {
-      popControls.start({
-        scale: [1.7, 1],
-        filter: ['brightness(2)', 'brightness(1)'],
-        transition: { duration: 0.45, ease: 'backOut' },
+      playFx(popRef.current, {
+        channels: { scale: [1.7, 1], filter: ['brightness(2)', 'brightness(1)'] },
+        durationSec: 0.45,
+        ease: 'backOut',
       })
     }
     prevBest.current = best
-  }, [best, popControls])
+  }, [best])
 
   return (
     <div className="flex w-full flex-col items-center gap-1 text-ink-soft">
@@ -58,13 +58,13 @@ export function RecordGauge() {
             className="h-5 w-5 shrink-0"
           />
         )}
-        {/* +강화 정도 — 최고치가 오를 때 popControls 로 한 번 통 튄다(위 effect). */}
-        <motion.span
-          animate={popControls}
+        {/* +강화 정도 — 최고치가 오를 때 playFx 로 한 번 통 튄다(위 effect). */}
+        <span
+          ref={popRef}
           className="fx-layer inline-block text-sm font-extrabold tabular-nums text-gold"
         >
           +{best}
-        </motion.span>
+        </span>
       </div>
 
       {/* 2줄: 진행도 바 — 레벨당 한 칸(전체 폭 stretch). 칸 i(0-base)의 색:

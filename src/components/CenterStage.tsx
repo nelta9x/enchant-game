@@ -2,13 +2,8 @@ import { memo, useMemo, type RefObject } from 'react'
 import { dataManager } from '../data/DataManager'
 import type { SwordData } from '../data/types'
 import { useT, type TranslationKey } from '../i18n'
-import { useShallow } from 'zustand/shallow'
-import { useEffectStore } from '../store/effectStore'
-import {
-  latestRunning,
-  runningEventsOf,
-  type Effect,
-} from '../store/effectQueue'
+import { latestOf, useEffectStore } from '../store/effectStore'
+import type { Effect } from '../store/effectQueue'
 import { useResultStore } from '../store/resultStore'
 import { DestructionEffect, type DestructionEvent } from './DestructionEffect'
 import { HammerStrike, type HammerStrikeEvent } from './HammerStrike'
@@ -47,24 +42,6 @@ function projectBurst(e: Effect): ShakeBurstEvent | null {
     : null
 }
 
-// 좁혀 구독한 버스트 효과 리스트(성공·파괴)를 전부 이벤트로 투영한다 — 각 효과가 burstAt 에 파티클을
-// emit 해야 하므로(겹친 옛 버스트 유실 방지) 최신 1개가 아니라 리스트 전체를 뽑는다.
-function projectBursts(list: Effect[]): ShakeBurstEvent[] {
-  return list.flatMap((e) => {
-    const ev = projectBurst(e)
-    return ev ? [ev] : []
-  })
-}
-
-// ANNOUNCE_KEY 에 해당하는 running 효과 중 최신(id 최대) 1개 — 스크린리더 알림 문구의 출처(좁힌 구독용).
-function latestAnnounce(running: Effect[]): Effect | null {
-  let best: Effect | null = null
-  for (const e of running) {
-    if (e.kind in ANNOUNCE_KEY && (best === null || e.id > best.id)) best = e
-  }
-  return best
-}
-
 type CenterStageProps = {
   // 현재(live) 검 — 스프라이트는 즉시 교체(떨림 동안 숨김), 이름·스탯은 아래 revealedSword 로 지연 반영.
   liveSword: SwordData | undefined
@@ -99,30 +76,19 @@ export const CenterStage = memo(function CenterStage({
     [anim],
   )
 
-  // running 을 kind 별로 좁혀 구독한다(효과 객체 참조 불변 → 해당 kind 가 바뀔 때만 값 변화).
-  const hammerStrikeFx = useEffectStore((s) =>
-    latestRunning(s.running, 'hammerStrike'),
+  // 효과 store 의 kind 별 "최신 시작"만 구독한다 — 새 효과가 시작될 때만 참조가 바뀌고 종료는 발행되지 않으므로
+  // 연출 종료 전이가 이 트리를 커밋시키지 않는다(각 연출은 트리거 id 로 자기 수명을 끝낸다).
+  const hammerStrikeFx = useEffectStore(latestOf('hammerStrike'))
+  const entranceFx = useEffectStore(latestOf('entranceSuppress'))
+  const protectedFx = useEffectStore(latestOf('protectedShake'))
+  const whiffFx = useEffectStore(latestOf('whiffShake'))
+  const successLatestFx = useEffectStore(latestOf('successBurst'))
+  const destructionLatestFx = useEffectStore(latestOf('destruction'))
+  // 스크린리더 알림 대상(성공/파괴/방지/헛방) 중 가장 최근 시작(id 최대) — 별도 구독 없이 위 넷에서 도출.
+  const announceFx = [protectedFx, whiffFx, successLatestFx, destructionLatestFx].reduce<Effect | null>(
+    (best, e) => (e && (best === null || e.id > best.id) ? e : best),
+    null,
   )
-  const entranceFx = useEffectStore((s) =>
-    latestRunning(s.running, 'entranceSuppress'),
-  )
-  const protectedFx = useEffectStore((s) =>
-    latestRunning(s.running, 'protectedShake'),
-  )
-  const whiffFx = useEffectStore((s) => latestRunning(s.running, 'whiffShake'))
-  const successLatestFx = useEffectStore((s) =>
-    latestRunning(s.running, 'successBurst'),
-  )
-  const destructionLatestFx = useEffectStore((s) =>
-    latestRunning(s.running, 'destruction'),
-  )
-  const successFxList = useEffectStore(
-    useShallow((s) => runningEventsOf(s.running, 'successBurst')),
-  )
-  const destructionFxList = useEffectStore(
-    useShallow((s) => runningEventsOf(s.running, 'destruction')),
-  )
-  const announceFx = useEffectStore((s) => latestAnnounce(s.running))
 
   // 결과 공개 상태(단일 출처) — heldSwordId 가 있으면 강화 전 검을 이름·스탯에 유지한다.
   const heldSwordId = useResultStore((s) => s.heldSwordId)
@@ -132,14 +98,14 @@ export const CenterStage = memo(function CenterStage({
     heldSwordId !== null ? dataManager.getSwordById(heldSwordId) : liveSword
 
   // 연출 트리거 투영 — 입력 효과 참조가 안정적이라 각 useMemo 는 해당 트리거가 바뀔 때만 새 값을 낸다.
-  // 성공·파괴 버스트는 겹친 옛 버스트가 유실되지 않도록 해당 kind 를 전부 투영한다(각 효과가 자기 burstAt 에 emit).
-  const destructionEvents = useMemo<DestructionEvent[]>(
-    () => projectBursts(destructionFxList),
-    [destructionFxList],
+  // 성공·파괴 버스트는 kind 별 최신 1개 — 겹친 옛 버스트의 emit 은 BurstEmitter 의 타이머 집합이 보존한다.
+  const destructionEvent = useMemo<DestructionEvent | null>(
+    () => (destructionLatestFx ? projectBurst(destructionLatestFx) : null),
+    [destructionLatestFx],
   )
-  const successEvents = useMemo<SuccessEvent[]>(
-    () => projectBursts(successFxList),
-    [successFxList],
+  const successEvent = useMemo<SuccessEvent | null>(
+    () => (successLatestFx ? projectBurst(successLatestFx) : null),
+    [successLatestFx],
   )
   // 잔상(떨림→팝업)은 영속 단일 노드가 성공·파괴를 합쳐 "가장 최근" 버스트 1개만 그린다(id 큰 쪽이 최신).
   const latestBurstEvent = useMemo<ShakeBurstEvent | null>(() => {
@@ -191,13 +157,9 @@ export const CenterStage = memo(function CenterStage({
       <>
         {/* 파티클 풀 — 성공/파괴 버스트 도트(데이터 플래그로 on/off). 풀이 없으면 emit 은 자동 no-op. */}
         {anim.enhanceParticlesEnabled && <ParticlePool />}
-        {/* 버스트 emit — 재강화 시 옛 버스트 emitter 유지(id 키잉, 렌더 null·풀이 그림). */}
-        {destructionEvents.map((ev) => (
-          <DestructionEffect key={ev.id} event={ev} />
-        ))}
-        {successEvents.map((ev) => (
-          <SuccessEffect key={ev.id} event={ev} />
-        ))}
+        {/* 버스트 emit — 영속 emitter 가 새 id 마다 burstAt 타이머를 건다(렌더 null·풀이 그림). */}
+        <DestructionEffect event={destructionEvent} />
+        <SuccessEffect event={successEvent} />
         {/* 잔상(떨림→팝업·소멸) — 영속 단일 캔버스가 최신 버스트를 그린다(레이어 churn 0, burstAt 에 교대). */}
         <ShakeAfterimage event={latestBurstEvent} />
         {/* 망치 — 결과 연출 위. impactMs 로 닿는 시점을 데이터에서 받는다(플래그로 on/off). */}
@@ -222,8 +184,8 @@ export const CenterStage = memo(function CenterStage({
     ),
     [
       anim,
-      destructionEvents,
-      successEvents,
+      destructionEvent,
+      successEvent,
       latestBurstEvent,
       hammerStrikeEvent,
       hammerShape,

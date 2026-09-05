@@ -1,5 +1,7 @@
 import { memo, type Ref } from 'react'
 import { dataManager } from '../data/DataManager'
+import { useGameStore } from '../store/gameStore'
+import { useResultStore } from '../store/resultStore'
 import { useT, type TranslationKey } from '../i18n'
 import type { SwordData } from '../data/types'
 import type { ItemStack } from '../game/types'
@@ -18,16 +20,10 @@ import { SpriteCanvas } from './SpriteCanvas'
 // 보유 골드는 헤더 우측에 둔다(스크롤 영역 밖 고정이라 목록을 스크롤해도 비침/겹침 없음). 판매·의뢰
 // 코인이 빨려드는 도착점이라 그 골드 div 를 goldRef 로 측정한다.
 type InventoryPanelProps = {
-  sword: SwordData | undefined
-  level: number | null
-  items: ItemStack[]
   // 가방의 검(itemId) 행을 클릭하면 장착한다.
   onEquip: (itemId: string) => void
-  // 장착 중인 검 행을 클릭하면 보관한다(보관 가능할 때만 클릭 가능 — canStoreEquipped 로 게이트).
+  // 장착 중인 검 행을 클릭하면 보관한다(보관 가능 여부는 장착 슬롯이 store 에서 직접 판정).
   onStoreEquipped: () => void
-  canStoreEquipped: boolean
-  // 판매·의뢰 코인 연출 동기화(pulseKey/coinCount)만 받는다 — 골드 값 자체는 GoldDisplay 가 store 에서
-  // 직접 구독한다(골드만 바뀔 때 이 패널이 재렌더돼 목록을 재조정하지 않도록).
   goldPulseKey: number
   goldCoinCount: number
   // 판매·의뢰 코인이 빨려드는 "도착점" 측정용 ref(헤더 우측 골드 배지를 가리킨다).
@@ -35,18 +31,16 @@ type InventoryPanelProps = {
 }
 
 export const InventoryPanel = memo(function InventoryPanel({
-  sword,
-  level,
-  items,
   onEquip,
   onStoreEquipped,
-  canStoreEquipped,
   goldPulseKey,
   goldCoinCount,
   goldRef,
 }: InventoryPanelProps) {
   const t = useT()
-  const equipped = sword !== undefined && level !== null
+  // 가방 내용은 여기서 직접 구독한다(GameScreen 을 거치지 않음) — 아이템 소모가 없는 강화는 참조가 유지돼(gameStore)
+  // 이 패널이 리렌더되지 않는다.
+  const items = useGameStore((s) => s.items)
 
   return (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-panel-edge bg-panel">
@@ -69,14 +63,7 @@ export const InventoryPanel = memo(function InventoryPanel({
           2.5행 = 8 + 2×56 + 2×4 + 28(반행) = 156px = 9.75rem / 4.5행 = 276px = 17.25rem.
           (rem 단위라 데스크탑 루트 font-size 스케일과 함께 커진다 — px 고정이면 다른 rem 과 어긋남.) */}
       <ul className="flex h-[9.75rem] flex-col gap-1 overflow-y-auto px-2 pb-2 pt-2 lg:h-[17.25rem]">
-        {equipped && (
-          <EquippedRow
-            sword={sword}
-            level={level}
-            storable={canStoreEquipped}
-            onStore={onStoreEquipped}
-          />
-        )}
+        <EquippedSlot onStore={onStoreEquipped} />
         {items.map((it) => (
           <ItemRow key={it.itemId} item={it} t={t} onEquip={onEquip} />
         ))}
@@ -88,6 +75,19 @@ export const InventoryPanel = memo(function InventoryPanel({
 // 장착 중인 검 — 금색 하이라이트가 곧 "장착 중" 표시다(별도 배지·성공률 없음).
 // 보관 가능(storable)하면 행 전체가 버튼이 되어 클릭 시 보관한다(ItemRow 검 행의 장착 버튼과 동일
 // 패턴 — 키보드/스크린리더 접근성 유지, 호버가 클릭 가능 표시). 시작 검(+1) 등 보관 불가면 정적 행이다.
+// 장착 행의 데이터 구독 — 무대 이름과 같은 박자로 공개된(reveal) 검을 보인다(강화 결과가 망치 전에 새지 않도록).
+// heldSwordId 가 있으면(강화 직후 떨림 동안) 강화 전 검을, null 이면 현재 검을. 이 구독을 여기 리프에 두어 reveal
+// 커밋이 인벤토리 패널 전체·GameScreen 을 재조정하지 않게 한다. 보관 가능 여부도 store 에서 직접 판정한다.
+function EquippedSlot({ onStore }: { onStore: () => void }) {
+  const heldSwordId = useResultStore((s) => s.heldSwordId)
+  const currentSwordId = useGameStore((s) => s.currentSwordId)
+  const storable = useGameStore((s) => s.canStore())
+  const id = heldSwordId ?? currentSwordId
+  const sword = id !== null ? dataManager.getSwordById(id) : undefined
+  if (!sword) return null
+  return <EquippedRow sword={sword} level={sword.level} storable={storable} onStore={onStore} />
+}
+
 function EquippedRow({
   sword,
   level,

@@ -1,31 +1,22 @@
-import type { Transition } from 'motion/react'
+import type { FxSpec } from '../lib/fx'
 
-// 무기 "덜덜 떨림" 애니메이션의 공유 정의(프레젠테이션 토큰).
-// 두 곳이 같은 떨림을 써야 한다 — (1) 성공/파괴 잔상이 터지기 전 떨 때, (2) 파괴보호장치로 살아남아
-// "떨림만" 보여 줄 때. 한 곳에 둬 두 연출의 떨림이 항상 동일하게 보이도록 한다.
-//
-// 떨림의 "모양"(좌우 진폭·times 곡선)은 코드 상수로 둔다. 떨림이 "언제 시작하고 얼마나 가는지"는 강화마다
-// 다르므로(망치가 닿는 순간 시작 + 0.2~0.5s 무작위 길이) 길이·지연을 인자로 받는 makeShakeTransition 으로
-// 만든다 — 시퀀스 타이밍은 데이터/타임라인(enhanceTimeline)이 정하고, 여기선 모양만 소유한다.
-
-// 좌우로 덜덜 떠는 x/rotate 키프레임(끝에서 정지로 수렴). 8개 — SHAKE_TIMES 와 길이 일치.
+// 검 떨림 키프레임(성공/파괴 잔상·방지·헛방 공용) — 좌우 흔들림(x, px) + 기울임(rotate, deg)이 감쇠하며 원점으로.
+// 실제 검(SwordStage)과 잔상(ShakeAfterimage)이 같은 데이터를 써 박자가 어긋나지 않는다.
 export const SHAKE_KEYFRAMES = {
   x: [0, -5, 5, -4, 4, -3, 3, 0],
   rotate: [0, -4, 4, -3, 3, -2, 2, 0],
 }
 
-// 키프레임 사이의 정규화된 진행 시각(0~1). 길이는 임의 떨림 길이로 스케일된다(makeShakeTransition).
+// 키프레임 오프셋(등간격 7구간) — 떨림 길이가 달라도 비율은 유지된다.
 const SHAKE_TIMES = [0, 0.14, 0.28, 0.42, 0.56, 0.7, 0.84, 1]
 
-// 떨림 트랜지션을 만든다 — durationSec 동안 떨고, delaySec 만큼 늦게 시작한다(망치 임팩트까지 대기).
-// 길이가 달라도 키프레임 모양(SHAKE_TIMES)은 그대로라 떨림의 "느낌"은 일정하고 전체 길이만 늘고 준다.
-export function makeShakeTransition(
-  durationSec: number,
-  delaySec = 0,
-): Transition {
+// 떨림 연출 명세 — 망치가 닿는 시각(delaySec)부터 검 데이터의 떨림 길이(durationSec)만큼. WAAPI(lib/fx)로 재생한다:
+// 컴포지터 전용이라 떨리는 동안 메인 스레드 비용이 없다.
+export function shakeFx(durationSec: number, delaySec = 0): FxSpec {
   return {
-    duration: durationSec,
-    delay: delaySec,
+    channels: SHAKE_KEYFRAMES,
+    durationSec,
+    delaySec,
     times: SHAKE_TIMES,
     ease: 'easeOut',
   }

@@ -17,18 +17,18 @@ import { useRepeatEngine } from './useRepeatEngine'
 //   press-and-hold(useHoldRepeat)와 같은 박자로 흐른다. 이 훅은 키 이벤트를 엔진에 배선만 한다.
 type UseEnhanceHotkeyOptions = {
   enabled: boolean
-  disabled: boolean
+  isDisabled: () => boolean // 발사 게이트(강화 불가/쿨다운) — 발사 시점마다 호출
   onEnhance: () => void
 }
 
 export function useEnhanceHotkey({
   enabled,
-  disabled,
+  isDisabled,
   onEnhance,
 }: UseEnhanceHotkeyOptions) {
   // 발사 정책(disabled 게이트·min-gap)은 공유 엔진이 소유. 엔진 핸들은 정체성이 안정적이라
   // 아래 effect deps 에 넣어도 잠금 토글마다 리스너가 재부착되지 않는다.
-  const engine = useRepeatEngine({ disabled, onFire: onEnhance })
+  const engine = useRepeatEngine({ isDisabled, onFire: onEnhance })
 
   useEffect(() => {
     if (!enabled || !isDesktopPointer()) return

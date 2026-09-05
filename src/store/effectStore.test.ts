@@ -87,3 +87,28 @@ describe('effectStore — 타이머 셸 생명주기', () => {
     expect(store.getState().running).toEqual([])
   })
 })
+
+describe('effectStore — latestByKind(뷰 트리거: 시작만 발행, 종료는 유지)', () => {
+  it('시작 시 kind 별 최신 효과가 기록되고, 종료돼도 남는다(참조 유지)', () => {
+    const store = createEffectStore()
+    store.getState().enqueueEffect(spec({ kind: 'burst', durationMs: 300 }))
+    const first = store.getState().latestByKind.burst
+    expect(first?.kind).toBe('burst')
+    vi.advanceTimersByTime(300) // 종료 — running 에선 빠지지만 latestByKind 는 그대로
+    expect(store.getState().running).toEqual([])
+    expect(store.getState().latestByKind.burst).toBe(first)
+  })
+
+  it('같은 kind 의 새 시작만 참조를 바꾼다(다른 kind 의 시작·종료엔 불변)', () => {
+    const store = createEffectStore()
+    store.getState().enqueueEffect(spec({ kind: 'a', durationMs: 100 }))
+    const a1 = store.getState().latestByKind.a
+    store.getState().enqueueEffect(spec({ kind: 'b', durationMs: 100 }))
+    expect(store.getState().latestByKind.a).toBe(a1)
+    vi.advanceTimersByTime(100)
+    expect(store.getState().latestByKind.a).toBe(a1)
+    store.getState().enqueueEffect(spec({ kind: 'a', durationMs: 100 }))
+    expect(store.getState().latestByKind.a).not.toBe(a1)
+    expect(store.getState().latestByKind.a?.id).toBeGreaterThan(a1!.id)
+  })
+})

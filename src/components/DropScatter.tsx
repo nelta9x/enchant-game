@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { motion } from 'motion/react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react'
+import { onFxDone, playFx } from '../lib/fx'
 import { sound } from '../lib/sound'
 import { ItemIcon } from './ItemIcon'
 import {
@@ -14,18 +21,9 @@ import {
 import { OneShotOverlay } from './OneShotOverlay'
 import { useRelativeCenter } from './useRelativeCenter'
 
-// 파괴 드롭 수집 연출(프레젠테이션 전용). 게임 로직과 분리되어 'drop' 이벤트(재생 id + 드롭 스택)
-// 에만 반응한다. 검(sourceRef) 아래로 재료가 흩어져 떨어진 뒤, 마우스로 스칠 때마다(또는 일정
-// 시간 후 자동으로) 각 재료가 인벤토리창(targetRef)으로 빨려 들어간다.
-//
-// 좌표: 토큰은 이 오버레이(absolute inset-0) 안에 산다. 출발(검)·도착(인벤토리)은 "오버레이 자신의
-// rect" 기준으로 측정한다(카드의 padding/border 만큼 어긋나지 않도록 — relativeCenter, 코인과 동일).
-//
-// 인지/접근성: 순수 시각 연출이라 aria-hidden. 실제 인벤토리 수량은 store 에서 이미 반영되었다.
-// 오버레이는 클릭을 막지 않도록 pointer-events-none, 개별 토큰만 호버를 받도록 pointer-events-auto.
-
-// appearDelaySec: 재료가 떨어지기 시작하는 시각(초) = 이번 강화의 버스트 시점 + 약간의 간격. 폭발이
-// 드러난 뒤 떨어지도록 GameScreen 이 타임라인에서 도출해 넘긴다(검 데이터 떨림 길이를 반영).
+// 파괴 드롭 흩뿌림 — 폭발이 드러난 직후(appearDelaySec) 재료 토큰들이 검 아래로 우르르 떨어져 바닥에 머물다가,
+// 마우스를 대거나(hover/pointerdown) 머무는 시간이 끝나면 인벤토리로 빨려 든다. 토큰이 도착할 때마다 onCollect 로
+// 실제 수량을 반영하고, 연출 수명이 끝나면(onExpire) 미수집분을 호출 측이 flush 한다.
 export type DropEvent = {
   id: number
   drops: { itemId: string; count: number }[]
@@ -37,19 +35,19 @@ export function DropScatter({
   sourceRef,
   targetRef,
   onCollect,
+  onExpire,
 }: {
   event: DropEvent | null
   sourceRef: RefObject<HTMLDivElement | null>
   targetRef: RefObject<HTMLDivElement | null>
-  // 토큰이 인벤토리에 도착(수집 완료)할 때 호출 — 실제 인벤토리 반영은 호출 측(store.collectDrop)이 한다.
-  // DropScatter 는 store 를 모른 채 "무엇이 수집됐는지"만 알린다(뷰-로직 분리).
   onCollect: (itemId: string, count: number) => void
+  onExpire?: () => void
 }) {
   return (
     <OneShotOverlay
       event={event}
-      // 수명은 등장 지연이 길수록 길어진다(자동 수집까지 덮어야 함) — 이벤트의 appearDelaySec 으로 도출한다.
       lifetimeMs={event ? dropLifetimeMs(event.appearDelaySec) : 0}
+      onExpire={onExpire}
     >
       {(active) => (
         <DropPile
@@ -65,8 +63,6 @@ export function DropScatter({
   )
 }
 
-// 한 번의 드롭. key=event.id 로 마운트되며, 마운트 시점에 출발/도착 좌표를 "자신의 rect" 기준으로
-// 한 번 측정해 잡아둔다. 미수집 토큰은 DROP_AUTO_AT_SEC 뒤 일괄 자동 수집된다(바닥에 영구히 남지 않도록).
 function DropPile({
   drops,
   appearDelaySec,
@@ -81,16 +77,11 @@ function DropPile({
   onCollect: (itemId: string, count: number) => void
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
-  // 좌표 확정 전엔 토큰을 그리지 않는다(null 가드 — useRelativeCenter).
   const source = useRelativeCenter(rootRef, sourceRef)
   const target = useRelativeCenter(rootRef, targetRef)
-  // 미수집분 일괄 자동 수집 신호(바닥에 영구히 머물지 않도록). 마우스로 스친 토큰은 개별 수집된다.
+  // 머무는 시간이 끝나면 남은 토큰을 한꺼번에 자동 수집한다.
   const [autoCollect, setAutoCollect] = useState(false)
-  // 수집 완료(인벤토리 도착)된 토큰 인덱스 — 보이지 않는 인터랙티브 노드를 정리한다.
   const [done, setDone] = useState<ReadonlySet<number>>(() => new Set())
-
-  // 일정 시간(머묾) 뒤 미수집 토큰을 일괄 수집. 타이머 콜백에서만 set → set-state-in-effect 규칙 OK.
-  // 자동 수집 시각은 등장 지연(appearDelaySec)에서 도출한다(등장이 늦으면 자동 수집도 그만큼 늦게).
   useEffect(() => {
     const tid = setTimeout(
       () => setAutoCollect(true),
@@ -102,11 +93,7 @@ function DropPile({
   const tokens = useMemo(() => makeDropTokens(drops), [drops])
 
   return (
-    <motion.div
-      ref={rootRef}
-      className="absolute inset-0 overflow-visible"
-      exit={{ opacity: 0, transition: { duration: 0.2 } }}
-    >
+    <div ref={rootRef} className="absolute inset-0 overflow-visible">
       {source &&
         target &&
         tokens.map((spec, i) =>
@@ -126,14 +113,12 @@ function DropPile({
             />
           ),
         )}
-    </motion.div>
+    </div>
   )
 }
 
-// 재료 토큰 1개 — 검 위치에서 아래로 "툭" 떨어져(backOut 바운스) 흩어진 자리에 머문다. 마우스로 스치면
-// (onPointerEnter) 또는 터치로 탭하면(onPointerDown — 모바일은 호버가 없고, 터치는 암묵 포인터 캡처라
-// 드래그로 스쳐도 pointerenter 가 오지 않는다) 또는 autoCollect 신호가 오면 살짝 떠올랐다(rise)
-// 인벤토리로 빨려 들어가며 작아진다. 빨려드는 동안은 pointer-events-none — 커서가 쫓아와도 재트리거되지 않는다.
+// 토큰 하나 — 낙하(검 중심 → 바닥 rest, backOut)와 수집(rest → 호를 그리며 인벤토리, 회전하며 축소)을 WAAPI 로 재생한다.
+// 수집이 낙하 도중에 시작되면 낙하 애니메이션은 취소되고 rest 에서 출발한다(짧은 점프 — 드문 경우, 무해).
 function DropToken({
   spec,
   appearDelaySec,
@@ -149,14 +134,57 @@ function DropToken({
   autoCollect: boolean
   onCollected: () => void
 }) {
+  const ref = useRef<HTMLDivElement>(null)
   const [hovered, setHovered] = useState(false)
   const collecting = hovered || autoCollect
-
   const restX = source.x + spec.dx
   const restY = source.y + spec.dy
 
+  // 낙하: 마운트 1회.
+  useLayoutEffect(() => {
+    playFx(ref.current, {
+      channels: {
+        x: [source.x, restX],
+        y: [source.y, restY],
+        scale: [0.4, 1],
+        opacity: [0, 1],
+      },
+      durationSec: DROP_IN_SEC,
+      delaySec: appearDelaySec + spec.inStagger,
+      ease: 'backOut',
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 수집: collecting 이 켜지는 순간 1회 — 도착하면 착지음 + 수집 반영.
+  const onCollectedRef = useRef(onCollected)
+  useEffect(() => {
+    onCollectedRef.current = onCollected
+  })
+  useEffect(() => {
+    if (!collecting) return
+    const anim = playFx(ref.current, {
+      channels: {
+        x: [restX, restX + spec.drift, target.x],
+        y: [restY, restY - spec.rise, target.y],
+        scale: [1, 1.12, 0.2],
+        opacity: [1, 1, 0],
+        rotate: [0, spec.spin * 120, spec.spin * 420],
+      },
+      durationSec: DROP_FLIGHT_SEC,
+      times: [0, 0.35, 1],
+      ease: ['easeOut', 'easeIn'],
+    })
+    onFxDone(anim, () => {
+      sound.playSfx('coin_pickup')
+      onCollectedRef.current()
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collecting])
+
   return (
-    <motion.div
+    <div
+      ref={ref}
       className="fx-layer absolute left-0 top-0 select-none"
       style={{
         width: spec.size,
@@ -165,52 +193,13 @@ function DropToken({
         marginTop: -spec.size / 2,
         pointerEvents: collecting ? 'none' : 'auto',
         cursor: 'pointer',
+        opacity: 0,
+        transform: `translate(${source.x}px, ${source.y}px) scale(0.4)`,
       }}
       onPointerEnter={() => setHovered(true)}
       onPointerDown={() => setHovered(true)}
-      // 검 중심에서 시작해(파괴 지점) 아래 rest 로 떨어진다.
-      initial={{ x: source.x, y: source.y, scale: 0.4, opacity: 0 }}
-      animate={
-        collecting
-          ? {
-              // 바닥 → 살짝 떠올랐다(rise) → 인벤토리로 빨려 들어가며 작아짐.
-              x: [restX, restX + spec.drift, target.x],
-              y: [restY, restY - spec.rise, target.y],
-              scale: [1, 1.12, 0.2],
-              opacity: [1, 1, 0],
-              rotate: [0, spec.spin * 120, spec.spin * 420],
-            }
-          : {
-              // 검 위치에서 흩어진 자리로 낙하(바운스 착지).
-              x: restX,
-              y: restY,
-              scale: 1,
-              opacity: 1,
-              rotate: 0,
-            }
-      }
-      transition={
-        collecting
-          ? {
-              duration: DROP_FLIGHT_SEC,
-              times: [0, 0.35, 1],
-              ease: ['easeOut', 'easeIn'],
-            }
-          : {
-              delay: appearDelaySec + spec.inStagger,
-              duration: DROP_IN_SEC,
-              ease: 'backOut',
-            }
-      }
-      onAnimationComplete={() => {
-        if (collecting) {
-          // 인벤토리창에 빨려 들어가 도달하는 순간(토큰마다 1회) — 코인 흡수음과 동일한 'coin_pickup'.
-          sound.playSfx('coin_pickup')
-          onCollected()
-        }
-      }}
     >
       <ItemIcon itemId={spec.itemId} className="h-full w-full" />
-    </motion.div>
+    </div>
   )
 }

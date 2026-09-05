@@ -12,7 +12,7 @@
 - 타입 import는 반드시 `import type` (`verbatimModuleSyntax`). 일반 `import`로 타입을 빼면 실패.
 - `enum`·`namespace`·생성자 파라미터 프로퍼티 금지 (`erasableSyntaxOnly`) → `as const` 객체로 대체.
 - 미사용 로컬 변수·함수 파라미터 금지 (`noUnusedLocals`/`noUnusedParameters`).
-- 애니메이션은 `motion/react`에서만 import. **`framer-motion`은 별개 패키지 — 설치·import 금지.**
+- 애니메이션: 강화 경로의 1회성 연출은 `lib/fx.ts`(`playFx` — Web Animations API)로 건다. `motion/react`는 남은 두 곳(게임 클리어 모달·망치 스윙)에만 쓰고 강화 경로에 다시 들이지 말 것(JS 프레임루프가 연출 내내 메인 스레드를 깨운다). **`framer-motion`은 별개 패키지 — 설치·import 금지.**
 
 ## 서버리스 빌드 제약
 
@@ -44,6 +44,9 @@
 - 연출 상수·계산도 `.ts`로 분리(`components/particles.ts`·`coins.ts` 등)하고, 컴포넌트는 렌더만 한다. 애니메이션 시간값을 컴포넌트에 하드코딩하면 연출 동기화가 깨진다.
 - 색상은 Tailwind v4 `@theme` 토큰(`--color-*`, `index.css`)을 쓰고 hex 하드코딩 금지.
 - 연출 재생은 증가하는 trigger key(0은 무시)로, 컴포넌트 정리는 `useOneShot`으로. 좌표는 엘리먼트 unmount 전에 동기로 `getBoundingClientRect()` 측정.
+- **연출 재생은 `playFx`(WAAPI)** — 키프레임 채널(x/y/scale/rotate/opacity/filter)·times·구간 이징을 motion 표기 그대로 넘긴다(`buildFx` 순수·테스트). 시작 스타일은 첫 키프레임과 같게 인라인으로 두고(`opacity: 0` 등), 타임라인이 다른 채널은 요소를 나눈다(플로팅 텍스트의 이동/회전).
+- **효과 store 는 "시작"만 발행한다.** 뷰는 `latestOf(kind)` 로 kind 별 최신 효과(id)를 구독하고 자기 수명(useOneShot·WAAPI 길이)으로 끝낸다. 종료(finish)를 구독하거나 `running` 리스트를 뷰에서 읽지 말 것 — 종료 전이마다 커밋이 생긴다. 잠금(lockCount)은 EnhanceButton 리프만 구독하고 핸들러·연사 엔진은 `getState()` 로 읽는다.
+- **GameScreen 은 탭 커밋 최소 구독**: 불리언 셀렉터(`canEnhance/canSell/canStore`)·현재 검·보호권 수만. 골드·가방·잠금·공개(heldSwordId)는 리프(GoldDisplay·InventoryPanel/EquippedSlot·EnhanceButton·CenterStage·CommissionCard)가 직접 구독한다. 새 상태를 GameScreen 에 구독으로 올리기 전에 리프에 둘 수 있는지 먼저 본다.
 - **연출은 합성 전용 속성(transform·opacity)만 움직인다.** `clip-path`·`filter`·`box-shadow`·`background-position`·등록 커스텀 프로퍼티 보간처럼 페인트 속성을 매 프레임 바꾸면 화면 전체가 프레임마다 다시 래스터된다(모바일 프레임 드랍의 실측 원인). 상시 반복은 CSS `@keyframes`, 1회성은 motion — 어느 쪽이든 움직이는 요소엔 `.fx-layer`(index.css)를 붙여 자기 합성 레이어를 준다(정적 장식엔 금지).
 - **커밋 중 레이아웃 읽기 금지.** 캔버스 스프라이트는 `SpriteCanvasBinding`(lib/spriteStore.ts) 경유 — 크기는 ResizeObserver 가 준다. 렌더/effect 안에서 `offsetWidth`·`getBoundingClientRect()`를 읽고 `canvas.width`를 쓰는 패턴을 새로 만들지 말 것(여러 캔버스가 한 커밋에서 이걸 번갈아 하면 강제 레이아웃이 캔버스 수만큼 반복된다).
 - 캔버스 파티클은 프레임마다 그라데이션·객체를 만들지 않는다 — 단면 텍스처를 1회 구워(`hitSparks.ts`/`dotParticles.ts`의 `bake*`/`get*Texture`) `drawImage`+`globalAlpha`로 찍는다.

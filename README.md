@@ -8,7 +8,7 @@ NBS 〈검 강화하기〉를 웹으로 클론한 확률 강화 게임.
 - **React 19** + **TypeScript** + **Vite 8**
 - **Tailwind CSS v4** (`@tailwindcss/vite`, CSS-first 테마)
 - **Zustand** — 상태 관리
-- **Motion** — 애니메이션 (`motion/react`)
+- **Web Animations API** — 강화 연출(`lib/fx.ts`, 컴포지터 구동) / **Motion** — 게임 클리어 모달·망치 스윙에만 (`motion/react`)
 - **경량 i18n** — 타입드 리소스 + `useT` 훅 (ko / en)
 - **Vitest** — 로직 테스트
 - **LocalStorage** — 로컬 세이브 (서버 없음, 로컬 전용)

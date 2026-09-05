@@ -13,16 +13,16 @@ import { useRepeatEngine } from './useRepeatEngine'
 //    PC 와 같은 "꾹 누르면 연속 강화"가 터치에서도 성립해야 한다.)
 //  - 키보드(Enter)·보조기술: click(포인터를 거치지 않은 합성 클릭)에서 1회. (스페이스는 전역 단축키가 전담.)
 type UseHoldRepeatOptions = {
-  disabled: boolean
+  isDisabled: () => boolean // 발사 게이트(강화 불가/쿨다운) — 발사 시점마다 호출
   onFire: () => void
 }
 
 export function useHoldRepeat<T extends HTMLElement = HTMLElement>({
-  disabled,
+  isDisabled,
   onFire,
 }: UseHoldRepeatOptions) {
   // 발사 정책(disabled 게이트·min-gap·폴링)은 공유 엔진이 소유. 언마운트 시 타이머도 엔진이 정리한다.
-  const engine = useRepeatEngine({ disabled, onFire })
+  const engine = useRepeatEngine({ isDisabled, onFire })
 
   // 홀드 해제(연사 정지 + 안전 리스너 해제). 같은 함수 참조로 add/remove 해야 정확히 떼이므로
   // ref 에 한 번 만들어 둔다 — 버튼 밖에서 떼거나 포커스를 잃어도 확실히 멈춘다.

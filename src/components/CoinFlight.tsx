@@ -1,5 +1,4 @@
 import { useMemo, useRef, type RefObject } from 'react'
-import { motion } from 'motion/react'
 import { itemSpriteUrl } from '../lib/sprites'
 import { sound } from '../lib/sound'
 import { COIN_FLIGHT_MS, makeCoins, type CoinSpec, type Point } from './coins'
@@ -64,12 +63,7 @@ function CoinBurst({
   const coins = useMemo(() => makeCoins(coinCount), [coinCount])
 
   return (
-    <motion.div
-      ref={rootRef}
-      className="absolute inset-0 overflow-visible"
-      // 새 판매로 교체되면 끊기지 않게 부드럽게 사라진다.
-      exit={{ opacity: 0, transition: { duration: 0.15 } }}
-    >
+    <div ref={rootRef} className="absolute inset-0 overflow-visible">
       {source && target && (
         <>
           {/* 분출 섬광 — 검에서 코인이 터져 나오는 순간의 황금 번쩍임(아이템 비행과 공유). */}
@@ -79,7 +73,7 @@ function CoinBurst({
           ))}
         </>
       )}
-    </motion.div>
+    </div>
   )
 }
 

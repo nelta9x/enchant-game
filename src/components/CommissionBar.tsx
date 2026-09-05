@@ -1,5 +1,5 @@
-import { memo, useCallback, useRef } from 'react'
-import { motion } from 'motion/react'
+import { memo, useCallback, useLayoutEffect, useRef } from 'react'
+import { playFx } from '../lib/fx'
 import { dataManager } from '../data/DataManager'
 import { useI18nStore, useT } from '../i18n'
 import { itemDisplayName } from '../lib/items'
@@ -28,16 +28,8 @@ export const CommissionBar = memo(function CommissionBar({
   hotkeysEnabled,
 }: CommissionBarProps) {
   const t = useT()
+  // 바 자체는 제안 목록(active)만 구독한다 — 골드·가방·검 변화는 카드별 fulfillable 셀렉터(불리언)가 리프에서 받는다.
   const active = useCommissionStore((s) => s.active)
-  // items/currentSwordId 를 구독해 보유 상태가 바뀌면 카드 활성/비활성이 갱신되게 한다.
-  const items = useGameStore((s) => s.items)
-  const currentSwordId = useGameStore((s) => s.currentSwordId)
-  const canFulfill = useGameStore((s) => s.canFulfill)
-  // gold 도 구독한다 — 골드 비용 거래는 보유 골드가 비용을 넘는 순간 카드가 활성(초록)으로 바뀌어야 한다.
-  const gold = useGameStore((s) => s.gold)
-  void items
-  void currentSwordId
-  void gold
 
   // 새 세션 도착 연출은 카드별로 처리한다 — 세션이 갱신되면 카드 id 가 전부 새 값이 되어 CommissionCard 가
   // remount 되고, 그때 카드 테두리가 짧게 황금빛으로 빛났다 가라앉는다(아래 CommissionCard). 별도 도착
@@ -58,7 +50,7 @@ export const CommissionBar = memo(function CommissionBar({
     (slot: number) => {
       const c = active[slot]
       // 슬롯에 의뢰가 있고 납품 가능할 때만 — 빈 슬롯/미보유 키 입력은 무시.
-      if (!c || !canFulfill(c.cost)) return
+      if (!c || !useGameStore.getState().canFulfill(c.cost)) return
       // 코인 연출의 출발점이 될 카드 DOM 을 슬롯 인덱스로 찾아 넘긴다(연출 전용·선택). 못 찾아도 onFulfill 이
       // 출발점을 옵션으로 받아 납품은 그대로 진행한다 — 마우스(currentTarget)와 동일하게 동작.
       const originEl =
@@ -67,7 +59,7 @@ export const CommissionBar = memo(function CommissionBar({
         ) ?? null
       onFulfill(c, originEl)
     },
-    [active, canFulfill, onFulfill],
+    [active, onFulfill],
   )
   useCommissionHotkey({ enabled: hotkeysEnabled, onSlot })
 
@@ -79,8 +71,7 @@ export const CommissionBar = memo(function CommissionBar({
   // 총 칸(attemptsTotal)은 세션 시작 시 뽑은 카운터, 켜진 칸(attemptsRemaining)은 남은 시도 수 —
   // 강화 시도마다 한 칸씩 꺼지고 0 이 되는 순간 세션이 통째로 새로 뜬다. 세션이 없으면(잠금/전부 납품 후
   // 빈 상태에서 total 0) 동일 높이 스페이서로 자리만 지킨다(SessionSegments 내부).
-  const attemptsRemaining = useCommissionStore((s) => s.attemptsRemaining)
-  const attemptsTotal = useCommissionStore((s) => s.attemptsTotal)
+  // (세그먼트 바의 remaining/total 은 SessionSegments 가 직접 구독한다 — 강화마다 이 바 전체가 재조정되지 않게.)
 
   return (
     <div
@@ -101,7 +92,6 @@ export const CommissionBar = memo(function CommissionBar({
                 key={c.id}
                 slotIndex={i}
                 commission={c}
-                fulfillable={canFulfill(c.cost)}
                 onFulfill={onFulfill}
               />
             ) : (
@@ -112,7 +102,7 @@ export const CommissionBar = memo(function CommissionBar({
         {/* 세그먼트 바 슬롯은 세션이 없어도(잠금/빈) 항상 자식으로 두어 부모 flex-col gap-1.5 의 간격과
             바 높이를 항상 확보한다 — 세션이 떴다 사라질 때 아래 UI 가 흔들리지 않게. 비활성 구간(total 0)은
             보이지 않는 동일 높이 스페이서로 그린다(SessionSegments 내부). */}
-        <SessionSegments remaining={attemptsRemaining} total={attemptsTotal} />
+        <SessionSegments />
       </div>
     </div>
   )
@@ -121,15 +111,15 @@ export const CommissionBar = memo(function CommissionBar({
 function CommissionCard({
   slotIndex,
   commission,
-  fulfillable,
   onFulfill,
 }: {
   slotIndex: number
   commission: Commission
-  fulfillable: boolean
   onFulfill: (commission: Commission, cardEl: HTMLElement) => void
 }) {
   const t = useT()
+  // 성사 가능 여부(골드·가방·장착 검 의존) — 불리언 셀렉터라 값이 바뀔 때만 이 카드가 리렌더된다.
+  const fulfillable = useGameStore((s) => s.canFulfill(commission.cost))
   const lang = useI18nStore((s) => s.lang)
   const key = slotIndex + 1 // 납품 단축키(1·2·3)
   // 거래는 "지불(cost) → 보상(reward)". 둘 다 골드 또는 아이템(Material)이다.
@@ -249,13 +239,16 @@ function CommissionCard({
 // 0.75→0 으로 한 번 페이드아웃해 "방금 새로 떴다"는 신호만 은은하게 준다. 납품으로 남은 카드는
 // remount 되지 않으므로(같은 id) 빛나지 않는다 — 새로 출제된 카드에만 적용된다.
 function NewSessionHighlight() {
+  const ref = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    playFx(ref.current, { channels: { opacity: [0.75, 0] }, durationSec: 0.35, ease: 'easeOut' })
+  }, [])
   return (
-    <motion.span
+    <span
+      ref={ref}
       aria-hidden
       className="fx-layer pointer-events-none absolute inset-0 rounded-lg border-2 border-gold"
-      initial={{ opacity: 0.75 }}
-      animate={{ opacity: 0 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
+      style={{ opacity: 0 }}
     />
   )
 }
@@ -280,13 +273,10 @@ function KeyHint({ slot, active }: { slot: number; active: boolean }) {
 // 켜짐/꺼짐, 전환은 CSS color/opacity). 슬롯은 레이아웃 안정을 위해 항상 마운트돼 있고, 세션이 없으면
 // (total 0 — 잠금/전부 납품 후) 보이지 않는 동일 높이 스페이서만 그린다. 마지막 한 칸만 남으면 임박
 // 경고로 황금→적색(bg-danger), 그 외 켜진 칸은 황금(bg-gold), 꺼진 칸은 어두운 트랙.
-function SessionSegments({
-  remaining,
-  total,
-}: {
-  remaining: number
-  total: number
-}) {
+function SessionSegments() {
+  // 남은 강화 시도(세션 게이지)는 강화마다 바뀐다 — 이 리프만 구독해 바(카드 3장)를 재조정하지 않는다.
+  const remaining = useCommissionStore((s) => s.attemptsRemaining)
+  const total = useCommissionStore((s) => s.attemptsTotal)
   if (total <= 0) return <span className="block h-1.5 w-full" aria-hidden />
 
   return (
