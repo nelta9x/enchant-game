@@ -47,7 +47,7 @@
 - **연출 재생은 `playFx`(WAAPI)** — 키프레임 채널(x/y/scale/rotate/opacity/filter)·times·구간 이징을 motion 표기 그대로 넘긴다(`buildFx` 순수·테스트). 시작 스타일은 첫 키프레임과 같게 인라인으로 두고(`opacity: 0` 등), 타임라인이 다른 채널은 요소를 나눈다(플로팅 텍스트의 이동/회전).
 - **효과 store 는 "시작"만 발행한다.** 뷰는 `latestOf(kind)` 로 kind 별 최신 효과(id)를 구독하고 자기 수명(useOneShot·WAAPI 길이)으로 끝낸다. 종료(finish)를 구독하거나 `running` 리스트를 뷰에서 읽지 말 것 — 종료 전이마다 커밋이 생긴다. 잠금(lockCount)은 EnhanceButton 리프만 구독하고 핸들러·연사 엔진은 `getState()` 로 읽는다.
 - **GameScreen 은 탭 커밋 최소 구독**: 불리언 셀렉터(`canEnhance/canSell/canStore`)·현재 검·보호권 수만. 골드·가방·잠금·공개(heldSwordId)는 리프(GoldDisplay·InventoryPanel/EquippedSlot·EnhanceButton·CenterStage·CommissionCard)가 직접 구독한다. 새 상태를 GameScreen 에 구독으로 올리기 전에 리프에 둘 수 있는지 먼저 본다.
-- **연출은 합성 전용 속성(transform·opacity)만 움직인다.** `clip-path`·`filter`·`box-shadow`·`background-position`·등록 커스텀 프로퍼티 보간처럼 페인트 속성을 매 프레임 바꾸면 화면 전체가 프레임마다 다시 래스터된다(모바일 프레임 드랍의 실측 원인). 상시 반복은 CSS `@keyframes`, 1회성은 motion — 어느 쪽이든 움직이는 요소엔 `.fx-layer`(index.css)를 붙여 자기 합성 레이어를 준다(정적 장식엔 금지).
+- **연출은 합성 전용 속성(transform·opacity)만 움직인다.** `clip-path`·`filter`·`box-shadow`·`background-position`·등록 커스텀 프로퍼티 보간처럼 페인트 속성을 매 프레임 바꾸면 화면 전체가 프레임마다 다시 래스터된다(모바일 프레임 드랍의 실측 원인). 상시 반복은 CSS `@keyframes`, 1회성은 `playFx`(WAAPI) — 어느 쪽이든 움직이는 요소엔 `.fx-layer`(index.css)를 붙여 자기 합성 레이어를 준다(정적 장식엔 금지).
 - **커밋 중 레이아웃 읽기 금지.** 캔버스 스프라이트는 `SpriteCanvasBinding`(lib/spriteStore.ts) 경유 — 크기는 ResizeObserver 가 준다. 렌더/effect 안에서 `offsetWidth`·`getBoundingClientRect()`를 읽고 `canvas.width`를 쓰는 패턴을 새로 만들지 말 것(여러 캔버스가 한 커밋에서 이걸 번갈아 하면 강제 레이아웃이 캔버스 수만큼 반복된다).
 - 캔버스 연출은 `EffectCanvasHost`(components/effectCanvasHost.ts) 한 장·rAF 루프 하나에 레이어(`EffectLayer`)로 얹는다 — 새 캔버스·새 rAF 루프를 만들지 말 것. backing store 는 DPR 1(흐린 글로우 전용; 또렷해야 하면 SpriteCanvasBinding). 크기는 호스트의 ResizeObserver 에서 오고 레이어는 `geometry()`/frame 만 읽는다.
 - 캔버스 파티클은 프레임마다 그라데이션·객체를 만들지 않는다 — 단면 텍스처를 1회 구워(`hitSparks.ts`/`dotParticles.ts`의 `bake*`/`get*Texture`) `drawImage`+`globalAlpha`로 찍는다.
@@ -60,5 +60,5 @@
 
 ## 함정
 
-- **난이도(Easy/Hard) 개념은 제거됐다.** 디자인 문서·일부 코드 주석·`easyBug` note에 잔존하니 따라가지 말 것.
+- **난이도(Easy/Hard) 개념은 제거됐다.** 코드·데이터엔 남아 있지 않고 외부 디자인 문서에만 잔존하니 따라가지 말 것.
 - `currentSwordId`에서 레벨을 파싱하지 말 것(`'sword_19'` → 19 금지) — `DataManager.getSwordById()`로 조회한다.
