@@ -8,6 +8,7 @@ import { useCommissionHotkey } from '../hooks/useCommissionHotkey'
 import { useCommissionStore } from '../store/commissionStore'
 import { useGameStore } from '../store/gameStore'
 import type { Commission } from '../store/commissionQueue'
+import { Coin } from './Coin'
 import { ItemIcon } from './ItemIcon'
 
 // 거래 제안 바. 현재 떠 있는 의뢰(active)를 최대 MAX_COMMISSIONS 슬롯으로 보여 준다(상점 카드 ShopCard 는
@@ -119,33 +120,34 @@ function CommissionCard({
   // 성사 가능 여부(골드·가방·장착 검 의존) — 불리언 셀렉터라 값이 바뀔 때만 이 카드가 리렌더된다.
   const fulfillable = useGameStore((s) => s.canFulfill(commission.cost))
   const lang = useI18nStore((s) => s.lang)
-  const key = slotIndex + 1 // 납품 단축키(1·2·3)
-  // 거래는 "지불(cost) → 보상(reward)". 둘 다 골드 또는 아이템(Material)이다.
-  // 헤드라인 = 지불할 것(큰 아이콘), 보조줄 = 받는 것(→ 표기). 골드 비용 거래는 코인이 헤드라인이 된다.
+  const key = slotIndex + 1 // 납품 단축키(1·2·3 — 슬롯 수만큼만 유효)
+  // 거래는 "가격(cost)을 내고 상품(reward)을 받는다". 카드는 상품을 헤드라인(큰 아이콘 + 이름)으로, 가격을 그 아래
+  // 가격표(코인+금액 / 아이템 아이콘+이름 ×N)로 보여 준다 — 플레이어가 "무엇을 얼마에 사는지"를 먼저 읽게.
+  // 둘 다 골드 또는 아이템(Material). 골드 상품(납품 보상)은 큰 코인 + 금액이 헤드라인이 된다.
   const cost = commission.cost
   const reward = commission.reward
-  const costName = cost.kind === 'item' ? itemDisplayName(cost.itemId, t) : ''
-  const costLvl =
+  const priceName = cost.kind === 'item' ? itemDisplayName(cost.itemId, t) : ''
+  const priceLvl =
     cost.kind === 'item'
       ? (dataManager.getSwordById(cost.itemId)?.level ?? null)
       : null
-  const rewardName =
+  const productName =
     reward.kind === 'item' ? itemDisplayName(reward.itemId, t) : ''
-  const rewardLvl =
+  const productLvl =
     reward.kind === 'item'
       ? (dataManager.getSwordById(reward.itemId)?.level ?? null)
       : null
-  // 스크린리더용 "지불 → 보상" 문구. 골드 단위는 formatGold(로케일별 '원'/'G')로 — 하드코딩 'gold' 회피.
-  const costLabel =
+  // 스크린리더용 "상품, 가격 …" 문구. 골드 단위는 formatGold(로케일별 '원'/'G')로 — 하드코딩 'gold' 회피.
+  const priceLabel =
     cost.kind === 'gold'
       ? formatGold(cost.amount, lang)
-      : `${costName}${cost.count > 1 ? ` ×${cost.count}` : ''}`
-  const rewardLabel =
+      : `${priceName}${cost.count > 1 ? ` ×${cost.count}` : ''}`
+  const productLabel =
     reward.kind === 'gold'
       ? formatGold(reward.amount, lang)
       : reward.kind === 'item'
-        ? `${rewardName}${reward.count > 1 ? ` ×${reward.count}` : ''}`
-        : rewardName
+        ? `${productName}${reward.count > 1 ? ` ×${reward.count}` : ''}`
+        : ''
 
   return (
     // 카드는 애니메이션 없이 즉각 표시된다(세션 갱신 시 깜빡임 방지) — 등장 시점 신호는 아래
@@ -155,11 +157,11 @@ function CommissionCard({
       data-commission-slot={slotIndex}
       disabled={!fulfillable}
       onClick={(e) => onFulfill(commission, e.currentTarget)}
-      // 거래 동작(지불 → 보상)을 스크린리더에 합성해 알린다. 단축키도 안내한다.
-      aria-label={`${t('commission.fulfill')}: ${costLabel} → ${rewardLabel}`}
+      // 거래 내용(상품·가격)을 스크린리더에 합성해 알린다. 단축키도 안내한다.
+      aria-label={`${t('commission.fulfill')}: ${productLabel}, ${t('commission.price')} ${priceLabel}`}
       aria-keyshortcuts={`${key}`}
-      // 지불 가능하면 초록색으로 강조(테두리 + 글로우), 불가하면 흐리게.
-      className={`relative flex flex-1 items-center justify-center gap-3 overflow-hidden rounded-lg border px-3 py-4 text-left transition-opacity ${
+      // 지불 가능하면 초록색으로 강조(테두리 + 글로우), 불가하면 흐리게. 높이는 아이콘 칸(h-14)이 잡는다 — EmptySlot 과 동기.
+      className={`relative flex flex-1 items-center gap-2 overflow-hidden rounded-lg border px-2.5 py-2.5 text-left transition-opacity sm:gap-3 sm:px-3 ${
         fulfillable
           ? 'cursor-pointer border-success bg-panel ring-1 ring-success/60 shadow-[0_0_12px_-2px_var(--color-success)] hover:opacity-90'
           : 'cursor-not-allowed border-frame/40 bg-panel-soft opacity-60'
@@ -167,65 +169,61 @@ function CommissionCard({
     >
       <NewSessionHighlight />
       <KeyHint slot={key} active={fulfillable} />
-      {/* 헤드라인 아이콘 = 지불할 것(아이템이면 아이콘, 골드면 큰 코인). */}
-      {cost.kind === 'item' ? (
-        <ItemIcon itemId={cost.itemId} className="h-12 w-12" />
+      {/* 헤드라인 아이콘 = 상품(아이템이면 스프라이트, 골드면 큰 코인). */}
+      {reward.kind === 'item' ? (
+        <ItemIcon itemId={reward.itemId} className="h-14 w-14" />
       ) : (
-        <span
-          className="grid h-12 w-12 shrink-0 place-items-center text-gold"
-          aria-hidden
-        >
-          <CoinIcon className="h-9 w-9" />
+        <span className="grid h-14 w-14 shrink-0 place-items-center" aria-hidden>
+          <Coin className="h-10 w-10" />
         </span>
       )}
-      <span className="flex min-w-0 flex-col gap-0.5">
-        {/* 지불 라인 */}
-        {cost.kind === 'item' ? (
-          <span className="flex min-w-0 items-baseline">
-            <span className="truncate text-xs font-semibold text-on-dark">
-              {costName}
-            </span>
-            {costLvl !== null && (
-              <span className="ml-1 shrink-0 text-xs font-bold tabular-nums text-gold">
-                +{costLvl}
+      <span className="flex min-h-14 min-w-0 flex-1 flex-col justify-center gap-1">
+        {/* 상품 라인 — 이름(+레벨 ·수량) 또는 골드 금액. 카드에서 가장 큰 글자라 캡션 없이도 상품으로 읽힌다. */}
+        {reward.kind === 'gold' ? (
+          <span className="flex items-center gap-1 text-sm font-bold leading-tight text-gold tabular-nums">
+            <Coin className="h-3.5 w-3.5" />
+            {formatAmount(reward.amount)}
+          </span>
+        ) : reward.kind === 'item' ? (
+          <span className="flex min-w-0 items-baseline text-sm font-bold leading-tight text-on-dark">
+            <span className="truncate">{productName}</span>
+            {productLvl !== null && (
+              <span className="ml-1 shrink-0 tabular-nums text-gold">
+                +{productLvl}
               </span>
             )}
-            {cost.count > 1 && (
-              <span className="ml-1 shrink-0 text-xs font-semibold tabular-nums text-on-dark-soft">
-                ×{cost.count}
+            {reward.count > 1 && (
+              <span className="ml-1 shrink-0 tabular-nums text-on-dark-soft">
+                ×{reward.count}
               </span>
             )}
           </span>
-        ) : (
-          <span className="flex items-center gap-1 text-xs font-bold text-gold">
-            <CoinIcon />
-            {formatAmount(cost.amount)}
+        ) : null}
+        {/* 가격표 — 캡션 + 어두운 태그 안의 황금 글자(코인+금액 / 아이템 아이콘+이름 ×N). */}
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5">
+          <span className="shrink-0 text-[0.6rem] font-semibold uppercase leading-none tracking-wider text-on-dark-soft">
+            {t('commission.price')}
           </span>
-        )}
-        {/* 보상 라인 — "→ 받는 것" */}
-        <span className="flex min-w-0 items-center gap-1 text-xs font-bold text-gold">
-          <span className="shrink-0 text-on-dark-soft" aria-hidden>
-            →
+          <span className="flex min-w-0 items-center gap-1 rounded-md bg-black/30 px-1.5 py-0.5 text-xs font-bold leading-none text-gold tabular-nums">
+            {cost.kind === 'gold' ? (
+              <>
+                <Coin className="h-3 w-3" />
+                {formatAmount(cost.amount)}
+              </>
+            ) : (
+              <>
+                <ItemIcon itemId={cost.itemId} className="h-4 w-4" />
+                {/* 좁은 화면(<sm)에선 이름을 숨기고 아이콘 + 수량만 — 카드 2장 + 상점 카드가 한 줄에 서야 한다. */}
+                <span className="hidden truncate sm:inline">{priceName}</span>
+                {priceLvl !== null && (
+                  <span className="shrink-0">+{priceLvl}</span>
+                )}
+                {cost.count > 1 && (
+                  <span className="shrink-0 text-on-dark-soft">×{cost.count}</span>
+                )}
+              </>
+            )}
           </span>
-          {reward.kind === 'gold' ? (
-            <>
-              <CoinIcon />
-              {formatAmount(reward.amount)}
-            </>
-          ) : reward.kind === 'item' ? (
-            <>
-              <ItemIcon itemId={reward.itemId} className="h-4 w-4 shrink-0" />
-              <span className="truncate">{rewardName}</span>
-              {rewardLvl !== null && (
-                <span className="shrink-0 tabular-nums">+{rewardLvl}</span>
-              )}
-              {reward.count > 1 && (
-                <span className="shrink-0 tabular-nums text-on-dark-soft">
-                  ×{reward.count}
-                </span>
-              )}
-            </>
-          ) : null}
         </span>
       </span>
     </button>
@@ -299,28 +297,15 @@ function SessionSegments() {
 
 // 의뢰가 없는 슬롯은 그냥 빈 공간으로 둔다 — 배경·텍스트·키 힌트 없이 비워, "제안 대기 중" 같은
 // placeholder 가 허전하게 보이지 않게 한다. 단, 의뢰가 오갈 때 게임 레이아웃이 흔들리지 않도록
-// 카드와 동일한 박스 크기는 유지한다: 보이지 않는 스페이서(h-12 = 카드 아이콘 높이) + 같은 px-3/py-4,
+// 카드와 동일한 박스 크기는 유지한다: 보이지 않는 스페이서(h-14 = 카드 아이콘 칸 높이) + 같은 px-3/py-2.5,
 // 그리고 box-border 높이에 카드 테두리(border 1px)가 더하는 만큼을 투명 테두리로 똑같이 채운다.
 function EmptySlot() {
   return (
     <div
-      className="flex flex-1 border border-transparent px-3 py-4"
+      className="flex flex-1 border border-transparent px-2.5 py-2.5 sm:px-3"
       aria-hidden
     >
-      <span className="h-12 w-0 shrink-0" aria-hidden />
+      <span className="h-14 w-0 shrink-0" aria-hidden />
     </div>
-  )
-}
-
-function CoinIcon({ className = 'h-3.5 w-3.5' }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={`${className} shrink-0`}
-      fill="currentColor"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="9" />
-    </svg>
   )
 }

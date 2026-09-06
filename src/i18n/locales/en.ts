@@ -36,6 +36,8 @@ export const en: Record<TranslationKey, string> = {
   // 거래 제안(Commission — 내부 코드명은 commission 유지, 표시명만 "거래 제안")
   'commission.title': 'Trade Offers',
   'commission.fulfill': 'Accept',
+  // 제안 카드 가격표 캡션(내는 것) — 상품(받는 것)은 캡션 없이 헤드라인으로만 보여 준다
+  'commission.price': 'Price',
   'commission.arrived': 'New trade offers!',
   // 상점 카드
   'commission.shop': 'SHOP',

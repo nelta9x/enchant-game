@@ -1,5 +1,5 @@
 {
-  "maxCommissions": 3,
+  "maxCommissions": 2,
   "unlockAtLevel": 10,
   "sessionAttempts": 3,
   "tiers": [

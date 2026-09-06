@@ -36,6 +36,8 @@ export const ko = {
   // 거래 제안(Commission — 내부 코드명은 commission 유지, 표시명만 "거래 제안")
   'commission.title': '거래 제안',
   'commission.fulfill': '거래 수락',
+  // 제안 카드 가격표 캡션(내는 것) — 상품(받는 것)은 캡션 없이 헤드라인으로만 보여 준다
+  'commission.price': '가격',
   'commission.arrived': '새 거래 제안!',
   // 상점 카드(거래 제안 줄 오른쪽 세로 패널) — 타이틀(한국어 '상점' / 영어 'SHOP'), 레벨은 LV.N. 클릭 시 비용(골드/아이템)을 내고 업그레이드.
   'commission.shop': '상점',
