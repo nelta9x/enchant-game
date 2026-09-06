@@ -8,16 +8,6 @@
       "items": [
         {
           "itemId": "iron_scrap",
-          "requiredCount": 1,
-          "weight": 3,
-          "rewardKind": "gold",
-          "incentiveMin": 0.8,
-          "incentiveMax": 3,
-          "additiveMin": 0,
-          "additiveMax": 100
-        },
-        {
-          "itemId": "iron_scrap",
           "requiredCount": 10,
           "weight": 2,
           "rewardKind": "item",
@@ -97,16 +87,6 @@
           "rewardKind": "item",
           "rewardItemId": "protection_ticket",
           "rewardItemCount": 10
-        },
-        {
-          "itemId": "flame_sword_handle",
-          "requiredCount": 1,
-          "weight": 1,
-          "rewardKind": "gold",
-          "incentiveMin": 1,
-          "incentiveMax": 3,
-          "additiveMin": 0,
-          "additiveMax": 0
         },
         {
           "itemId": "flame_sword_handle",
