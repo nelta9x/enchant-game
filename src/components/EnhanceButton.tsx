@@ -1,7 +1,9 @@
 import { memo, type ReactNode, useState } from 'react'
-import type { ItemCost, Material } from '../data/types'
+import { dataManager } from '../data/DataManager'
 import { useHoldRepeat } from '../hooks/useHoldRepeat'
 import { useEffectStore } from '../store/effectStore'
+import { useGameStore } from '../store/gameStore'
+import { useResultStore } from '../store/resultStore'
 import { useI18nStore, useT } from '../i18n'
 import { formatAmount, formatGold } from '../lib/format'
 import { itemDisplayName } from '../lib/items'
@@ -40,23 +42,30 @@ const RECHARGE_DIM =
 // 실제 처리는 useEnhanceHotkey).
 //  - 쿨다운(charging)은 효과 store 의 lockCount 를 버튼이 직접 구독한다(prop 아님).
 //  - chargeMs: 쿨다운 길이(= 직전 강화의 타임라인 lockMs = 떨림 끝 + 재강화 가드). 리차지가 끝까지 차오르는 시간 기준.
+//  - 비용 칩은 "공개된(reveal)" 검 기준이다(prop 아님 — 이 리프가 resultStore.heldSwordId ∪ gameStore.currentSwordId 를
+//    직접 구독). 강화 로직은 클릭 즉시 currentSwordId 를 바꾸지만(파괴면 시작 검), 이름 배너·판매가와 같은
+//    박자로 떨림이 끝나는 reveal 시점까지 강화 전 검의 비용을 유지한다 — 파괴 연출이 끝나기도 전에 버튼이
+//    "300 골드"로 먼저 바뀌던 결과 누설을 막는다. 그 사이 버튼은 어차피 charging(잠금)이라 클릭은 무효.
 type EnhanceButtonProps = {
   disabled: boolean
   chargeMs: number
   onEnhance: () => void
-  enchantCost: Material | null
-  enchantCostItems: readonly ItemCost[]
 }
 
 export const EnhanceButton = memo(function EnhanceButton({
   disabled,
   chargeMs,
   onEnhance,
-  enchantCost,
-  enchantCostItems,
 }: EnhanceButtonProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
+  // 공개된 검(CenterStage·InventoryPanel 과 같은 규칙): heldSwordId 가 있으면 강화 전 검, 없으면 현재 검.
+  const heldSwordId = useResultStore((s) => s.heldSwordId)
+  const currentSwordId = useGameStore((s) => s.currentSwordId)
+  const shownId = heldSwordId ?? currentSwordId
+  const shownSword = shownId !== null ? dataManager.getSwordById(shownId) : undefined
+  const enchantCost = shownSword?.enchantCost ?? null
+  const enchantCostItems = shownSword?.enchantCostItems ?? []
   // 쿨다운(입력 잠금) — 효과 store 의 lockCount 를 이 리프만 구독한다. 잠금 해제 전이가 상위 화면(GameScreen)을
   // 커밋시키지 않고 버튼 하나만 다시 그린다(잠금 시작은 강화 탭 커밋에 이미 포함).
   const charging = useEffectStore((s) => s.lockCount > 0)

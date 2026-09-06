@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type RefObject } from 'react'
 import { dataManager } from '../data/DataManager'
-import type { ItemCost } from '../data/types'
 import { useActionHotkeys } from '../hooks/useActionHotkeys'
 import { useEnhanceHotkey } from '../hooks/useEnhanceHotkey'
 import { useStableCallback } from '../hooks/useStableCallback'
@@ -34,8 +33,6 @@ import { TopControls } from './TopControls'
 import { CenterStage } from './CenterStage'
 import { CardOverlays } from './CardOverlays'
 
-// enchantCostItems 의 기본 빈 배열 — 매 렌더 새 [](`?? []`)를 만들면 EnhanceButton 의 memo 가 깨진다.
-const EMPTY_ITEM_COSTS: readonly ItemCost[] = []
 
 // 클릭 순간 캡처한 카드 rect 를 고정해 두는 보이지 않는 비행 출발 anchor(영점 크기·클릭 통과).
 // 의뢰 완료의 코인·아이템 보상 연출이 공유한다 — 카드가 active 에서 빠져 사라진 뒤에도
@@ -580,8 +577,6 @@ export function GameScreen() {
                 // 충전 오버레이는 직전 강화의 재강화 잠금 길이(매회 떨림에 따라 다름)로 걷힌다.
                 chargeMs={lastLockMs}
                 onEnhance={handleEnhance}
-                enchantCost={sword?.enchantCost ?? null}
-                enchantCostItems={sword?.enchantCostItems ?? EMPTY_ITEM_COSTS}
               />
               {/* 세로형(<lg)에선 판매 버튼 높이를 ~30% 키운다(min-h ≈ 2.92rem×1.3). 데스크탑은
                   고정 높이 2fr:1fr 그리드가 높이를 정하므로 lg:min-h-0 으로 리셋(영향 없음). */}
