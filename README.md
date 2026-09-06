@@ -1,5 +1,7 @@
 # 검 강화하기 (enchant-game)
 
+**▶ 바로 플레이: https://nelta9x.github.io/enchant-game/** (GitHub Pages — 설치 없이 브라우저에서 실행)
+
 NBS 〈검 강화하기〉를 웹으로 클론한 확률 강화 게임.
 **검 강화 → 판매 → 더 비싼 검 도전**의 핵심 루프를, 서버 없이 브라우저에서 로컬로 즐긴다.
 
